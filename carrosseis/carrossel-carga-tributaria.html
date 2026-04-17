@@ -21,7 +21,7 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Inter','Helvetica Neue',sa
 .nav-wrap{display:flex;align-items:center;gap:10px;width:100%;max-width:490px;justify-content:center}
 .arrow-btn{width:34px;height:34px;border-radius:50%;background:#fff;border:1px solid #e0e0e0;color:#333;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit}
 .arrow-btn:disabled{background:#e8e8e8;color:#ccc;cursor:default}
-.card{width:420px;max-width:420px;min-width:420px;height:525px;flex-shrink:0;background:#fff;border-radius:0;box-shadow:0 0 0 1px #e5e5e5;overflow:hidden;display:flex;flex-direction:column}
+.card{width:420px;max-width:420px;min-width:420px;min-height:525px;flex-shrink:0;background:#fff;border-radius:0;box-shadow:0 0 0 1px #e5e5e5;overflow:visible;display:flex;flex-direction:column;position:relative}
 .profile-area{padding:20px 22px 0}
 .profile-row{display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:14px}
 .avatar-circle{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#1a1a2e,#16213e);display:flex;align-items:center;justify-content:center;color:#fff;font-size:26px;font-weight:800;flex-shrink:0;overflow:hidden}
@@ -103,6 +103,59 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Inter','Helvetica Neue',sa
 .preview-modal-actions{display:flex;gap:8px;justify-content:flex-end}
 .preview-modal-close{padding:7px 14px;font-size:11px;font-weight:700;background:#f0f0f0;color:#333;border:none;border-radius:7px;cursor:pointer;font-family:inherit}
 .preview-modal-info{font-size:11px;color:#666;font-weight:600}
+
+/* Visual indicator: the 1080x1350 Instagram cut line */
+.card::after{
+  content:'';
+  position:absolute;
+  left:-3px;right:-3px;top:525px;
+  border-top:2px dashed #ff3b30;
+  pointer-events:none;
+  z-index:5;
+}
+.card::before{
+  content:'LIMITE DO POST 1080x1350';
+  position:absolute;
+  right:0;top:527px;
+  background:#ff3b30;color:#fff;
+  font-size:9px;font-weight:700;
+  padding:2px 6px;letter-spacing:.5px;
+  pointer-events:none;
+  z-index:5;
+  font-family:'Inter',sans-serif;
+}
+.card.has-overflow{box-shadow:0 0 0 1px #ff3b30}
+.overflow-warn{
+  display:none;
+  margin-top:8px;max-width:420px;width:100%;
+  padding:10px 14px;
+  background:#fff5f5;
+  border:1px solid #ff3b30;
+  border-radius:8px;
+  font-size:11px;color:#c0392b;font-weight:600;
+  font-family:'Inter',sans-serif;
+}
+.overflow-warn.active{display:block}
+
+/* Edit toolbar (Canva-style) */
+.edit-toolbar{
+  display:flex;gap:5px;align-items:center;
+  margin-bottom:6px;padding:4px 0;
+  border-bottom:1px solid #eee
+}
+.etb-btn{
+  width:28px;height:28px;
+  background:#fff;border:1px solid #ddd;
+  border-radius:6px;
+  cursor:pointer;
+  font-weight:700;font-family:inherit;
+  font-size:14px;color:#333;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s
+}
+.etb-btn:hover{background:#1d9bf0;color:#fff;border-color:#1d9bf0}
+.etb-btn.active{background:#1d9bf0;color:#fff;border-color:#1d9bf0}
+.etb-hint{font-size:10px;color:#aaa;margin-left:auto}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
@@ -157,7 +210,7 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Inter','Helvetica Neue',sa
     <div class="text-area" id="textArea">
       <div class="text-display" id="textDisplay" onclick="startEdit()" title="Clique para editar"></div>
       <div id="textEditArea" style="display:none">
-        <textarea class="edit-textarea" id="editTA" oninput="liveUpdate(this.value)"></textarea>
+        <textarea class="edit-textarea" id="editTA" oninput="updateEditPreview();if(typeof autoSave==='function')autoSave()" oninput="liveUpdate(this.value)"></textarea>
         <div class="edit-actions">
           <button class="btn-save" onclick="saveEdit()">Salvar</button>
           <span class="edit-hint">**texto** = negrito</span>
@@ -310,6 +363,8 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Inter','Helvetica Neue',sa
   <button class="btn-dl-all" onclick="downloadZip()">&#x1F4E6; Baixar ZIP</button>
 </div>
 <div class="dl-status" id="dlStatus"></div>
+<div class="overflow-warn" id="overflowWarn">Atencao: o conteudo excede o limite do post (1080x1350). Texto alem da linha vermelha nao vai aparecer no PNG baixado.</div>
+
 
 <div class="help-box">
   <div class="help-title">COMO USAR</div>
@@ -1039,6 +1094,68 @@ async function preloadImages(){
 }
 
 
+
+// ===== Canva-style bold editor =====
+function wrapBoldSelection(){
+  const ta=document.getElementById('editTA');
+  if(!ta)return;
+  const start=ta.selectionStart,end=ta.selectionEnd;
+  if(start===end){ta.focus();return;}
+  const txt=ta.value;
+  const selected=txt.slice(start,end);
+  // Check if already bold — unwrap
+  let newSel,delta;
+  if(selected.startsWith('**')&&selected.endsWith('**')&&selected.length>4){
+    newSel=selected.slice(2,-2);delta=-4;
+  }else{
+    newSel='**'+selected+'**';delta=4;
+  }
+  const newText=txt.slice(0,start)+newSel+txt.slice(end);
+  ta.value=newText;
+  ta.focus();
+  ta.selectionStart=start;
+  ta.selectionEnd=end+delta;
+  // Live preview update
+  updateEditPreview();
+}
+function updateEditPreview(){
+  const ta=document.getElementById('editTA');
+  const prev=document.getElementById('editPreview');
+  if(!ta||!prev)return;
+  const html=ta.value
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\n\n+/g,'</p><p>').replace(/\n/g,'<br>');
+  prev.innerHTML='<p>'+html+'</p>';
+}
+function checkOverflow(){
+  const card=document.getElementById('theCard');
+  const warn=document.getElementById('overflowWarn');
+  if(!card)return;
+  const h=card.offsetHeight;
+  if(h>525){
+    card.classList.add('has-overflow');
+    if(warn)warn.classList.add('active');
+  }else{
+    card.classList.remove('has-overflow');
+    if(warn)warn.classList.remove('active');
+  }
+}
+// Keyboard shortcuts inside textarea
+document.addEventListener('keydown',function(e){
+  if(e.target&&e.target.id==='editTA'){
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='b'){
+      e.preventDefault();
+      wrapBoldSelection();
+    }
+  }
+});
+// Check overflow on render
+const _origRender=typeof render==='function'?render:null;
+if(_origRender){
+  window.render=function(){_origRender.apply(this,arguments);setTimeout(checkOverflow,50);};
+}
+
 function getTextStyle(){
   return {
     family: document.getElementById('fontFamily').value,
@@ -1200,6 +1317,7 @@ async function downloadZip(){
 
 render();
 loadTextStyle();
+checkOverflow();
 </script>
 </body>
 </html>
