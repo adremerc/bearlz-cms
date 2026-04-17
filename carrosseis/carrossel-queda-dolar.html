@@ -5,188 +5,38 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Carrossel — Queda do Dólar | Gabriel Bearlz</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Roboto:wght@400;700;900&family=Poppins:wght@400;600;700;800&family=Montserrat:wght@400;600;700;800&family=Open+Sans:wght@400;600;700;800&family=Lato:wght@400;700;900&family=Playfair+Display:wght@400;700;900&family=Merriweather:wght@400;700;900&display=swap" rel="stylesheet"/>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{min-height:100vh;background:#F0EEEC;font-family:'Inter','Helvetica Neue',sans-serif;display:flex;flex-direction:column;align-items:center;padding:20px 10px 40px}
-.header{display:flex;align-items:center;justify-content:space-between;width:100%;max-width:420px;margin-bottom:14px}
-.header h1{font-size:15px;font-weight:700;color:#111;margin:0}
-.header p{font-size:11px;color:#999;margin:2px 0 0}
-.header-btns{display:flex;gap:5px}
-.btn-add{padding:6px 12px;font-size:11px;font-weight:700;background:#111;color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:inherit}
-.btn-rem{padding:6px 10px;font-size:11px;font-weight:600;background:#fff;color:#c0392b;border:1px solid #e0e0e0;border-radius:7px;cursor:pointer;font-family:inherit}
-.btn-rem:disabled{color:#ccc;cursor:default}
-.top-dots{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap;justify-content:center}
-.top-dot{height:7px;border-radius:4px;border:none;cursor:pointer;padding:0;transition:all .25s;background:#d0d0d0}
-.top-dot.active{background:#1d9bf0;width:20px}
-.nav-wrap{display:flex;align-items:center;gap:10px;width:100%;max-width:490px;justify-content:center}
-.arrow-btn{width:34px;height:34px;border-radius:50%;background:#fff;border:1px solid #e0e0e0;color:#333;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit}
-.arrow-btn:disabled{background:#e8e8e8;color:#ccc;cursor:default}
-.card{width:420px;max-width:420px;min-width:420px;min-height:525px;flex-shrink:0;background:#fff;border-radius:0;box-shadow:0 0 0 1px #e5e5e5;overflow:visible;display:flex;flex-direction:column;position:relative}
-/* Profile */
-.profile-area{padding:20px 22px 0}
-.profile-row{display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:14px}
-.avatar-circle{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#1a1a2e,#16213e);display:flex;align-items:center;justify-content:center;color:#fff;font-size:26px;font-weight:800;flex-shrink:0;overflow:hidden}
-.avatar-circle img{width:64px;height:64px;object-fit:cover;border-radius:50%}
-.profile-name-row{display:flex;align-items:center}
-.profile-name-txt{font-size:18px;font-weight:700;color:#0f1419}
-.profile-handle-txt{font-size:15px;color:#555555}
-.profile-edit-panel{background:#fafafa;border-radius:10px;padding:12px 14px;margin-bottom:14px;border:1px solid #eee;display:flex;flex-direction:column;gap:8px}
-.profile-edit-row{display:flex;gap:6px}
-.profile-input{flex:1;padding:7px 10px;border:1px solid #e0e0e0;border-radius:7px;font-size:12px;font-family:inherit;outline:none;color:#0f1419}
-.btn-change-photo{padding:7px 12px;font-size:11px;font-weight:600;background:#111;color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:inherit;align-self:flex-start}
-/* Text body */
-.text-area{padding:0 22px 10px;overflow:hidden}
-.text-display{font-size:18.5px;line-height:1.5;color:#0f1419;white-space:pre-line;cursor:text;min-height:60px;padding:2px 0}
-.text-display strong{font-weight:700}
-.edit-textarea{width:100%;min-height:180px;border:1.5px solid #1d9bf0;border-radius:10px;padding:12px 14px;font-size:16px;font-family:inherit;line-height:1.6;resize:vertical;outline:none;color:#0f1419;background:#fafcff;box-sizing:border-box}
-.edit-actions{display:flex;gap:6px;margin-top:8px;align-items:center}
-.btn-save{padding:7px 16px;font-size:11px;font-weight:700;background:#1d9bf0;color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:inherit}
-.edit-hint{font-size:10px;color:#aaa}
-/* Image section */
-#imgSection{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
-.img-section{flex:1;min-height:0;padding:0 22px 6px;display:flex;flex-direction:column}
-.img-placeholder{flex:1;min-height:40px;padding:10px 16px;border:2px dashed #e0e0e0;border-radius:0;text-align:center;cursor:pointer;background:#fcfcfc;transition:border-color .2s;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
-.img-placeholder:hover{border-color:#1d9bf0}
-.img-placeholder-icon{font-size:20px;margin-bottom:2px}
-.img-placeholder-txt{font-size:12px;font-weight:600;color:#999}
-.img-container{flex:1;min-height:40px;position:relative;border-radius:0;overflow:hidden;cursor:grab;user-select:none;background-size:cover;background-position:50% 50%;background-repeat:no-repeat}
-.img-container:active{cursor:grabbing}
-.img-overlay-btn{position:absolute;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;border:none;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2}
-.img-ctrl-panel{margin-top:8px;padding:10px 14px;background:#f8f8f8;border-radius:10px;display:flex;flex-direction:column;gap:8px}
-.ctrl-row-inner{display:flex;align-items:center;gap:10px}
-.ctrl-label{font-size:10px;font-weight:700;color:#888;min-width:36px}
-.ctrl-range{flex:1;accent-color:#1d9bf0}
-.ctrl-val{font-size:10px;color:#aaa;min-width:32px;text-align:right}
-.ctrl-btn-row{display:flex;gap:6px}
-.ctrl-btn{padding:5px 10px;font-size:10px;font-weight:600;background:#fff;color:#666;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-family:inherit}
-.ctrl-btn-blue{color:#1d9bf0}
-.ctrl-btn-ok{background:#1d9bf0;color:#fff;border:none;margin-left:auto}
-/* Card bottom */
-.card-dots-row{padding:8px 22px 10px;display:flex;justify-content:center;gap:5px}
-.card-dot{width:7px;height:7px;border-radius:50%;background:#ddd}
-.card-dot.active{background:#1d9bf0}
-.card-footer{padding:6px 22px 12px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f0f0f0}
-.footer-counter{font-size:11px;color:#c0c0c0;font-weight:500}
-.footer-actions{display:flex;gap:12px}
-.footer-btn{background:none;border:none;cursor:pointer;font-size:10px;color:#1d9bf0;font-weight:700;font-family:inherit}
-/* Download row */
-.dl-row{margin-top:14px;display:flex;gap:8px;align-items:center}
-.btn-dl-primary{padding:10px 22px;font-size:12px;font-weight:700;background:#1d9bf0;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:inherit}
-.btn-dl-all{padding:10px 22px;font-size:12px;font-weight:700;background:#1e1e22;color:#ccc;border:1px solid #333;border-radius:10px;cursor:pointer;font-family:inherit}
-.dl-status{margin-top:8px;font-size:11px;color:#1d9bf0;font-weight:600;min-height:16px}
-/* Help */
-.help-box{margin-top:14px;max-width:420px;width:100%;padding:12px 16px;background:#fff;border-radius:10px;border:1px solid #eee}
-.help-title{font-size:11px;font-weight:700;color:#1d9bf0;margin-bottom:6px}
-.help-text{font-size:11px;color:#888;line-height:1.7}
-.help-text strong{color:#555}
-.help-text code{background:#f5f5f5;padding:1px 4px;border-radius:3px;font-size:10px}
-/* Badge */
-.badge-svg{display:inline-flex;margin-left:3px;flex-shrink:0;vertical-align:middle}
-
-.style-panel{margin-top:14px;max-width:420px;width:100%;padding:10px 14px;background:#fff;border-radius:10px;border:1px solid #eee;display:flex;flex-direction:column;gap:8px}
-.sp-title{font-size:10px;font-weight:700;color:#1d9bf0;text-transform:uppercase;letter-spacing:.5px;display:flex;justify-content:space-between}
-.sp-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.sp-label{font-size:11px;font-weight:600;color:#666;min-width:52px}
-.sp-select{flex:1;min-width:120px;padding:5px 8px;font-size:12px;border:1px solid #e0e0e0;border-radius:6px;font-family:inherit;background:#fff;cursor:pointer;outline:none}
-.sp-num{width:60px;padding:5px 8px;font-size:12px;border:1px solid #e0e0e0;border-radius:6px;font-family:inherit;outline:none;text-align:center}
-.sp-btn{padding:6px 10px;font-size:11px;font-weight:600;background:#f0f0f0;color:#333;border:none;border-radius:6px;cursor:pointer;font-family:inherit}
-.sp-btn:hover{background:#e0e0e0}
-.sp-preview-btn{padding:7px 14px;font-size:11px;font-weight:700;background:#fff;color:#1d9bf0;border:1px solid #1d9bf0;border-radius:7px;cursor:pointer;font-family:inherit}
-.sp-preview-btn:hover{background:#1d9bf0;color:#fff}
-.sp-dim{font-size:10px;color:#999;font-weight:600}
-.preview-modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center;padding:20px}
-.preview-modal.active{display:flex}
-.preview-modal-inner{background:#fff;border-radius:12px;padding:16px;max-width:90vw;max-height:90vh;display:flex;flex-direction:column;gap:10px}
-.preview-modal img{max-width:100%;max-height:75vh;object-fit:contain;border-radius:6px}
-.preview-modal-actions{display:flex;gap:8px;justify-content:flex-end}
-.preview-modal-close{padding:7px 14px;font-size:11px;font-weight:700;background:#f0f0f0;color:#333;border:none;border-radius:7px;cursor:pointer;font-family:inherit}
-.preview-modal-info{font-size:11px;color:#666;font-weight:600}
-
-/* Visual indicator: the 1080x1350 Instagram cut line */
-.card::after{
-  content:'';
-  position:absolute;
-  left:-3px;right:-3px;top:525px;
-  border-top:2px dashed #ff3b30;
-  pointer-events:none;
-  z-index:5;
-}
-.card::before{
-  content:'LIMITE DO POST 1080x1350';
-  position:absolute;
-  right:0;top:527px;
-  background:#ff3b30;color:#fff;
-  font-size:9px;font-weight:700;
-  padding:2px 6px;letter-spacing:.5px;
-  pointer-events:none;
-  z-index:5;
-  font-family:'Inter',sans-serif;
-}
-.card.has-overflow{box-shadow:0 0 0 1px #ff3b30}
-.overflow-warn{
-  display:none;
-  margin-top:8px;max-width:420px;width:100%;
-  padding:10px 14px;
-  background:#fff5f5;
-  border:1px solid #ff3b30;
-  border-radius:8px;
-  font-size:11px;color:#c0392b;font-weight:600;
-  font-family:'Inter',sans-serif;
-}
-.overflow-warn.active{display:block}
-
-/* Edit toolbar (Canva-style) */
-.edit-toolbar{
-  display:flex;gap:5px;align-items:center;
-  margin-bottom:6px;padding:4px 0;
-  border-bottom:1px solid #eee
-}
-.etb-btn{
-  width:28px;height:28px;
-  background:#fff;border:1px solid #ddd;
-  border-radius:6px;
-  cursor:pointer;
-  font-weight:700;font-family:inherit;
-  font-size:14px;color:#333;
-  display:flex;align-items:center;justify-content:center;
-  transition:all .15s
-}
-.etb-btn:hover{background:#1d9bf0;color:#fff;border-color:#1d9bf0}
-.etb-btn.active{background:#1d9bf0;color:#fff;border-color:#1d9bf0}
-.etb-hint{font-size:10px;color:#aaa;margin-left:auto}
-</style>
+<link rel="stylesheet" href="/static/carousel-shared.css?v=1">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 </head>
+
 <body>
 
-<!-- Hidden inputs -->
 <input type="file" id="fileImg" accept="image/*" style="display:none" onchange="onImgFile(this)"/>
 <input type="file" id="fileAvatar" accept="image/*" style="display:none" onchange="onAvatarFile(this)"/>
 <canvas id="exportCanvas" style="display:none"></canvas>
 
-<!-- Header -->
 <div class="header">
   <div>
     <h1>Queda do Dólar</h1>
     <p id="subtitle">9 slides · Gabriel Bearlz</p>
   </div>
-  <div class="header-btns">
-    <button class="btn-add" onclick="addSlide()">+ Slide</button>
-    <button class="btn-rem" id="btnRem" onclick="removeSlide()">Remover</button>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span class="save-badge" id="saveIndicator"></span>
+    <div class="header-btns">
+      <button class="btn-add" onclick="addSlide()">+ Slide</button>
+      <button class="btn-rem" id="btnRem" onclick="removeSlide()">Remover</button>
+    </div>
   </div>
 </div>
 
-<!-- Top dots -->
 <div class="top-dots" id="topDots"></div>
 
-<!-- Nav + Card -->
 <div class="nav-wrap">
   <button class="arrow-btn" id="btnPrev" onclick="navigate(-1)">‹</button>
 
   <div class="card" id="theCard">
 
-    <!-- Profile -->
     <div class="profile-area">
       <div class="profile-row" onclick="toggleProfileEdit()">
         <div class="avatar-circle" id="avatarDisp"><span id="avatarLetter">G</span></div>
@@ -207,7 +57,6 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Inter','Helvetica Neue',sa
       </div>
     </div>
 
-    <!-- Text body -->
     <div class="text-area" id="textArea">
       <div class="text-display" id="textDisplay" onclick="startEdit()" title="Clique para editar"></div>
       <div id="textEditArea" style="display:none">
@@ -219,33 +68,84 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Inter','Helvetica Neue',sa
       </div>
     </div>
 
-    <!-- Image section -->
     <div id="imgSection"></div>
 
-    <!-- Image controls panel -->
     <div id="imgCtrlPanel" style="display:none;padding:0 22px 6px">
       <div class="img-ctrl-panel">
-        <div class="ctrl-row-inner">
-          <span class="ctrl-label">Zoom</span>
-          <input class="ctrl-range" type="range" min="1" max="3" step="0.05" id="rangeZoom" oninput="updateZoom(this.value)"/>
-          <span class="ctrl-val" id="valZoom">100%</span>
+
+        <!-- Modo de ajuste -->
+        <div class="ctrl-row-inner" style="gap:10px">
+          <span class="ctrl-section-label">Modo</span>
+          <div class="preset-btns">
+            <button class="preset-btn" id="btnFitCover" onclick="setFit('cover')">Preencher</button>
+            <button class="preset-btn" id="btnFitContain" onclick="setFit('contain')">Encaixar</button>
+          </div>
         </div>
-        <div class="ctrl-row-inner">
-          <span class="ctrl-label">Horiz.</span>
-          <input class="ctrl-range" type="range" min="0" max="100" step="1" id="rangeOx" oninput="updateOx(this.value)"/>
-          <span class="ctrl-val" id="valOx">50%</span>
+
+        <!-- Grade de posição -->
+        <div class="ctrl-row-inner" style="gap:10px;align-items:flex-start">
+          <span class="ctrl-section-label" style="margin-top:6px">Posição</span>
+          <div class="pos-grid" id="posGrid">
+            <button onclick="setPos(15,15)">↖</button>
+            <button onclick="setPos(50,15)">↑</button>
+            <button onclick="setPos(85,15)">↗</button>
+            <button onclick="setPos(15,50)">←</button>
+            <button onclick="setPos(50,50)">●</button>
+            <button onclick="setPos(85,50)">→</button>
+            <button onclick="setPos(15,85)">↙</button>
+            <button onclick="setPos(50,85)">↓</button>
+            <button onclick="setPos(85,85)">↘</button>
+          </div>
         </div>
-        <div class="ctrl-row-inner">
-          <span class="ctrl-label">Vert.</span>
-          <input class="ctrl-range" type="range" min="0" max="100" step="1" id="rangeOy" oninput="updateOy(this.value)"/>
-          <span class="ctrl-val" id="valOy">50%</span>
+
+        <!-- Zoom rápido -->
+        <div class="ctrl-row-inner" style="gap:10px">
+          <span class="ctrl-section-label">Zoom</span>
+          <div class="preset-btns" id="zoomBtns">
+            <button class="preset-btn" onclick="setZoomPreset(1)">1×</button>
+            <button class="preset-btn" onclick="setZoomPreset(1.3)">1.3×</button>
+            <button class="preset-btn" onclick="setZoomPreset(1.7)">1.7×</button>
+            <button class="preset-btn" onclick="setZoomPreset(2)">2×</button>
+          </div>
         </div>
-        <div class="ctrl-row-inner">
-          <span class="ctrl-label">Altura</span>
-          <input class="ctrl-range" type="range" min="140" max="480" step="10" id="rangeH" oninput="updateImgH(this.value)"/>
-          <span class="ctrl-val" id="valH">Auto</span>
+
+        <!-- Altura rápida -->
+        <div class="ctrl-row-inner" style="gap:10px">
+          <span class="ctrl-section-label">Altura</span>
+          <div class="preset-btns" id="hBtns">
+            <button class="preset-btn" onclick="setHPreset(120)">S</button>
+            <button class="preset-btn" onclick="setHPreset(200)">M</button>
+            <button class="preset-btn" onclick="setHPreset(300)">G</button>
+            <button class="preset-btn" onclick="setHPreset(null)">Máx</button>
+          </div>
         </div>
-        <div class="ctrl-btn-row">
+
+        <!-- Ajuste fino (sliders, colapsável) -->
+        <button class="fine-toggle" onclick="toggleFineCtrl()">▸ Ajuste fino (sliders)</button>
+        <div id="fineCtrlWrap" style="display:none;margin-top:6px">
+          <div class="ctrl-row-inner">
+            <span class="ctrl-label">Zoom</span>
+            <input class="ctrl-range" type="range" min="1" max="3" step="0.05" id="rangeZoom" oninput="updateZoom(this.value)"/>
+            <span class="ctrl-val" id="valZoom">100%</span>
+          </div>
+          <div class="ctrl-row-inner">
+            <span class="ctrl-label">Horiz.</span>
+            <input class="ctrl-range" type="range" min="0" max="100" step="1" id="rangeOx" oninput="updateOx(this.value)"/>
+            <span class="ctrl-val" id="valOx">50%</span>
+          </div>
+          <div class="ctrl-row-inner">
+            <span class="ctrl-label">Vert.</span>
+            <input class="ctrl-range" type="range" min="0" max="100" step="1" id="rangeOy" oninput="updateOy(this.value)"/>
+            <span class="ctrl-val" id="valOy">50%</span>
+          </div>
+          <div class="ctrl-row-inner">
+            <span class="ctrl-label">Altura</span>
+            <input class="ctrl-range" type="range" min="140" max="480" step="10" id="rangeH" oninput="updateImgH(this.value)"/>
+            <span class="ctrl-val" id="valH">Auto</span>
+          </div>
+        </div>
+
+        <div class="ctrl-btn-row" style="margin-top:8px">
           <button class="ctrl-btn" onclick="resetImgCtrl()">Resetar</button>
           <button class="ctrl-btn ctrl-btn-blue" onclick="document.getElementById('fileImg').click()">Trocar</button>
           <button class="ctrl-btn ctrl-btn-ok" onclick="document.getElementById('imgCtrlPanel').style.display='none'">OK</button>
@@ -253,12 +153,10 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Inter','Helvetica Neue',sa
       </div>
     </div>
 
-    <!-- Card dots -->
     <div class="card-dots-row" id="cardDots"></div>
 
-    <!-- Card footer -->
     <div class="card-footer">
-      <span class="footer-counter" id="footerCounter">1/9</span>
+      <span class="footer-counter" id="footerCounter">1/7</span>
       <div class="footer-actions">
         <button class="footer-btn" onclick="document.getElementById('fileImg').click()">+ Imagem</button>
         <button class="footer-btn" onclick="startEdit()">Editar</button>
@@ -266,12 +164,11 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Inter','Helvetica Neue',sa
       </div>
     </div>
 
-  </div><!-- /card -->
+  </div>
 
   <button class="arrow-btn" id="btnNext" onclick="navigate(1)">›</button>
 </div>
 
-<!-- Download -->
 <div class="style-panel">
   <div class="sp-title"><span>ESTILO DO TEXTO</span><span class="sp-dim" id="dimLabel">1080 x 1350 px</span></div>
   <div class="sp-row">
@@ -319,14 +216,13 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Inter','Helvetica Neue',sa
 <div class="overflow-warn" id="overflowWarn">Atencao: o conteudo excede o limite do post (1080x1350). Texto alem da linha vermelha nao vai aparecer no PNG baixado.</div>
 
 
-<!-- Help -->
 <div class="help-box">
   <div class="help-title">COMO USAR</div>
   <div class="help-text">
-    <strong>Texto:</strong> clique no texto para editar · <code>**texto**</code> = <strong>negrito</strong><br/>
-    <strong>Imagem:</strong> "+ Imagem" · "Ajustar" = zoom + arraste<br/>
-    <strong>Perfil:</strong> clique no nome/foto · <strong>Avatar:</strong> botão "Trocar foto"<br/>
-    <strong>Download:</strong> "Baixar PNG" = slide atual 1080×1350 · "Baixar todos" = sequência completa
+    <strong>Texto:</strong> clique para editar · <code>**texto**</code> = <strong>negrito</strong><br/>
+    <strong>Imagem:</strong> "+ Imagem" para trocar · "Ajustar" = zoom + arraste<br/>
+    <strong>Perfil:</strong> clique no nome/foto · <strong>Avatar:</strong> "Trocar foto"<br/>
+    <strong>Download:</strong> "Baixar PNG" = slide atual 1080×1350 · "Baixar todos" = lote completo
   </div>
 </div>
 
@@ -354,632 +250,9 @@ const slides=[
   {id:9,text:`Precisa de ajuda para montar **a sua estratégia para esse momento?**\n\nComenta **"Carteira"** aqui embaixo para receber uma **análise gratuita** da sua carteira.\n\nVou **avaliar sua carteira gratuitamente** e te ajudar a definir a **estratégia para os próximos meses**.`,image:PX+'636190/pexels-photo-636190.jpeg'+Q,zoom:1,ox:50,oy:50},
 ];
 
-/* ── Preview height calculator ── */
-// Simulates canvas text rendering (same font/wrap logic) to compute how much
-// vertical space the image gets in the 1080x1350 export, then converts to
-// preview scale (420px wide). This makes preview proportions match the export.
-function calcPreviewImgH(slide){
-  if(slide.imgH)return slide.imgH; // user-overridden via Altura slider (already preview px)
-  const cW=1080,cH=1350,px=74,fSize=46,lh=Math.round(fSize*1.45);
-  const tmp=document.createElement('canvas');tmp.width=cW;tmp.height=cH;
-  const ctx=tmp.getContext('2d');
-  let cy=64+160+44; // top padding + avatar (160px) + gap below avatar
-  const maxW=cW-px*2;
-  const paras=slide.text.split(/\n\n+/);
-  for(let pi=0;pi<paras.length;pi++){
-    const segs=parseBold(paras[pi].replace(/\n/g,' '));
-    const lines=canvasWrapText(ctx,segs,maxW,fSize);
-    cy+=lines.length*lh;
-    if(pi<paras.length-1)cy+=24;
-  }
-  cy+=20;
-  const canvasImgH=Math.max(60,cH-cy-20);
-  return Math.max(60,Math.round(canvasImgH*(420/cW)));
-}
-
-/* ── Helpers ── */
-function parseBold(t){
-  const p=[];const r=/\*\*(.*?)\*\*/g;let l=0,m;
-  while((m=r.exec(t))!==null){if(m.index>l)p.push({t:t.slice(l,m.index),b:false});p.push({t:m[1],b:true});l=r.lastIndex}
-  if(l<t.length)p.push({t:t.slice(l),b:false});
-  return p;
-}
-function toHTML(text){
-  return parseBold(text).map(p=>{
-    const esc=p.t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    return p.b?`<strong>${esc}</strong>`:esc;
-  }).join('');
-}
-
-/* ── Render ── */
-function render(){
-  const s=slides[cur];
-  const total=slides.length;
-
-  document.getElementById('subtitle').textContent=`${total} slides · Gabriel Bearlz`;
-
-  const td=document.getElementById('topDots');
-  td.innerHTML=slides.map((_,i)=>`<button class="top-dot${i===cur?' active':''}" style="width:${i===cur?20:7}px" onclick="goTo(${i})"></button>`).join('');
-
-  document.getElementById('btnPrev').disabled=cur===0;
-  document.getElementById('btnNext').disabled=cur===total-1;
-  document.getElementById('btnRem').disabled=total<=1;
-
-  document.getElementById('dispName').textContent=profile.name;
-  document.getElementById('dispHandle').textContent=profile.handle;
-  if(avatarDataUrl){
-    document.getElementById('avatarDisp').innerHTML=`<img src="${avatarDataUrl}"/>`;
-  }else{
-    document.getElementById('avatarDisp').innerHTML=`<span id="avatarLetter">G</span>`;
-  }
-
-  if(editingText){
-    document.getElementById('textDisplay').style.display='none';
-    document.getElementById('textEditArea').style.display='block';
-    document.getElementById('editTA').value=s.text;
-  }else{
-    document.getElementById('textDisplay').style.display='block';
-    document.getElementById('textEditArea').style.display='none';
-    const paras=s.text.split(/\n\n+/).map(p=>`<span style="display:block;margin-bottom:16px">${toHTML(p)}</span>`).join('');
-    document.getElementById('textDisplay').innerHTML=paras;
-  }
-
-  renderImgSection();
-
-  const cd=document.getElementById('cardDots');
-  cd.innerHTML=slides.map((_,i)=>`<div class="card-dot${i===cur?' active':''}"></div>`).join('');
-
-  document.getElementById('footerCounter').textContent=`${cur+1}/${total}`;
-  document.getElementById('btnAjustar').style.display=s.image?'inline':'none';
-
-  document.getElementById('rangeZoom').value=s.zoom||1;
-  document.getElementById('valZoom').textContent=Math.round((s.zoom||1)*100)+'%';
-  document.getElementById('rangeOx').value=s.ox||50;
-  document.getElementById('valOx').textContent=(s.ox||50)+'%';
-  document.getElementById('rangeOy').value=s.oy||50;
-  document.getElementById('valOy').textContent=(s.oy||50)+'%';
-  document.getElementById('rangeH').value=s.imgH||240;
-  document.getElementById('valH').textContent=s.imgH?(s.imgH+'px'):'Auto';
-}
-
-function renderImgSection(){
-  const s=slides[cur];
-  const sec=document.getElementById('imgSection');
-  const panel=document.getElementById('imgCtrlPanel');
-
-  if(s.image){
-    const hStyle=s.imgH?`height:${s.imgH}px;flex:none`:'';
-    sec.innerHTML=`<div class="img-section">
-      <div class="img-container" id="imgContainer" style="background-image:url('${s.image}');background-size:cover;background-position:${s.ox||50}% ${s.oy||50}%;${hStyle}">
-        <button class="img-overlay-btn" style="top:8px;right:8px" onclick="clearImage()">×</button>
-      </div>
-    </div>`;
-    document.getElementById('btnAjustar').style.display='inline';
-    initDrag();
-  }else{
-    sec.innerHTML=`<div class="img-section">
-      <div class="img-placeholder" onclick="document.getElementById('fileImg').click()">
-        <div class="img-placeholder-icon">🖼</div>
-        <div class="img-placeholder-txt">Adicionar imagem</div>
-      </div>
-    </div>`;
-    document.getElementById('btnAjustar').style.display='none';
-    panel.style.display='none';
-  }
-}
-
-/* ── Drag to pan ── */
-function initDrag(){
-  const cont=document.getElementById('imgContainer');
-  if(!cont)return;
-  let dragging=false,startX=0,startY=0,startOx=0,startOy=0;
-  const s=slides[cur];
-
-  const onDown=(e)=>{
-    e.preventDefault();
-    dragging=true;
-    const pt=e.touches?e.touches[0]:e;
-    startX=pt.clientX;startY=pt.clientY;
-    startOx=s.ox||50;startOy=s.oy||50;
-    window.addEventListener('mousemove',onMove);window.addEventListener('mouseup',onUp);
-    window.addEventListener('touchmove',onMove,{passive:false});window.addEventListener('touchend',onUp);
-  };
-  const onMove=(e)=>{
-    if(!dragging)return;
-    e.preventDefault();
-    const pt=e.touches?e.touches[0]:e;
-    const r=cont.getBoundingClientRect();
-    const dx=((pt.clientX-startX)/r.width)*100;
-    const dy=((pt.clientY-startY)/r.height)*100;
-    slides[cur].ox=Math.max(0,Math.min(100,Math.round(startOx-dx)));
-    slides[cur].oy=Math.max(0,Math.min(100,Math.round(startOy-dy)));
-    cont.style.backgroundPosition=`${slides[cur].ox}% ${slides[cur].oy}%`;
-  };
-  const onUp=()=>{
-    dragging=false;
-    window.removeEventListener('mousemove',onMove);window.removeEventListener('mouseup',onUp);
-    window.removeEventListener('touchmove',onMove);window.removeEventListener('touchend',onUp);
-  };
-  cont.addEventListener('mousedown',onDown);
-  cont.addEventListener('touchstart',onDown,{passive:false});
-}
-
-/* ── Navigation ── */
-function goTo(i){
-  cur=i;editingText=false;showImgCtrl=false;
-  document.getElementById('imgCtrlPanel').style.display='none';
-  render();
-}
-function navigate(d){goTo(Math.max(0,Math.min(slides.length-1,cur+d)))}
-
-/* ── Profile ── */
-function toggleProfileEdit(){
-  showProfileEdit=!showProfileEdit;
-  document.getElementById('profileEditPanel').style.display=showProfileEdit?'flex':'none';
-  if(showProfileEdit){
-    document.getElementById('inputName').value=profile.name;
-    document.getElementById('inputHandle').value=profile.handle;
-  }
-}
-function updateProfile(){
-  profile.name=document.getElementById('inputName').value;
-  profile.handle=document.getElementById('inputHandle').value;
-  document.getElementById('dispName').textContent=profile.name;
-  document.getElementById('dispHandle').textContent=profile.handle;
-}
-function onAvatarFile(input){
-  const f=input.files[0];if(!f)return;
-  const r=new FileReader();
-  r.onload=e=>{avatarDataUrl=e.target.result;render()};
-  r.readAsDataURL(f);input.value='';
-}
-
-/* ── Text editing ── */
-function startEdit(){editingText=true;render();setTimeout(()=>document.getElementById('editTA').focus(),10)}
-function liveUpdate(val){slides[cur].text=val;const paras=val.split(/\n\n+/).map(p=>`<span style="display:block;margin-bottom:16px">${toHTML(p)}</span>`).join('');document.getElementById('textDisplay').innerHTML=paras}
-function saveEdit(){slides[cur].text=document.getElementById('editTA').value;editingText=false;render()}
-
-/* ── Image ── */
-function onImgFile(input){
-  const f=input.files[0];if(!f)return;
-  const r=new FileReader();
-  r.onload=e=>{
-    const tmp=new Image();
-    tmp.onload=()=>{slides[cur].image=e.target.result;slides[cur].zoom=1;slides[cur].ox=50;slides[cur].oy=50;slides[cur].imgH=null;slides[cur].imgNW=tmp.naturalWidth;slides[cur].imgNH=tmp.naturalHeight;render()};
-    tmp.src=e.target.result;
-  };
-  r.readAsDataURL(f);input.value='';
-}
-function clearImage(){slides[cur].image=null;slides[cur].zoom=1;slides[cur].ox=50;slides[cur].oy=50;slides[cur].imgH=null;slides[cur].imgNW=null;slides[cur].imgNH=null;document.getElementById('imgCtrlPanel').style.display='none';render()}
-function toggleImgCtrl(){
-  const panel=document.getElementById('imgCtrlPanel');
-  const showing=panel.style.display!=='none';
-  panel.style.display=showing?'none':'block';
-}
-function applyBgSize(s){
-  const cont=document.getElementById('imgContainer');if(!cont)return;
-  const z=s.zoom||1;
-  if(!s.imgNW||!s.imgNH){
-    if(z>1){const t=new Image();t.crossOrigin='anonymous';t.onload=()=>{s.imgNW=t.naturalWidth;s.imgNH=t.naturalHeight;applyBgSize(s)};t.src=s.image;}
-    cont.style.backgroundSize='cover';return;
-  }
-  const cw=cont.offsetWidth,ch=cont.offsetHeight;if(!cw||!ch)return;
-  const base=Math.max(cw/s.imgNW,ch/s.imgNH);
-  cont.style.backgroundSize=`${Math.round(s.imgNW*base*z)}px ${Math.round(s.imgNH*base*z)}px`;
-}
-function updateZoom(val){
-  slides[cur].zoom=parseFloat(val);
-  document.getElementById('valZoom').textContent=Math.round(val*100)+'%';
-  applyBgSize(slides[cur]);
-}
-function updateOx(val){
-  slides[cur].ox=parseInt(val);
-  document.getElementById('valOx').textContent=val+'%';
-  const cont=document.getElementById('imgContainer');
-  if(cont)cont.style.backgroundPosition=`${slides[cur].ox}% ${slides[cur].oy}%`;
-}
-function updateOy(val){
-  slides[cur].oy=parseInt(val);
-  document.getElementById('valOy').textContent=val+'%';
-  const cont=document.getElementById('imgContainer');
-  if(cont)cont.style.backgroundPosition=`${slides[cur].ox}% ${slides[cur].oy}%`;
-}
-function updateImgH(val){
-  slides[cur].imgH=parseInt(val);
-  document.getElementById('valH').textContent=val+'px';
-  const cont=document.getElementById('imgContainer');
-  if(cont){cont.style.height=val+'px';cont.style.flex='none';}
-}
-function resetImgCtrl(){
-  slides[cur].zoom=1;slides[cur].ox=50;slides[cur].oy=50;slides[cur].imgH=null;
-  document.getElementById('rangeZoom').value=1;document.getElementById('valZoom').textContent='100%';
-  document.getElementById('rangeOx').value=50;document.getElementById('valOx').textContent='50%';
-  document.getElementById('rangeOy').value=50;document.getElementById('valOy').textContent='50%';
-  document.getElementById('rangeH').value=240;document.getElementById('valH').textContent='Auto';
-  renderImgSection();
-}
-
-/* ── Add / Remove slides ── */
-function addSlide(){
-  const nid=Math.max(...slides.map(x=>x.id))+1;
-  slides.splice(cur+1,0,{id:nid,text:`Novo slide. Use **negrito** para destacar.`,image:null,zoom:1,ox:50,oy:50});
-  cur++;editingText=true;render();
-  setTimeout(()=>document.getElementById('editTA').focus(),10);
-}
-function removeSlide(){
-  if(slides.length<=1)return;
-  slides.splice(cur,1);
-  cur=Math.min(cur,slides.length-1);
-  editingText=false;render();
-}
-
-/* ── Canvas export engine ── */
-function loadImg(src){
-  return new Promise((res,rej)=>{const img=new Image();img.crossOrigin='anonymous';img.onload=()=>res(img);img.onerror=rej;img.src=src});
-}
-function roundRect(ctx,x,y,w,h,r){
-  ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
-}
-function canvasWrapText(ctx,segs,maxW,fSize){
-  const lines=[];let line=[],lineW=0;
-  let prevSpaced=false;
-  for(const seg of segs){
-    const words=seg.t.split(' ');
-    let first=true;
-    for(let i=0;i<words.length;i++){
-      const w=words[i];
-      if(!w){prevSpaced=true;continue;}
-      ctx.font=`${seg.b?'700':'400'} ${fSize}px Inter,sans-serif`;
-      const sp=lineW>0&&(!first||prevSpaced);
-      const pre=sp?' ':'';
-      const ww=ctx.measureText(pre+w).width;
-      if(lineW+ww>maxW&&line.length>0){
-        lines.push([...line]);line=[];lineW=0;
-        line.push({text:w,bold:seg.b});
-        lineW=ctx.measureText(w).width;
-      }else{
-        line.push({text:pre+w,bold:seg.b});
-        lineW+=ww;
-      }
-      first=false;prevSpaced=false;
-    }
-  }
-  if(line.length)lines.push(line);
-  return lines;
-}
-function canvasDrawBadge(ctx,x,y,size){
-  ctx.save();ctx.translate(x,y);const sc=size/22;ctx.scale(sc,sc);
-  ctx.beginPath();ctx.arc(11,11,11,0,Math.PI*2);ctx.fillStyle='#1d9bf0';ctx.fill();
-  ctx.fillStyle='#fff';ctx.font='bold 11px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
-  ctx.fillText('✓',11,11.5);ctx.restore();
-}
-function canvasAvatarPlaceholder(ctx,x,y,sz){
-  ctx.save();ctx.beginPath();ctx.arc(x+sz/2,y+sz/2,sz/2,0,Math.PI*2);ctx.clip();
-  const g=ctx.createLinearGradient(x,y,x+sz,y+sz);g.addColorStop(0,'#1a1a2e');g.addColorStop(1,'#16213e');
-  ctx.fillStyle=g;ctx.fillRect(x,y,sz,sz);
-  ctx.fillStyle='#fff';ctx.font='900 42px Inter,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
-  ctx.fillText('G',x+sz/2,y+sz/2);ctx.textAlign='left';ctx.textBaseline='top';ctx.restore();
-}
-
-async function drawSlideToCanvas(canvas,slide){
-  await Promise.all([
-    document.fonts.load('400 44px Inter'),
-    document.fonts.load('700 44px Inter'),
-    document.fonts.load('700 46px Inter'),
-    document.fonts.load('400 39px Inter'),
-  ]);
-  const ctx=canvas.getContext('2d');
-  canvas.width=W;canvas.height=H;
-  const px=57,fSize=44,lh=Math.round(fSize*1.6),nameSize=46,handleSize=39;
-  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
-  let cy=64;
-  const picSz=160;
-
-  if(avatarDataUrl){
-    try{const img=await loadImg(avatarDataUrl);ctx.save();ctx.beginPath();ctx.arc(px+picSz/2,cy+picSz/2,picSz/2,0,Math.PI*2);ctx.clip();ctx.drawImage(img,px,cy,picSz,picSz);ctx.restore();}
-    catch(e){canvasAvatarPlaceholder(ctx,px,cy,picSz)}
-  }else{canvasAvatarPlaceholder(ctx,px,cy,picSz)}
-
-  const tx=px+picSz+24;
-  ctx.textBaseline='top';
-  // Vertically center name+handle block relative to avatar (same as CSS align-items:center)
-  const nameHandleH=nameSize+8+handleSize;
-  const nameY=cy+Math.round((picSz-nameHandleH)/2);
-  ctx.fillStyle='#0f1419';ctx.font=`700 ${nameSize}px Inter,sans-serif`;
-  ctx.fillText(profile.name,tx,nameY);
-  ctx.fillStyle='#555555';ctx.font=`400 ${handleSize}px Inter,sans-serif`;
-  ctx.fillText(profile.handle,tx,nameY+nameSize+8);
-  const hw=ctx.measureText(profile.handle).width;
-  canvasDrawBadge(ctx,tx+hw+10,nameY+nameSize+8,32);
-  cy+=picSz+44;
-
-  const maxW=W-px*2;
-  const paras=slide.text.split(/\n\n+/);
-  for(let pi=0;pi<paras.length;pi++){
-    const segs=parseBold(paras[pi].replace(/\n/g,' '));
-    const lines=canvasWrapText(ctx,segs,maxW,fSize);
-    for(const ln of lines){
-      let lx=px;
-      for(const chunk of ln){
-        ctx.font=`${chunk.bold?'700':'400'} ${fSize}px Inter,sans-serif`;
-        ctx.fillStyle='#0f1419';
-        ctx.fillText(chunk.text,lx,cy);
-        lx+=ctx.measureText(chunk.text).width;
-      }
-      cy+=lh;
-    }
-    if(pi<paras.length-1)cy+=24;
-  }
-  cy+=20;
-
-  const maxImgH=H-cy-20;
-  const minImgH=Math.min(380,maxImgH);
-  const imgH=Math.max(slide.imgH?Math.min(Math.round(slide.imgH*(1080/420)),maxImgH):maxImgH,minImgH);
-  const radius=24;
-  if(slide.image){
-    try{
-      const img=await loadImg(slide.image);
-      ctx.save();roundRect(ctx,px,cy,W-px*2,imgH,radius);ctx.clip();
-      // Cover + zoom: scale to fill, then apply zoom
-      const z=slide.zoom||1;
-      const sw=W-px*2,sh=imgH;
-      const base=Math.max(sw/img.width,sh/img.height);
-      const fw=img.width*base*z;
-      const fh=img.height*base*z;
-      const dx=px+((slide.ox||50)/100)*(sw-fw);
-      const dy=cy+((slide.oy||50)/100)*(sh-fh);
-      ctx.drawImage(img,dx,dy,fw,fh);
-      ctx.restore();
-    }catch(e){
-      ctx.save();roundRect(ctx,px,cy,W-px*2,imgH,radius);ctx.clip();
-      ctx.fillStyle='#f4f4f4';ctx.fillRect(px,cy,W-px*2,imgH);
-      ctx.fillStyle='#ccc';ctx.font='400 36px Inter,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillText(`Imagem slide ${slide.id}`,W/2,cy+imgH/2);ctx.textAlign='left';ctx.textBaseline='top';ctx.restore();
-    }
-  }else{
-    ctx.save();roundRect(ctx,px,cy,W-px*2,imgH,radius);ctx.clip();
-    ctx.fillStyle='#f4f4f4';ctx.fillRect(px,cy,W-px*2,imgH);
-    ctx.fillStyle='#ccc';ctx.font='400 36px Inter,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(`Imagem slide ${slide.id}`,W/2,cy+imgH/2);ctx.textAlign='left';ctx.textBaseline='top';ctx.restore();
-  }
-}
-
-function setStatus(msg){const el=document.getElementById('dlStatus');el.textContent=msg;}
-
-async function preloadImages(){
-  const urls=slides.map(s=>s.image).filter(u=>u&&!u.startsWith('data:'));
-  if(avatarDataUrl&&!avatarDataUrl.startsWith('data:'))urls.push(avatarDataUrl);
-  await Promise.all(urls.map(u=>new Promise(res=>{
-    const img=new Image();img.crossOrigin='anonymous';
-    img.onload=res;img.onerror=res;img.src=u;
-  })));
-}
-
-
-
-// ===== Canva-style bold editor =====
-function wrapBoldSelection(){
-  const ta=document.getElementById('editTA');
-  if(!ta)return;
-  const start=ta.selectionStart,end=ta.selectionEnd;
-  if(start===end){ta.focus();return;}
-  const txt=ta.value;
-  const selected=txt.slice(start,end);
-  // Check if already bold — unwrap
-  let newSel,delta;
-  if(selected.startsWith('**')&&selected.endsWith('**')&&selected.length>4){
-    newSel=selected.slice(2,-2);delta=-4;
-  }else{
-    newSel='**'+selected+'**';delta=4;
-  }
-  const newText=txt.slice(0,start)+newSel+txt.slice(end);
-  ta.value=newText;
-  ta.focus();
-  ta.selectionStart=start;
-  ta.selectionEnd=end+delta;
-  // Live preview update
-  updateEditPreview();
-}
-function updateEditPreview(){
-  const ta=document.getElementById('editTA');
-  const prev=document.getElementById('editPreview');
-  if(!ta||!prev)return;
-  const html=ta.value
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/\n\n+/g,'</p><p>').replace(/\n/g,'<br>');
-  prev.innerHTML='<p>'+html+'</p>';
-}
-function checkOverflow(){
-  const card=document.getElementById('theCard');
-  const warn=document.getElementById('overflowWarn');
-  if(!card)return;
-  const h=card.offsetHeight;
-  if(h>525){
-    card.classList.add('has-overflow');
-    if(warn)warn.classList.add('active');
-  }else{
-    card.classList.remove('has-overflow');
-    if(warn)warn.classList.remove('active');
-  }
-}
-// Keyboard shortcuts inside textarea
-document.addEventListener('keydown',function(e){
-  if(e.target&&e.target.id==='editTA'){
-    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='b'){
-      e.preventDefault();
-      wrapBoldSelection();
-    }
-  }
-});
-// Check overflow on render
-const _origRender=typeof render==='function'?render:null;
-if(_origRender){
-  window.render=function(){_origRender.apply(this,arguments);setTimeout(checkOverflow,50);};
-}
-
-function getTextStyle(){
-  return {
-    family: document.getElementById('fontFamily').value,
-    size: parseFloat(document.getElementById('fontSize').value)||18.5,
-    lh: parseFloat(document.getElementById('lineHeight').value)||1.5,
-    pg: parseInt(document.getElementById('paraGap').value)||16
-  };
-}
-function applyTextStyle(){
-  const st=getTextStyle();
-  document.querySelectorAll('.text-display').forEach(el=>{
-    el.style.fontFamily=st.family;
-    el.style.fontSize=st.size+'px';
-    el.style.lineHeight=st.lh;
-    el.querySelectorAll(':scope > span').forEach(s=>{
-      s.style.marginBottom=st.pg+'px';
-    });
-  });
-  const edit=document.getElementById('editTA');
-  if(edit){edit.style.fontFamily=st.family;edit.style.fontSize=st.size+'px';edit.style.lineHeight=st.lh;}
-  try{localStorage.setItem(LS_KEY+'_style',JSON.stringify(st));}catch(e){}
-}
-function loadTextStyle(){
-  try{
-    const saved=JSON.parse(localStorage.getItem(LS_KEY+'_style')||'null');
-    if(saved){
-      document.getElementById('fontFamily').value=saved.family;
-      document.getElementById('fontSize').value=saved.size;
-      document.getElementById('lineHeight').value=saved.lh;
-      document.getElementById('paraGap').value=saved.pg;
-    }
-  }catch(e){}
-  applyTextStyle();
-}
-function resetTextStyle(){
-  document.getElementById('fontFamily').value='Inter,sans-serif';
-  document.getElementById('fontSize').value=18.5;
-  document.getElementById('lineHeight').value=1.5;
-  document.getElementById('paraGap').value=16;
-  applyTextStyle();
-}
-let _previewCanvas=null;
-async function showExportPreview(){
-  setStatus('Gerando preview...');
-  try{
-    _previewCanvas=await captureCard();
-    document.getElementById('previewImg').src=_previewCanvas.toDataURL('image/png');
-    document.getElementById('previewModal').classList.add('active');
-    setStatus('');
-  }catch(e){setStatus('Erro no preview');console.error(e);}
-}
-function closePreview(){
-  document.getElementById('previewModal').classList.remove('active');
-}
-function downloadFromPreview(){
-  if(!_previewCanvas)return;
-  const a=document.createElement('a');a.download='slide_'+(cur+1)+'.png';a.href=_previewCanvas.toDataURL('image/png');a.click();
-}
-
-async function captureCard(){
-  const card=document.getElementById('theCard');
-  const CARD_W=420,CARD_H=525,SCALE=1080/CARD_W;
-  // Measure heights of UI elements BEFORE hiding (so we can replace with spacers)
-  const dotsEl=document.querySelector('.card-dots-row');
-  const footerEl=document.querySelector('.card-footer');
-  const dotsH=dotsEl?dotsEl.offsetHeight:0;
-  const footerH=footerEl?footerEl.offsetHeight:0;
-  const hideEls=Array.from(document.querySelectorAll('.card-dots-row,.card-footer,#imgCtrlPanel,.img-overlay-btn,.profile-edit-panel'));
-  const prevDisplay=hideEls.map(el=>el.style.display);
-  hideEls.forEach(el=>{el.style.display='none';});
-  // Add spacer inside card to preserve image container size (matches preview exactly)
-  const spacer=document.createElement('div');
-  spacer.style.height=(dotsH+footerH)+'px';
-  spacer.style.flexShrink='0';
-  spacer.style.width='100%';
-  spacer.setAttribute('data-capture-spacer','1');
-  card.appendChild(spacer);
-  const origStyle={};
-  ['borderRadius','boxShadow','border','width','maxWidth','height','minHeight','maxHeight'].forEach(k=>{origStyle[k]=card.style[k];});
-  card.style.borderRadius='0';card.style.boxShadow='none';card.style.border='none';
-  card.style.width=CARD_W+'px';card.style.maxWidth=CARD_W+'px';
-  card.style.height=CARD_H+'px';card.style.minHeight=CARD_H+'px';card.style.maxHeight=CARD_H+'px';
-  await new Promise(r=>requestAnimationFrame(r));
-  try{
-    const canvas=await html2canvas(card,{
-      scale:SCALE,width:CARD_W,height:CARD_H,
-      useCORS:true,allowTaint:false,logging:false,backgroundColor:'#ffffff'
-    });
-    return canvas;
-  }finally{
-    hideEls.forEach((el,i)=>{el.style.display=prevDisplay[i];});
-    Object.keys(origStyle).forEach(k=>{card.style[k]=origStyle[k];});
-    if(spacer.parentNode)spacer.parentNode.removeChild(spacer);
-  }
-}
-
-async function downloadCurrent(){
-  setStatus(`Gerando slide ${cur+1}...`);
-  const s=slides[cur];
-  if(s.image&&!s.image.startsWith('data:')){
-    await new Promise(res=>{const img=new Image();img.crossOrigin='anonymous';img.onload=res;img.onerror=res;img.src=s.image;});
-  }
-  try{
-    const canvas=await captureCard();
-    const a=document.createElement('a');a.download=`slide_${cur+1}_queda-dolar.png`;a.href=canvas.toDataURL('image/png');a.click();
-    setStatus('Slide baixado!');setTimeout(()=>setStatus(''),2500);
-  }catch(e){setStatus('Erro ao gerar slide');console.error(e);}
-}
-
-async function downloadAll(){
-  setStatus('Pre-carregando imagens...');
-  await preloadImages();
-  const orig=cur;
-  for(let i=0;i<slides.length;i++){
-    cur=i;render();
-    setStatus(`Gerando ${i+1}/${slides.length}...`);
-    await new Promise(r=>setTimeout(r,1000));
-    try{
-      const canvas=await captureCard();
-      const a=document.createElement('a');a.download=`slide_${i+1}_queda-dolar.png`;a.href=canvas.toDataURL('image/png');a.click();
-    }catch(e){console.error(e);}
-    await new Promise(r=>setTimeout(r,300));
-  }
-  cur=orig;render();
-  setStatus('Todos os slides baixados!');setTimeout(()=>setStatus(''),3000);
-}
-
-autoLoad();
-
-async function downloadZip(){
-  if(typeof JSZip==='undefined'){setStatus('JSZip nao carregou. Verifique conexao.');return;}
-  const zip=new JSZip();
-  const slug=document.title.replace(/[^a-z0-9]/gi,'-').toLowerCase().slice(0,40)||'carrossel';
-  const orig=cur;
-  setStatus('Pre-carregando imagens...');
-  await preloadImages();
-  setStatus('Preparando ZIP...');
-  for(let i=0;i<slides.length;i++){
-    cur=i;render();
-    setStatus(`Gerando ${i+1}/${slides.length} para ZIP...`);
-    await new Promise(r=>setTimeout(r,1000));
-    try{
-      const canvas=await captureCard();
-      const blob=await new Promise(res=>canvas.toBlob(res,'image/png'));
-      zip.file(`slide_${i+1}.png`,blob);
-    }catch(e){console.error('Slide',i+1,e);}
-    await new Promise(r=>setTimeout(r,200));
-  }
-  cur=orig;render();
-  setStatus('Criando ZIP...');
-  const content=await zip.generateAsync({type:'blob',compression:'STORE'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(content);
-  a.download=`${slug}.zip`;
-  a.click();
-  setStatus(`ZIP com ${slides.length} slides baixado!`);
-  setTimeout(()=>setStatus(''),3500);
-}
-
-render();
-loadTextStyle();
-checkOverflow();
+window.CAROUSEL_SLUG='queda-dolar';
+window.CAROUSEL_LS_KEY='bearlz_queda_dolar_v1';
 </script>
+<script src="/static/carousel-shared.js?v=1"></script>
 </body>
 </html>
