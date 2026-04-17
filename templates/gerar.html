@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Gerar Carrossel — Bearlz CMS{% endblock %}
+
+{% block content %}
+
+<div class="max-w-xl mx-auto">
+
+  <!-- Header -->
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">Gerar novo carrossel</h1>
+    <p class="text-sm text-gray-500 mt-1">Paste o conteúdo ou descreva o que quer abordar</p>
+  </div>
+
+  <!-- API key warning -->
+  {% if not has_key %}
+  <div class="mb-5 flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+    </svg>
+    <div>
+      <p class="text-sm font-semibold text-red-700">API key não configurada</p>
+      <p class="text-sm text-red-600 mt-0.5">
+        Adicione <code class="bg-red-100 px-1 rounded font-mono text-xs">ANTHROPIC_API_KEY</code> em
+        <code class="bg-red-100 px-1 rounded font-mono text-xs">idea-bot/config.py</code>
+        ou como variável de ambiente.
+      </p>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Form card -->
+  <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+    <fieldset {% if not has_key %}disabled{% endif %} class="space-y-5">
+
+      <!-- Tópico -->
+      <div>
+        <label for="topico" class="block text-sm font-semibold text-gray-700 mb-1.5">
+          Tópico
+        </label>
+        <input type="text" id="topico"
+          placeholder="Ex: Bitcoin acima de 100k, Queda do dólar, Ray Dalio..."
+          class="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400 transition-shadow">
+      </div>
+
+      <!-- Brief -->
+      <div>
+        <label for="brief" class="block text-sm font-semibold text-gray-700 mb-1.5">
+          Conteúdo / Brief
+        </label>
+        <textarea id="brief" rows="8"
+          placeholder="Cole aqui o texto do artigo, notícia, ou descreva o ângulo e dados que quer abordar..."
+          class="w-full border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:bg-gray-50 disabled:text-gray-400 transition-shadow"></textarea>
+      </div>
+
+      <!-- Número de slides -->
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-1.5">
+          Número de slides
+          <span class="ml-2 text-blue-600 font-bold" id="slides-value">8</span>
+        </label>
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-gray-400">4</span>
+          <input type="range" id="num-slides" min="4" max="14" value="8"
+            class="flex-1 h-2 rounded-lg appearance-none bg-gray-200 accent-blue-500 cursor-pointer disabled:opacity-50"
+            oninput="document.getElementById('slides-value').textContent = this.value">
+          <span class="text-xs text-gray-400">14</span>
+        </div>
+        <p class="text-xs text-gray-400 mt-1">Total inclui 1 slide de CTA ao final</p>
+      </div>
+
+      <!-- Submit button -->
+      <button id="gerar-btn" onclick="gerarCarrossel()"
+        class="w-full py-3 bg-blue-500 text-white text-sm font-semibold rounded-xl hover:bg-blue-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+        Gerar Carrossel
+      </button>
+
+    </fieldset>
+  </div>
+
+  <!-- Loading state -->
+  <div id="loading-box" class="hidden mt-4 bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center gap-3">
+    <svg class="w-5 h-5 text-blue-500 animate-spin flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+    </svg>
+    <div>
+      <p class="text-sm font-semibold text-blue-800">Gerando com Claude AI...</p>
+      <p class="text-xs text-blue-600 mt-0.5">20–30 segundos. Não feche a aba.</p>
+    </div>
+  </div>
+
+  <!-- Success state -->
+  <div id="success-box" class="hidden mt-4 bg-green-50 border border-green-200 rounded-xl p-4">
+    <div class="flex items-center gap-2 mb-3">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <p class="text-sm font-semibold text-green-800">Carrossel gerado!</p>
+    </div>
+    <p id="success-titulo" class="text-sm text-green-700 mb-3 font-medium"></p>
+    <a id="success-link" href="#"
+       class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-500 text-white text-sm font-semibold rounded-lg hover:bg-blue-600 transition-colors">
+      Ver e revisar
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+      </svg>
+    </a>
+  </div>
+
+  <!-- Error state -->
+  <div id="error-box" class="hidden mt-4 bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    <div>
+      <p class="text-sm font-semibold text-red-700">Erro ao gerar</p>
+      <p id="error-msg" class="text-sm text-red-600 mt-0.5"></p>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  async function gerarCarrossel() {
+    const topico    = document.getElementById('topico').value.trim();
+    const brief     = document.getElementById('brief').value.trim();
+    const num_slides = parseInt(document.getElementById('num-slides').value);
+
+    if (!topico) {
+      toast('Preencha o tópico');
+      document.getElementById('topico').focus();
+      return;
+    }
+
+    // UI: loading state
+    const btn = document.getElementById('gerar-btn');
+    btn.disabled = true;
+    document.getElementById('loading-box').classList.remove('hidden');
+    document.getElementById('success-box').classList.add('hidden');
+    document.getElementById('error-box').classList.add('hidden');
+
+    try {
+      const r = await fetch('/api/gerar', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({topico, brief, num_slides})
+      });
+      const d = await r.json();
+
+      document.getElementById('loading-box').classList.add('hidden');
+
+      if (d.ok) {
+        document.getElementById('success-titulo').textContent = d.titulo;
+        document.getElementById('success-link').href = d.url;
+        document.getElementById('success-box').classList.remove('hidden');
+        toast('Carrossel gerado com sucesso!');
+      } else {
+        document.getElementById('error-msg').textContent = d.error || 'Erro desconhecido';
+        document.getElementById('error-box').classList.remove('hidden');
+        btn.disabled = false;
+      }
+    } catch(e) {
+      document.getElementById('loading-box').classList.add('hidden');
+      document.getElementById('error-msg').textContent = 'Erro de conexão: ' + e.message;
+      document.getElementById('error-box').classList.remove('hidden');
+      btn.disabled = false;
+    }
+  }
+
+  // Allow Ctrl+Enter in brief to submit
+  document.getElementById('brief').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) gerarCarrossel();
+  });
+</script>
+{% endblock %}

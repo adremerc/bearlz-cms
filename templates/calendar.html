@@ -1,0 +1,459 @@
+{% extends "base.html" %}
+{% block title %}Calendário — Bearlz CMS{% endblock %}
+
+{% block content %}
+
+{%- set MONTHS   = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'] %}
+{%- set DAY_NAMES = ['SEG','TER','QUA','QUI','SEX','SÁB','DOM'] %}
+
+<!-- Header -->
+<div class="flex items-center justify-between mb-5">
+  <a href="/calendario?semana={{ prev_week }}"
+     class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+    </svg>
+    Semana anterior
+  </a>
+
+  <div class="text-center">
+    <h1 class="text-xl font-bold text-gray-900">
+      {{ days[0].day }}–{{ days[6].day }} {{ MONTHS[days[0].month - 1] }}
+      {% if days[0].month != days[6].month %} / {{ MONTHS[days[6].month - 1] }}{% endif %}
+      {{ days[0].year }}
+    </h1>
+    <p class="text-xs text-gray-400 mt-0.5">Calendário editorial semanal</p>
+  </div>
+
+  <a href="/calendario?semana={{ next_week }}"
+     class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">
+    Próxima semana
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+    </svg>
+  </a>
+</div>
+
+<!-- Total da semana -->
+{%- set total_semana = namespace(n=0) %}
+{%- for day in days %}
+  {%- set total_semana.n = total_semana.n + (cal[day.isoformat()] | length) %}
+{%- endfor %}
+{% if total_semana.n > 0 %}
+<div class="flex items-center justify-center gap-2 mb-4">
+  <span class="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-3 py-1 text-xs font-medium">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+    </svg>
+    {{ total_semana.n }} post{{ 's' if total_semana.n > 1 else '' }} agendado{{ 's' if total_semana.n > 1 else '' }} esta semana
+  </span>
+</div>
+{% endif %}
+
+<!-- Grid -->
+<div class="grid grid-cols-7 gap-2">
+  {% for day in days %}
+  {%- set iso = day.isoformat() %}
+  {%- set is_today = iso == today %}
+  {%- set cards = cal[iso] %}
+  {%- set count = cards | length %}
+
+  <div class="flex flex-col bg-white rounded-xl border {% if is_today %}border-blue-400 shadow-blue-100{% else %}border-gray-200{% endif %} shadow-sm overflow-hidden"
+       id="col-{{ iso }}">
+
+    <!-- Column header -->
+    <div class="px-3 pt-3 pb-2.5 {% if is_today %}bg-blue-500{% else %}bg-gray-50 border-b border-gray-100{% endif %}">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs font-bold {% if is_today %}text-blue-100{% else %}text-gray-400{% endif %} uppercase tracking-wider">
+            {{ DAY_NAMES[loop.index0] }}
+          </p>
+          <p class="text-base font-bold {% if is_today %}text-white{% else %}text-gray-800{% endif %} leading-tight">
+            {{ day.day }} {{ MONTHS[day.month - 1] }}
+          </p>
+        </div>
+        <!-- Count badge -->
+        {% if count > 0 %}
+        <span class="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold
+          {% if is_today %}bg-white text-blue-600{% else %}bg-blue-100 text-blue-700{% endif %}">
+          {{ count }}
+        </span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Cards area -->
+    <div class="flex-1 p-2 flex flex-col gap-2 cards-container min-h-48 overflow-y-auto" data-date="{{ iso }}" style="max-height: 520px;">
+
+      {% if cards %}
+        {% for item in cards %}
+        <div class="calendar-card group relative rounded-lg border overflow-hidden
+          {% if item.status == 'publicado' %}border-blue-200 bg-blue-50
+          {% elif item.status == 'aprovado' %}border-green-200 bg-green-50
+          {% elif item.status == 'analise_gabriel' %}border-purple-200 bg-purple-50
+          {% elif item.status == 'analise_adre' %}border-orange-200 bg-orange-50
+          {% else %}border-gray-200 bg-white{% endif %}"
+          data-slug="{{ item.slug }}">
+
+          <!-- Status strip (left border accent) -->
+          <div class="absolute left-0 top-0 bottom-0 w-0.5
+            {% if item.status == 'publicado' %}bg-blue-400
+            {% elif item.status == 'aprovado' %}bg-green-400
+            {% elif item.status == 'analise_gabriel' %}bg-purple-400
+            {% elif item.status == 'analise_adre' %}bg-orange-400
+            {% else %}bg-gray-300{% endif %}"></div>
+
+          <div class="pl-3 pr-2 py-2.5">
+            <!-- Title + remove -->
+            <div class="flex items-start justify-between gap-1 mb-2">
+              <a href="/c/{{ item.slug }}"
+                 class="text-xs font-semibold text-gray-800 hover:text-blue-600 transition-colors leading-snug flex-1"
+                 title="{{ item.titulo }}">
+                {{ item.titulo | truncate(55, true, '…') }}
+              </a>
+              <button onclick="removeFromCalendar('{{ item.slug }}', this.closest('.calendar-card'))"
+                class="opacity-0 group-hover:opacity-100 flex-shrink-0 text-gray-300 hover:text-red-500 transition-all p-0.5 rounded mt-0.5"
+                title="Remover do dia">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Meta row -->
+            <div class="flex items-center justify-between gap-1">
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
+                {% if item.status_color == 'green' %}bg-green-100 text-green-700
+                {% elif item.status_color == 'blue' %}bg-blue-100 text-blue-700
+                {% elif item.status_color == 'orange' %}bg-orange-100 text-orange-700
+                {% elif item.status_color == 'purple' %}bg-purple-100 text-purple-700
+                {% else %}bg-gray-100 text-gray-500{% endif %}">
+                {{ item.status_label }}
+              </span>
+
+              {% if item.num_slides %}
+              <span class="text-xs text-gray-400 flex items-center gap-0.5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                </svg>
+                {{ item.num_slides }}
+              </span>
+              {% endif %}
+
+              <!-- Quick open link -->
+              <a href="/c/{{ item.slug }}" title="Abrir"
+                class="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-blue-500 transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                </svg>
+              </a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+
+      {% else %}
+        <div class="empty-placeholder flex-1 flex flex-col items-center justify-center py-6 gap-1.5">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
+          <p class="text-xs text-gray-300">Sem posts</p>
+        </div>
+      {% endif %}
+
+    </div>
+
+    <!-- Add bar -->
+    <div class="p-2 border-t border-gray-100 bg-gray-50">
+      <button onclick="openAddModal('{{ iso }}')"
+        class="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed border-gray-300 text-xs font-medium text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+        </svg>
+        Agendar post
+      </button>
+    </div>
+
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ── Modal de adicionar ──────────────────────────────── -->
+<div id="add-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+  <!-- Overlay -->
+  <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeAddModal()"></div>
+
+  <!-- Panel -->
+  <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col" style="max-height: 80vh;">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+      <div>
+        <h3 class="font-semibold text-gray-900 text-sm">Agendar post</h3>
+        <p id="modal-date-label" class="text-xs text-gray-400 mt-0.5"></p>
+      </div>
+      <button onclick="closeAddModal()" class="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-lg hover:bg-gray-100">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Search -->
+    <div class="px-4 py-3 border-b border-gray-100">
+      <div class="relative">
+        <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
+        </svg>
+        <input type="text" id="modal-search" placeholder="Buscar carrossel..."
+          oninput="filterModal()"
+          class="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50"/>
+      </div>
+    </div>
+
+    <!-- List -->
+    <div id="modal-list" class="overflow-y-auto flex-1 p-2 flex flex-col gap-1">
+      <!-- populated by JS -->
+    </div>
+
+    <!-- Empty state -->
+    <div id="modal-empty" class="hidden py-10 text-center text-sm text-gray-400">
+      Nenhum carrossel encontrado.
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const ALL_CARROSSEIS = {{ all_carrosseis | tojson }};
+
+  const STATUS_META = {
+    rascunho:        { label: 'Rascunho',         bg: 'bg-gray-100',   text: 'text-gray-500',   border: 'border-gray-200',   strip: 'bg-gray-300'    },
+    analise_adre:    { label: 'Análise Adre',     bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-200', strip: 'bg-orange-400'  },
+    analise_gabriel: { label: 'Análise Gabriel',  bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200', strip: 'bg-purple-400'  },
+    aprovado:        { label: 'Aprovado',         bg: 'bg-green-100',  text: 'text-green-700',  border: 'border-green-200',  strip: 'bg-green-400'   },
+    publicado:       { label: 'Publicado',        bg: 'bg-blue-100',   text: 'text-blue-700',   border: 'border-blue-200',   strip: 'bg-blue-400'    },
+  };
+
+  const MONTH_NAMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+  let modalDate = null;
+
+  // ── Modal ───────────────────────────────────────────────────────────────────
+
+  function openAddModal(date) {
+    modalDate = date;
+    // Format date for label
+    const [y, m, d] = date.split('-').map(Number);
+    const weekdays = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+    const dt = new Date(y, m-1, d);
+    document.getElementById('modal-date-label').textContent =
+      weekdays[dt.getDay()] + ', ' + d + ' de ' + MONTH_NAMES[m-1] + ' ' + y;
+
+    document.getElementById('modal-search').value = '';
+    renderModalList('');
+    document.getElementById('add-modal').classList.remove('hidden');
+    setTimeout(() => document.getElementById('modal-search').focus(), 50);
+  }
+
+  function closeAddModal() {
+    document.getElementById('add-modal').classList.add('hidden');
+    modalDate = null;
+  }
+
+  function filterModal() {
+    renderModalList(document.getElementById('modal-search').value.trim().toLowerCase());
+  }
+
+  function renderModalList(query) {
+    const list = document.getElementById('modal-list');
+    const empty = document.getElementById('modal-empty');
+    const items = query
+      ? ALL_CARROSSEIS.filter(c => c.titulo.toLowerCase().includes(query))
+      : ALL_CARROSSEIS;
+
+    if (!items.length) {
+      list.innerHTML = '';
+      empty.classList.remove('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+
+    list.innerHTML = items.map(c => {
+      const st = STATUS_META[c.status] || STATUS_META.rascunho;
+      const slides = c.num_slides ? `<span class="text-gray-400 text-xs">${c.num_slides} slides</span>` : '';
+      return `
+        <button onclick="addToDay('${escHtml(c.slug)}')"
+          class="w-full text-left flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-200 group">
+          <!-- Status strip -->
+          <div class="w-1 h-10 rounded-full flex-shrink-0 ${st.strip}"></div>
+          <!-- Info -->
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-gray-800 truncate group-hover:text-blue-600 transition-colors">
+              ${escHtml(c.titulo)}
+            </p>
+            <div class="flex items-center gap-2 mt-0.5">
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${st.bg} ${st.text}">
+                ${st.label}
+              </span>
+              ${slides}
+            </div>
+          </div>
+          <!-- Arrow -->
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-300 group-hover:text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+          </svg>
+        </button>`;
+    }).join('');
+  }
+
+  // ── Add / Remove ────────────────────────────────────────────────────────────
+
+  async function addToDay(slug) {
+    if (!modalDate) return;
+    const date = modalDate;
+
+    try {
+      const r = await fetch('/api/agendar', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({slug, data: date})
+      });
+      const d = await r.json();
+      if (!d.ok) { toast('Erro ao agendar'); return; }
+
+      const item = ALL_CARROSSEIS.find(c => c.slug === slug);
+      if (!item) { closeAddModal(); toast('Agendado'); return; }
+
+      const col = document.querySelector(`#col-${date} .cards-container`);
+      const placeholder = col.querySelector('.empty-placeholder');
+      if (placeholder) placeholder.remove();
+
+      const st = STATUS_META[item.status] || STATUS_META.rascunho;
+      const titulo = item.titulo.length > 55 ? item.titulo.slice(0, 54) + '…' : item.titulo;
+      const slidesHtml = item.num_slides
+        ? `<span class="text-xs text-gray-400 flex items-center gap-0.5">
+             <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+               <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+             </svg>
+             ${item.num_slides}
+           </span>` : '';
+
+      const card = document.createElement('div');
+      card.className = `calendar-card group relative rounded-lg border overflow-hidden ${st.border} ${
+        item.status === 'publicado' ? 'bg-blue-50' : item.status === 'aprovado' ? 'bg-green-50' : 'bg-white'
+      }`;
+      card.dataset.slug = slug;
+      card.innerHTML = `
+        <div class="absolute left-0 top-0 bottom-0 w-0.5 ${st.strip}"></div>
+        <div class="pl-3 pr-2 py-2.5">
+          <div class="flex items-start justify-between gap-1 mb-2">
+            <a href="/c/${escHtml(slug)}"
+               class="text-xs font-semibold text-gray-800 hover:text-blue-600 transition-colors leading-snug flex-1"
+               title="${escHtml(item.titulo)}">
+              ${escHtml(titulo)}
+            </a>
+            <button onclick="removeFromCalendar('${escHtml(slug)}', this.closest('.calendar-card'))"
+              class="opacity-0 group-hover:opacity-100 flex-shrink-0 text-gray-300 hover:text-red-500 transition-all p-0.5 rounded mt-0.5"
+              title="Remover do dia">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+          <div class="flex items-center justify-between gap-1">
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${st.bg} ${st.text}">
+              ${st.label}
+            </span>
+            ${slidesHtml}
+            <a href="/c/${escHtml(slug)}" title="Abrir"
+              class="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-blue-500 transition-all">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+              </svg>
+            </a>
+          </div>
+        </div>`;
+
+      col.appendChild(card);
+      updateDayCount(date);
+      closeAddModal();
+      toast('Agendado para ' + date.split('-').reverse().join('/'));
+    } catch(e) {
+      toast('Erro de conexão');
+    }
+  }
+
+  async function removeFromCalendar(slug, cardEl) {
+    try {
+      const r = await fetch('/api/agendar', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({slug, data: null})
+      });
+      const d = await r.json();
+      if (!d.ok) { toast('Erro ao remover'); return; }
+
+      const container = cardEl.closest('.cards-container');
+      const date      = container.dataset.date;
+      cardEl.remove();
+
+      if (!container.querySelector('.calendar-card')) {
+        container.innerHTML = `
+          <div class="empty-placeholder flex-1 flex flex-col items-center justify-center py-6 gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+            <p class="text-xs text-gray-300">Sem posts</p>
+          </div>`;
+      }
+      updateDayCount(date);
+      toast('Removido do calendário');
+    } catch(e) {
+      toast('Erro de conexão');
+    }
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+
+  function updateDayCount(date) {
+    const col   = document.getElementById('col-' + date);
+    if (!col) return;
+    const header = col.querySelector('[data-count-badge]') ||
+                   col.querySelector('.count-badge');
+    const count = col.querySelectorAll('.calendar-card').length;
+    // Find or create count badge in header
+    let badge = col.querySelector('.count-badge');
+    if (count > 0) {
+      if (badge) {
+        badge.textContent = count;
+      } else {
+        // inject next to date text in header
+        const headerDiv = col.querySelector('.flex.items-center.justify-between');
+        if (headerDiv) {
+          const span = document.createElement('span');
+          const isToday = col.querySelector('.text-white.text-base') !== null;
+          span.className = 'count-badge flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ' +
+            (isToday ? 'bg-white text-blue-600' : 'bg-blue-100 text-blue-700');
+          span.textContent = count;
+          headerDiv.appendChild(span);
+        }
+      }
+    } else if (badge) {
+      badge.remove();
+    }
+  }
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  // Close modal on Escape
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeAddModal();
+  });
+</script>
+{% endblock %}

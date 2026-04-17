@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Bearlz CMS{% endblock %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="flex items-center justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">Carrosseis</h1>
+    <p class="text-sm text-gray-500 mt-0.5">{{ counts.todos }} post{% if counts.todos != 1 %}s{% endif %} no total</p>
+  </div>
+</div>
+
+<!-- Filters row -->
+<div class="flex flex-wrap items-center gap-3 mb-6">
+
+  <!-- Status tabs -->
+  <div class="flex bg-white border border-gray-200 rounded-lg p-1 gap-0.5">
+    {% for key, label, count in [
+      ('todos',           'Todos',            counts.todos),
+      ('rascunho',        'Rascunho',         counts.rascunho),
+      ('analise_adre',    'Análise Adre',     counts.analise_adre),
+      ('analise_gabriel', 'Análise Gabriel',  counts.analise_gabriel),
+      ('aprovado',        'Aprovado',         counts.aprovado),
+      ('publicado',       'Publicado',        counts.publicado),
+    ] %}
+    <a href="?status={{ key }}&prio={{ prio_filter }}{% if busca %}&q={{ busca }}{% endif %}"
+       class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5
+              {% if status_filter == key %}bg-gray-900 text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %}">
+      {{ label }}
+      <span class="text-xs rounded-full px-1.5 py-0.5 font-semibold
+        {% if status_filter == key %}bg-white/20 text-white{% else %}bg-gray-100 text-gray-500{% endif %}">
+        {{ count }}
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- Priority filter -->
+  <div class="flex bg-white border border-gray-200 rounded-lg p-1 gap-0.5">
+    {% for key, label, color in [
+      ('todos', 'Prioridade', 'gray'),
+      ('alta',  'Alta',       'red'),
+      ('media', 'Média',      'yellow'),
+      ('baixa', 'Baixa',      'gray'),
+    ] %}
+    <a href="?status={{ status_filter }}&prio={{ key }}{% if busca %}&q={{ busca }}{% endif %}"
+       class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors
+              {% if prio_filter == key %}bg-gray-900 text-white{% else %}text-gray-600 hover:bg-gray-100{% endif %}">
+      {% if key != 'todos' %}
+      <span class="inline-block w-2 h-2 rounded-full mr-1
+        {% if color == 'red' %}bg-red-400{% elif color == 'yellow' %}bg-yellow-400{% else %}bg-gray-400{% endif %}"></span>
+      {% endif %}
+      {{ label }}
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- Search -->
+  <form method="get" class="flex-1 min-w-44 max-w-xs">
+    <input type="hidden" name="status" value="{{ status_filter }}">
+    <input type="hidden" name="prio"   value="{{ prio_filter }}">
+    <input type="text" name="q" value="{{ busca }}" placeholder="Buscar por título..."
+      class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+  </form>
+</div>
+
+<!-- Cards grid -->
+{% if carrosseis %}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+  {% for c in carrosseis %}
+  <a href="/c/{{ c.slug }}"
+     class="group bg-white rounded-xl border border-gray-200 overflow-hidden hover:border-blue-300 hover:shadow-md transition-all duration-150 flex flex-col">
+
+    <!-- Thumbnail -->
+    <div class="aspect-[4/5] bg-gradient-to-br
+      {% if c.status == 'publicado' %}from-blue-50 to-blue-100
+      {% elif c.status == 'aprovado' %}from-green-50 to-green-100
+      {% elif c.status == 'analise_gabriel' %}from-purple-50 to-purple-100
+      {% elif c.status == 'analise_adre' %}from-orange-50 to-orange-100
+      {% else %}from-gray-50 to-gray-100{% endif %}
+      flex flex-col items-center justify-center p-6 relative">
+
+      <!-- Priority ribbon -->
+      {% if c.prio_color == 'red' %}
+      <div class="absolute top-0 left-0 right-0 h-1 bg-red-400 rounded-t-xl"></div>
+      {% elif c.prio_color == 'yellow' %}
+      <div class="absolute top-0 left-0 right-0 h-1 bg-yellow-400 rounded-t-xl"></div>
+      {% endif %}
+
+      <img src="/static/gabriel.png" class="w-12 h-12 rounded-full object-cover shadow mb-3" alt="Gabriel">
+      <p class="text-xs font-semibold text-gray-700 text-center">gabriel.bearlz</p>
+      <p class="text-xs text-gray-400 mb-4">@gabriel.bearlz ✓</p>
+      <p class="text-center text-xs text-gray-800 font-medium leading-snug line-clamp-4 px-2">{{ c.titulo }}</p>
+
+      {% if c.num_slides %}
+      <span class="absolute bottom-3 right-3 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full">
+        {{ c.num_slides }} slides
+      </span>
+      {% endif %}
+
+      <!-- Review time badge -->
+      {% if c.tempo_fmt %}
+      <span class="absolute bottom-3 left-3 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2"/>
+        </svg>
+        {{ c.tempo_fmt }}
+      </span>
+      {% endif %}
+    </div>
+
+    <!-- Footer -->
+    <div class="px-4 py-3 border-t border-gray-100 flex-1 flex flex-col justify-between">
+      <p class="text-sm font-semibold text-gray-900 truncate mb-2">{{ c.titulo }}</p>
+      <div class="flex items-center justify-between flex-wrap gap-1">
+        <!-- Status badge -->
+        <span class="text-xs font-medium px-2 py-0.5 rounded-full border
+          {% if c.status_color == 'green' %}bg-green-50 text-green-700 border-green-200
+          {% elif c.status_color == 'blue' %}bg-blue-50 text-blue-700 border-blue-200
+          {% elif c.status_color == 'orange' %}bg-orange-50 text-orange-700 border-orange-200
+          {% elif c.status_color == 'purple' %}bg-purple-50 text-purple-700 border-purple-200
+          {% else %}bg-gray-100 text-gray-600 border-gray-200{% endif %}">
+          {{ c.status_label }}
+        </span>
+        <!-- Priority badge -->
+        <span class="text-xs font-medium px-2 py-0.5 rounded-full border flex items-center gap-1
+          {% if c.prio_color == 'red' %}bg-red-50 text-red-700 border-red-200
+          {% elif c.prio_color == 'yellow' %}bg-yellow-50 text-yellow-700 border-yellow-200
+          {% else %}bg-gray-100 text-gray-500 border-gray-200{% endif %}">
+          <span class="w-1.5 h-1.5 rounded-full
+            {% if c.prio_color == 'red' %}bg-red-400
+            {% elif c.prio_color == 'yellow' %}bg-yellow-400
+            {% else %}bg-gray-400{% endif %}"></span>
+          {{ c.prio_label }}
+        </span>
+      </div>
+      <p class="text-xs text-gray-400 mt-1.5">{{ c.created_fmt }}</p>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="flex flex-col items-center justify-center py-24 text-center">
+  <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+    </svg>
+  </div>
+  <p class="text-gray-600 font-medium">Nenhum carrossel encontrado</p>
+  <p class="text-gray-400 text-sm mt-1">
+    {% if busca %}Tente outro termo.
+    {% elif status_filter != 'todos' or prio_filter != 'todos' %}Nenhum resultado com esses filtros.
+    {% else %}Rode <code class="bg-gray-100 px-1 rounded">python gerar-lote.py</code> para gerar carrosseis.{% endif %}
+  </p>
+  {% if status_filter != 'todos' or prio_filter != 'todos' or busca %}
+  <a href="/" class="mt-4 text-sm text-blue-500 hover:underline">Ver todos</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

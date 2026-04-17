@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: bearlz-cms
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --workers 2 --bind 0.0.0.0:$PORT
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CMS_API_KEY
+        generateValue: true
+    disk:
+      name: carrosseis-data
+      mountPath: /opt/render/project/src/carrosseis
+      sizeGB: 1
