@@ -1,5 +1,5 @@
 *{box-sizing:border-box;margin:0;padding:0}
-body{min-height:100vh;background:#F0EEEC;font-family:'Inter','Helvetica Neue',sans-serif;display:flex;flex-direction:column;align-items:center;padding:20px 10px 40px}
+body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue',sans-serif;display:flex;flex-direction:column;align-items:center;padding:20px 10px 40px}
 .header{display:flex;align-items:center;justify-content:space-between;width:100%;max-width:420px;margin-bottom:14px}
 .header h1{font-size:15px;font-weight:700;color:#111;margin:0}
 .header p{font-size:11px;color:#999;margin:2px 0 0}
@@ -108,13 +108,13 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Inter','Helvetica Neue',sa
 .card::before{
   content:'LIMITE DO POST 1080x1350';
   position:absolute;
-  right:0;top:527px;
+  right:0;top:calc(100% + 4px);
   background:#ff3b30;color:#fff;
   font-size:9px;font-weight:700;
   padding:2px 6px;letter-spacing:.5px;
   pointer-events:none;
   z-index:5;
-  font-family:'Inter',sans-serif;
+  font-family:'Open Sans',sans-serif;
 }
 .card.has-overflow{box-shadow:0 0 0 1px #ff3b30}
 .overflow-warn{
@@ -125,7 +125,7 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Inter','Helvetica Neue',sa
   border:1px solid #ff3b30;
   border-radius:8px;
   font-size:11px;color:#c0392b;font-weight:600;
-  font-family:'Inter',sans-serif;
+  font-family:'Open Sans',sans-serif;
 }
 .overflow-warn.active{display:block}
 

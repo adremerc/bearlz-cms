@@ -364,7 +364,7 @@ function canvasWrapText(ctx,segs,maxW,fSize){
     for(let i=0;i<words.length;i++){
       const w=words[i];
       if(!w){prevSpaced=true;continue;}
-      ctx.font=`${seg.b?'700':'400'} ${fSize}px Inter,sans-serif`;
+      ctx.font=`${seg.b?'700':'400'} ${fSize}px Open Sans,sans-serif`;
       const sp=lineW>0&&(!first||prevSpaced);
       const pre=sp?' ':'';
       const tw=ctx.measureText(pre+w).width;
@@ -385,7 +385,7 @@ function canvasAvatarPlaceholder(ctx,x,y,sz){
   ctx.save();ctx.beginPath();ctx.arc(x+sz/2,y+sz/2,sz/2,0,Math.PI*2);ctx.clip();
   const g=ctx.createLinearGradient(x,y,x+sz,y+sz);g.addColorStop(0,'#1a1a2e');g.addColorStop(1,'#16213e');
   ctx.fillStyle=g;ctx.fillRect(x,y,sz,sz);
-  ctx.fillStyle='#fff';ctx.font='900 42px Inter,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillStyle='#fff';ctx.font='900 42px Open Sans,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
   ctx.fillText('G',x+sz/2,y+sz/2);ctx.textAlign='left';ctx.textBaseline='top';ctx.restore();
 }
 function canvasDrawBadge(ctx,x,y,sz){
@@ -422,9 +422,9 @@ async function drawSlideToCanvas(canvas,slide){
   ctx.textBaseline='top';
   const nameHandleH=nameSize+8+handleSize;
   const nameY=cy+Math.round((picSz-nameHandleH)/2);
-  ctx.fillStyle='#0f1419';ctx.font=`700 ${nameSize}px Inter,sans-serif`;
+  ctx.fillStyle='#0f1419';ctx.font=`700 ${nameSize}px Open Sans,sans-serif`;
   ctx.fillText(profile.name,tx,nameY);
-  ctx.fillStyle='#555555';ctx.font=`400 ${handleSize}px Inter,sans-serif`;
+  ctx.fillStyle='#555555';ctx.font=`400 ${handleSize}px Open Sans,sans-serif`;
   ctx.fillText(profile.handle,tx,nameY+nameSize+8);
   const hw=ctx.measureText(profile.handle).width;
   canvasDrawBadge(ctx,tx+hw+10,nameY+nameSize+8,32);
@@ -438,7 +438,7 @@ async function drawSlideToCanvas(canvas,slide){
     for(const ln of lines){
       let lx=px;
       for(const chunk of ln){
-        ctx.font=`${chunk.bold?'700':'400'} ${fSize}px Inter,sans-serif`;
+        ctx.font=`${chunk.bold?'700':'400'} ${fSize}px Open Sans,sans-serif`;
         ctx.fillStyle='#0f1419';
         ctx.fillText(chunk.text,lx,cy);
         lx+=ctx.measureText(chunk.text).width;
@@ -480,13 +480,13 @@ async function drawSlideToCanvas(canvas,slide){
     }catch(e){
       ctx.save();roundRect(ctx,px,cy,W-px*2,imgH,radius);ctx.clip();
       ctx.fillStyle='#f4f4f4';ctx.fillRect(px,cy,W-px*2,imgH);
-      ctx.fillStyle='#ccc';ctx.font='400 36px Inter,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillStyle='#ccc';ctx.font='400 36px Open Sans,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
       ctx.fillText(`Slide ${slide.id}`,W/2,cy+imgH/2);ctx.textAlign='left';ctx.textBaseline='top';ctx.restore();
     }
   }else{
     ctx.save();roundRect(ctx,px,cy,W-px*2,imgH,radius);ctx.clip();
     ctx.fillStyle='#f4f4f4';ctx.fillRect(px,cy,W-px*2,imgH);
-    ctx.fillStyle='#ccc';ctx.font='400 36px Inter,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle='#ccc';ctx.font='400 36px Open Sans,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillText(`Slide ${slide.id}`,W/2,cy+imgH/2);ctx.textAlign='left';ctx.textBaseline='top';ctx.restore();
   }
 }
@@ -600,7 +600,7 @@ function loadTextStyle(){
   applyTextStyle();
 }
 function resetTextStyle(){
-  document.getElementById('fontFamily').value='Inter,sans-serif';
+  document.getElementById('fontFamily').value='Open Sans,sans-serif';
   document.getElementById('fontSize').value=18.5;
   document.getElementById('lineHeight').value=1.5;
   document.getElementById('paraGap').value=16;
@@ -626,7 +626,7 @@ function downloadFromPreview(){
 
 async function captureCard(){
   const card=document.getElementById('theCard');
-  const CARD_W=420,CARD_H=525,SCALE=1080/CARD_W;
+  const CARD_W=420,CARD_H=525,SCALE=2160/CARD_W;
   // Measure heights of UI elements BEFORE hiding (so we can replace with spacers)
   const dotsEl=document.querySelector('.card-dots-row');
   const footerEl=document.querySelector('.card-footer');
