@@ -25,9 +25,14 @@ env/
 Thumbs.db
 desktop.ini
 
-# Local SQLite (will be regenerated on Render with persistent disk)
-# Comment the line below if you want to ship current db
-# bearlz.db
+# Dados persistentes locais (servidor Render usa disco montado em /data)
+bearlz.db
+data/bearlz.db
+data/edits/*.json
+carrosseis/edits/*.json
+
+# Testes/backups
+bearlz-cms-backup-*/
 
 # Logs
 *.log
