@@ -826,6 +826,109 @@ async function downloadZip(){
   setTimeout(()=>setStatus(''),3500);
 }
 
+/* ── Feature: 3 hooks (Curiosidade / Dor / Promessa) para o slide 1 ── */
+
+function _ensureHookButton(){
+  if(document.getElementById('btnHooks'))return;
+  const footerActions=document.querySelector('.footer-actions');
+  if(!footerActions)return;
+  const btn=document.createElement('button');
+  btn.id='btnHooks';
+  btn.className='footer-btn';
+  btn.textContent='✨ Hooks';
+  btn.title='Gera 3 variações do slide 1: Curiosidade / Dor / Promessa';
+  btn.onclick=_abrirHooksModal;
+  footerActions.appendChild(btn);
+}
+
+function _ensureHooksModal(){
+  if(document.getElementById('hooksModal'))return;
+  const modal=document.createElement('div');
+  modal.id='hooksModal';
+  modal.className='hooks-modal';
+  modal.innerHTML=`
+    <div class="hooks-inner" onclick="event.stopPropagation()">
+      <div class="hooks-head">
+        <strong>3 variações do slide 1</strong>
+        <button class="hooks-x" onclick="_fecharHooksModal()">×</button>
+      </div>
+      <div id="hooksBody" class="hooks-body">
+        <div class="hooks-loading">Gerando com Claude… (15–30s)</div>
+      </div>
+    </div>`;
+  modal.addEventListener('click',_fecharHooksModal);
+  document.body.appendChild(modal);
+}
+
+function _fecharHooksModal(e){
+  if(e&&e.target&&e.target.closest('.hooks-inner')&&!e.target.classList.contains('hooks-x'))return;
+  const m=document.getElementById('hooksModal');
+  if(m)m.classList.remove('active');
+}
+window._fecharHooksModal=_fecharHooksModal;
+
+async function _abrirHooksModal(){
+  _ensureHooksModal();
+  const modal=document.getElementById('hooksModal');
+  const body=document.getElementById('hooksBody');
+  modal.classList.add('active');
+  body.innerHTML='<div class="hooks-loading">Gerando com Claude… (15–30s)</div>';
+  const slug=window.CAROUSEL_SLUG;
+  if(!slug){body.innerHTML='<div class="hooks-err">Slug do carrossel não encontrado.</div>';return;}
+  try{
+    const r=await fetch(`/api/hooks/${encodeURIComponent(slug)}`,{
+      method:'POST',headers:{'Content-Type':'application/json'},body:'{}'
+    });
+    const raw=await r.text();
+    let d;
+    try{d=JSON.parse(raw);}
+    catch{
+      if(r.status===500||r.status===502||r.status===504){
+        body.innerHTML='<div class="hooks-err">Servidor demorou demais. Tente novamente em 30s.</div>';
+      }else{
+        body.innerHTML=`<div class="hooks-err">Resposta inválida do servidor (status ${r.status}).</div>`;
+      }
+      return;
+    }
+    if(!d.ok){
+      body.innerHTML=`<div class="hooks-err">${d.error||'Erro ao gerar hooks'}</div>`;
+      return;
+    }
+    const corMap={Curiosidade:'curi',Dor:'dor',Promessa:'prom'};
+    body.innerHTML=d.variantes.map((v,i)=>{
+      const klass=corMap[v.tipo]||'curi';
+      const esc=(v.texto||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      // Render negritos **x** como <strong>
+      const html=esc.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+      return `<div class="hook-card" data-idx="${i}">
+        <div class="hook-label hook-${klass}">${v.tipo}</div>
+        <div class="hook-text">${html}</div>
+        <button class="hook-apply" onclick="_aplicarHook(${i})">Usar este</button>
+      </div>`;
+    }).join('');
+    window._hooksVariantes=d.variantes;
+  }catch(e){
+    body.innerHTML=`<div class="hooks-err">Erro de conexão: ${e.message}</div>`;
+  }
+}
+window._abrirHooksModal=_abrirHooksModal;
+
+function _aplicarHook(i){
+  const v=(window._hooksVariantes||[])[i];
+  if(!v||!slides[0])return;
+  slides[0].text=v.texto;
+  if(typeof render==='function')render();
+  if(typeof autoSave==='function')autoSave();
+  if(typeof saveToServer==='function')saveToServer();
+  if(typeof checkOverflow==='function')checkOverflow();
+  _fecharHooksModal();
+  if(typeof setStatus==='function')setStatus(`Hook "${v.tipo}" aplicado no slide 1!`);
+  setTimeout(()=>{if(typeof setStatus==='function')setStatus('');},3500);
+}
+window._aplicarHook=_aplicarHook;
+
 // Hidratação: tenta carregar do servidor primeiro, fallback pra localStorage
 // Depois chama render(), loadTextStyle(), checkOverflow() e inicia polling
 initHydrate();
+// Adiciona botão Hooks no footer apos o DOM estar pronto
+setTimeout(_ensureHookButton,100);

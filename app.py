@@ -991,6 +991,121 @@ def api_gerar():
         return jsonify({"error": str(e)}), 500
 
 
+# ── Gerador de 3 hooks (slide 1) por abordagem: Curiosidade / Dor / Promessa ───
+
+def _extrair_contexto_carrossel(slug: str):
+    """Le o HTML do carrossel e extrai titulo + texto do slide 1 atual + resumo
+    dos proximos slides para dar contexto ao Claude na geracao dos hooks."""
+    with get_db() as conn:
+        row = conn.execute("SELECT arquivo, titulo FROM carrosseis WHERE slug=?", (slug,)).fetchone()
+    if not row or not row["arquivo"]:
+        return None, None, None
+    html_path = CARROSSEIS_DIR / row["arquivo"]
+    if not html_path.exists():
+        return row["titulo"], None, None
+
+    html = html_path.read_text(encoding="utf-8")
+    arr_start = html.find("const slides=[")
+    if arr_start == -1:
+        return row["titulo"], None, None
+    # Captura o array de slides (ingenuo: acha o primeiro "];" depois do inicio)
+    arr_end = html.find("\n];", arr_start)
+    if arr_end == -1:
+        return row["titulo"], None, None
+    bloco = html[arr_start:arr_end]
+
+    # Extrai os textos dos slides (dentro de backticks `...`). Regex simples.
+    textos = re.findall(r"text:`([^`]*)`", bloco, flags=re.DOTALL)
+    slide1 = textos[0].strip() if textos else ""
+    # Resumo dos proximos (primeiros 200 chars de cada)
+    resto = [t.strip().replace("\n", " ")[:200] for t in textos[1:5]]
+    return row["titulo"], slide1, resto
+
+
+@app.route("/api/hooks/<slug>", methods=["POST"])
+def api_hooks(slug):
+    """Gera 3 variantes de slide 1 (hook) com abordagens Curiosidade, Dor e Promessa."""
+    if not ANTHROPIC_AVAILABLE:
+        return jsonify({"error": "Biblioteca anthropic não instalada"}), 400
+    if not ANTHROPIC_API_KEY or not ANTHROPIC_API_KEY.startswith("sk-ant-api"):
+        return jsonify({"error": "ANTHROPIC_API_KEY não configurada"}), 400
+
+    titulo, slide1_atual, proximos = _extrair_contexto_carrossel(slug)
+    if titulo is None:
+        return jsonify({"error": "Carrossel não encontrado"}), 404
+
+    # Permite override via body (caso usuario queira passar contexto manual)
+    data = request.get_json(silent=True) or {}
+    contexto_extra = data.get("contexto", "").strip()
+
+    SYSTEM = (
+        "Você é redator sênior de conteúdo financeiro para @gabriel.bearlz no Instagram.\n"
+        "Estilo: thread do Twitter/X analítico. Público: investidores brasileiros 25-45 anos.\n\n"
+
+        "TAREFA: gerar 3 VARIANTES do slide 1 (hook) usando 3 abordagens distintas de copywriting:\n\n"
+
+        "1. CURIOSIDADE — desperta interesse com pergunta provocadora, revelação intrigante,\n"
+        "   dado surpreendente ou paralelo histórico que faz o leitor parar pra entender.\n"
+        "   Ex: 'Em 1995 quase ninguém tinha site. Em 2007 achavam iPhone caro. Agora existe\n"
+        "   um sinal parecido, e quase ninguém está prestando atenção.'\n\n"
+
+        "2. DOR — toca num medo concreto, prejuízo real ou frustração que o público já sente.\n"
+        "   Use contraste forte (quem faz X vs quem não faz). Ex: 'Seu concorrente acabou de\n"
+        "   contratar 30 funcionários que nunca dormem — e você ainda nem começou.'\n\n"
+
+        "3. PROMESSA — vende transformação, ganho tangível ou janela de oportunidade clara,\n"
+        "   com número/dado quando possível. Ex: 'Mercado que cresceu 822% em 6 anos, e a\n"
+        "   janela de entrada ainda está aberta.'\n\n"
+
+        "REGRAS INEGOCIÁVEIS:\n"
+        "- 280 a 420 caracteres por hook\n"
+        "- 2 a 4 negritos (**palavra**) com palavras-chave, números ou expressões de impacto\n"
+        "- NUNCA use travessão (—) em hipótese alguma\n"
+        "- Sem frases picotadas estilo IA: 'Queda. Alta. Oportunidade.' é proibido\n"
+        "- Sem enchimento: 'vale destacar', 'é importante ressaltar', 'cabe destacar' proibidos\n"
+        "- Sem emoji, sem hashtag\n"
+        "- Conectores naturais: 'Com isso,', 'Só que,', 'O que acontece é que,', 'Na prática,'\n"
+        "- Números em formatação brasileira (vírgula decimal, % colado)\n\n"
+
+        "RETORNE SOMENTE JSON VÁLIDO (sem markdown, sem texto fora):\n"
+        '{"variantes":[{"tipo":"Curiosidade","texto":"..."},'
+        '{"tipo":"Dor","texto":"..."},{"tipo":"Promessa","texto":"..."}]}'
+    )
+
+    prompt_partes = [f"TÍTULO DO CARROSSEL: {titulo}"]
+    if slide1_atual:
+        prompt_partes.append(f"\nSLIDE 1 ATUAL (a ser SUBSTITUÍDO por algo mais forte):\n{slide1_atual}")
+    if proximos:
+        prompt_partes.append("\nPRÓXIMOS SLIDES (use para manter coerência temática):")
+        for i, t in enumerate(proximos, start=2):
+            prompt_partes.append(f"  Slide {i}: {t}")
+    if contexto_extra:
+        prompt_partes.append(f"\nCONTEXTO ADICIONAL DO USUÁRIO: {contexto_extra}")
+    prompt_partes.append("\nGere 3 variantes do slide 1 com abordagens: Curiosidade, Dor, Promessa.")
+    prompt = "\n".join(prompt_partes)
+
+    try:
+        client = _anthropic_lib.Anthropic(api_key=ANTHROPIC_API_KEY)
+        resp = client.messages.create(
+            model="claude-sonnet-4-5", max_tokens=2500,
+            system=SYSTEM,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        texto = resp.content[0].text.strip()
+        if texto.startswith("```"):
+            texto = re.sub(r"^```[a-z]*\n?", "", texto)
+            texto = re.sub(r"\n?```$", "", texto).strip()
+        dados = json.loads(texto)
+        variantes = dados.get("variantes", [])
+        if not isinstance(variantes, list) or len(variantes) != 3:
+            return jsonify({"error": "Claude não retornou 3 variantes"}), 500
+        return jsonify({"ok": True, "variantes": variantes})
+    except json.JSONDecodeError as e:
+        return jsonify({"error": f"Resposta inválida do Claude: {e}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ── Static (css/js se precisar de arquivos extras) ─────────────────────────────
 @app.route("/static/<path:filename>")
 def static_files(filename):
