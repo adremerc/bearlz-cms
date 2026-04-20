@@ -178,15 +178,15 @@
 </div>
 
 <div class="style-panel">
-  <div class="sp-title"><span>ESTILO DO TEXTO</span><span class="sp-dim" id="dimLabel">1080 x 1350 px</span></div>
+  <div class="sp-title"><span>ESTILO DO TEXTO</span><span class="sp-dim" id="dimLabel">Open Sans 18px = Canva 34pt  |  Export 2160x2700 (4K)</span></div>
   <div class="sp-row">
     <label class="sp-label">Fonte:</label>
     <select class="sp-select" id="fontFamily" onchange="applyTextStyle()">
-      <option value="Inter,sans-serif">Inter (padrao)</option>
+      <option value="Open Sans,sans-serif">Open Sans (padrao)</option>
+      <option value="Inter,sans-serif">Inter</option>
       <option value="Roboto,sans-serif">Roboto</option>
       <option value="Poppins,sans-serif">Poppins</option>
       <option value="Montserrat,sans-serif">Montserrat</option>
-      <option value="Open Sans,sans-serif">Open Sans</option>
       <option value="Lato,sans-serif">Lato</option>
       <option value="Playfair Display,serif">Playfair Display</option>
       <option value="Merriweather,serif">Merriweather</option>
@@ -195,11 +195,11 @@
   </div>
   <div class="sp-row">
     <label class="sp-label">Tamanho:</label>
-    <input type="number" class="sp-num" id="fontSize" value="18.5" step="0.5" min="12" max="30" onchange="applyTextStyle()"/>
+    <input type="number" class="sp-num" id="fontSize" value="18" step="0.5" min="12" max="30" onchange="applyTextStyle()"/>
     <label class="sp-label" style="min-width:auto">LH:</label>
-    <input type="number" class="sp-num" id="lineHeight" value="1.5" step="0.05" min="1" max="2" onchange="applyTextStyle()"/>
+    <input type="number" class="sp-num" id="lineHeight" value="1.4" step="0.05" min="1" max="2" onchange="applyTextStyle()"/>
     <label class="sp-label" style="min-width:auto">Gap:</label>
-    <input type="number" class="sp-num" id="paraGap" value="16" step="1" min="0" max="40" onchange="applyTextStyle()"/>
+    <input type="number" class="sp-num" id="paraGap" value="20" step="1" min="0" max="40" onchange="applyTextStyle()"/>
     <button class="sp-btn" onclick="resetTextStyle()">Resetar</button>
     <button class="sp-preview-btn" onclick="showExportPreview()">Preview Export</button>
   </div>

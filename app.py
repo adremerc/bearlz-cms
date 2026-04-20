@@ -631,7 +631,7 @@ def api_revisar(slug):
     try:
         client = _anthropic_lib.Anthropic(api_key=ANTHROPIC_API_KEY)
         resp   = client.messages.create(
-            model="claude-sonnet-4-6", max_tokens=5000,
+            model="claude-sonnet-4-5", max_tokens=5000,
             system=SYSTEM_REVISAO,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -762,7 +762,7 @@ def api_gerar():
     try:
         client = _anthropic_lib.Anthropic(api_key=ANTHROPIC_API_KEY)
         resp   = client.messages.create(
-            model="claude-sonnet-4-6", max_tokens=6000,
+            model="claude-sonnet-4-5", max_tokens=6000,
             system=SYSTEM,
             messages=[{"role": "user", "content": prompt}]
         )
