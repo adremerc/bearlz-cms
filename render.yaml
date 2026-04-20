@@ -4,7 +4,10 @@ services:
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --workers 2 --bind 0.0.0.0:$PORT
+    # --timeout 180: /api/gerar chama Claude que pode demorar 20-40s para
+    # gerar 8-14 slides. Default do gunicorn e 30s, o que causa 500 e HTML
+    # de erro no lugar de JSON (frontend quebra com "Unexpected token '<'").
+    startCommand: gunicorn app:app --workers 2 --timeout 180 --bind 0.0.0.0:$PORT
     envVars:
       - key: SECRET_KEY
         generateValue: true

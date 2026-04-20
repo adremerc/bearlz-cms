@@ -151,7 +151,18 @@
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({topico, brief, num_slides})
       });
-      const d = await r.json();
+
+      // Tenta ler como JSON; se falhar, provavel timeout do gunicorn (retorna HTML).
+      const raw = await r.text();
+      let d;
+      try {
+        d = JSON.parse(raw);
+      } catch(parseErr) {
+        if (r.status === 500 || r.status === 502 || r.status === 504) {
+          throw new Error('O servidor demorou demais para responder. Tente gerar com menos slides (4–6) ou aguarde 30s e tente novamente.');
+        }
+        throw new Error('Resposta inválida do servidor (status ' + r.status + ')');
+      }
 
       document.getElementById('loading-box').classList.add('hidden');
 
@@ -167,7 +178,7 @@
       }
     } catch(e) {
       document.getElementById('loading-box').classList.add('hidden');
-      document.getElementById('error-msg').textContent = 'Erro de conexão: ' + e.message;
+      document.getElementById('error-msg').textContent = e.message;
       document.getElementById('error-box').classList.remove('hidden');
       btn.disabled = false;
     }
