@@ -39,13 +39,30 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "bearlz-dev-2026")
 
 BASE_DIR      = Path(__file__).parent
-# Dados persistentes (DB + edits compartilhadas) ficam em /data,
-# que é onde o disco persistente do Render é montado.
-# Os HTMLs dos carrosseis ficam no repo (carrosseis/) e são atualizados a cada deploy.
+# Dados persistentes (DB + edits compartilhadas + carrosseis gerados em prod)
+# ficam em /data, que é onde o disco persistente do Render é montado.
+# Os 9 HTMLs fixos (carga-tributaria, bitcoin-2026, etc) ficam no repo
+# (carrosseis/) e são atualizados a cada deploy.
 DATA_DIR       = BASE_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)
 DB_PATH        = DATA_DIR / "bearlz.db"
 CARROSSEIS_DIR = BASE_DIR / "carrosseis"
+# Onde vão os carrosseis gerados via /api/gerar (disco persistente, nao se
+# perdem entre deploys).
+GENERATED_DIR  = DATA_DIR / "generated"
+GENERATED_DIR.mkdir(exist_ok=True)
+
+def _find_carrossel_file(nome: str):
+    """Procura o arquivo de carrossel em ambos os diretorios (repo + persistente).
+    Carrosseis gerados em prod vao pra GENERATED_DIR; carrosseis fixos do repo
+    ficam em CARROSSEIS_DIR. Retorna o Path existente ou None."""
+    p1 = CARROSSEIS_DIR / nome
+    if p1.exists():
+        return p1
+    p2 = GENERATED_DIR / nome
+    if p2.exists():
+        return p2
+    return None
 
 # Migração: se existir bearlz.db no diretório antigo (raiz), move pro novo lugar
 _old_db = BASE_DIR / "bearlz.db"
@@ -106,12 +123,16 @@ def init_db():
 
 
 def scan_carrosseis_dir():
-    """Escaneia a pasta carrosseis/ e registra HTMLs novos no banco."""
-    if not CARROSSEIS_DIR.exists():
+    """Escaneia as pastas carrosseis/ (repo) e data/generated/ (disco persistente)
+    e registra HTMLs novos no banco."""
+    dirs_to_scan = [d for d in (CARROSSEIS_DIR, GENERATED_DIR) if d.exists()]
+    if not dirs_to_scan:
         return
     with get_db() as conn:
-        for html in sorted(CARROSSEIS_DIR.glob("carrossel-*.html"),
-                           key=lambda f: f.stat().st_mtime, reverse=True):
+        files = []
+        for d in dirs_to_scan:
+            files.extend(d.glob("carrossel-*.html"))
+        for html in sorted(files, key=lambda f: f.stat().st_mtime, reverse=True):
             exists = conn.execute(
                 "SELECT 1 FROM carrosseis WHERE arquivo = ?", (html.name,)
             ).fetchone()
@@ -293,7 +314,12 @@ def arquivo_carrossel(slug):
         ).fetchone()
     if not row or not row["arquivo"]:
         abort(404)
-    return send_from_directory(CARROSSEIS_DIR, row["arquivo"])
+    # Carrosseis fixos do repo em CARROSSEIS_DIR; carrosseis gerados em prod
+    # em GENERATED_DIR (disco persistente).
+    path = _find_carrossel_file(row["arquivo"])
+    if not path:
+        abort(404)
+    return send_from_directory(path.parent, path.name)
 
 
 # ── Edits compartilhadas (ambos editam, ambos veem) ───────────────────────────
@@ -548,9 +574,9 @@ def api_deletar_carrossel(slug):
     with get_db() as conn:
         row = conn.execute("SELECT arquivo FROM carrosseis WHERE slug=?", (slug,)).fetchone()
         if row and row["arquivo"]:
-            html_path = CARROSSEIS_DIR / row["arquivo"]
+            html_path = _find_carrossel_file(row["arquivo"])
             try:
-                if html_path.exists():
+                if html_path and html_path.exists():
                     html_path.unlink()
             except Exception:
                 pass
@@ -635,8 +661,8 @@ def api_revisar(slug):
     if not row or not row["arquivo"]:
         return jsonify({"error": "Carrossel não encontrado"}), 404
 
-    html_path = CARROSSEIS_DIR / row["arquivo"]
-    if not html_path.exists():
+    html_path = _find_carrossel_file(row["arquivo"])
+    if not html_path:
         return jsonify({"error": "Arquivo HTML não encontrado"}), 404
 
     html = html_path.read_text(encoding="utf-8")
@@ -971,7 +997,9 @@ def api_gerar():
             )
             novo_array = "const slides=[\n" + ",\n".join(linhas) + "\n];"
             html = re.sub(r"const slides=\[.*?\];", lambda _: novo_array, html, flags=re.DOTALL)
-            (CARROSSEIS_DIR / nome).write_text(html, encoding="utf-8")
+            # Grava em GENERATED_DIR (disco persistente do Render) em vez de
+            # CARROSSEIS_DIR (que eh resetado a cada deploy).
+            (GENERATED_DIR / nome).write_text(html, encoding="utf-8")
 
         # Register in DB
         with get_db() as conn:
@@ -1000,8 +1028,8 @@ def _extrair_contexto_carrossel(slug: str):
         row = conn.execute("SELECT arquivo, titulo FROM carrosseis WHERE slug=?", (slug,)).fetchone()
     if not row or not row["arquivo"]:
         return None, None, None
-    html_path = CARROSSEIS_DIR / row["arquivo"]
-    if not html_path.exists():
+    html_path = _find_carrossel_file(row["arquivo"])
+    if not html_path:
         return row["titulo"], None, None
 
     html = html_path.read_text(encoding="utf-8")
