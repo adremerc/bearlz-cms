@@ -13,7 +13,7 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
 .nav-wrap{display:flex;align-items:center;gap:10px;width:100%;max-width:490px;justify-content:center}
 .arrow-btn{width:34px;height:34px;border-radius:50%;background:#fff;border:1px solid #e0e0e0;color:#333;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit}
 .arrow-btn:disabled{background:#e8e8e8;color:#ccc;cursor:default}
-.card{width:420px;max-width:420px;min-width:420px;min-height:525px;flex-shrink:0;background:#fff;border-radius:0;box-shadow:0 0 0 1px #e5e5e5;overflow:visible;display:flex;flex-direction:column;position:relative}
+.card{width:420px;max-width:420px;min-width:420px;min-height:525px;flex-shrink:0;background:#fff;border-radius:0;box-shadow:0 0 0 1px #e5e5e5;overflow:visible;display:flex;flex-direction:column;position:relative;margin-bottom:60px}
 .profile-area{padding:20px 22px 0}
 .profile-row{display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:14px}
 .avatar-circle{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#1a1a2e,#16213e);display:flex;align-items:center;justify-content:center;color:#fff;font-size:26px;font-weight:800;flex-shrink:0;overflow:hidden}
@@ -50,10 +50,11 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
 .ctrl-btn{padding:5px 10px;font-size:10px;font-weight:600;background:#fff;color:#666;border:1px solid #ddd;border-radius:6px;cursor:pointer;font-family:inherit}
 .ctrl-btn-blue{color:#1d9bf0}
 .ctrl-btn-ok{background:#1d9bf0;color:#fff;border:none;margin-left:auto}
-.card-dots-row{padding:8px 22px 10px;display:flex;justify-content:center;gap:5px}
+/* Dots e footer ficam FORA do limite do post (posicionados abaixo do card, flutuando) */
+.card-dots-row{position:absolute;top:calc(100% + 22px);left:0;right:0;padding:0 22px;display:flex;justify-content:center;gap:5px;z-index:6}
 .card-dot{width:7px;height:7px;border-radius:50%;background:#ddd}
 .card-dot.active{background:#1d9bf0}
-.card-footer{padding:6px 22px 12px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f0f0f0}
+.card-footer{position:absolute;top:calc(100% + 36px);left:0;right:0;padding:0 22px;display:flex;justify-content:space-between;align-items:center;z-index:6}
 .footer-counter{font-size:11px;color:#c0c0c0;font-weight:500}
 .footer-actions{display:flex;gap:12px}
 .footer-btn{background:none;border:none;cursor:pointer;font-size:10px;color:#1d9bf0;font-weight:700;font-family:inherit}

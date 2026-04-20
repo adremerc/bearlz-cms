@@ -739,26 +739,17 @@ function downloadFromPreview(){
 async function captureCard(){
   const card=document.getElementById('theCard');
   const CARD_W=420,CARD_H=525,SCALE=2160/CARD_W;
-  // Measure heights of UI elements BEFORE hiding (so we can replace with spacers)
-  const dotsEl=document.querySelector('.card-dots-row');
-  const footerEl=document.querySelector('.card-footer');
-  const dotsH=dotsEl?dotsEl.offsetHeight:0;
-  const footerH=footerEl?footerEl.offsetHeight:0;
+  // Dots e footer agora estao em position:absolute (fora do fluxo do card),
+  // entao nao precisamos mais do spacer. Basta esconder os controles de edicao.
   const hideEls=Array.from(document.querySelectorAll('.card-dots-row,.card-footer,#imgCtrlPanel,.img-overlay-btn,.profile-edit-panel'));
   const prevDisplay=hideEls.map(el=>el.style.display);
   hideEls.forEach(el=>{el.style.display='none';});
-  // Add spacer inside card to preserve image container size (matches preview exactly)
-  const spacer=document.createElement('div');
-  spacer.style.height=(dotsH+footerH)+'px';
-  spacer.style.flexShrink='0';
-  spacer.style.width='100%';
-  spacer.setAttribute('data-capture-spacer','1');
-  card.appendChild(spacer);
   const origStyle={};
-  ['borderRadius','boxShadow','border','width','maxWidth','height','minHeight','maxHeight'].forEach(k=>{origStyle[k]=card.style[k];});
+  ['borderRadius','boxShadow','border','width','maxWidth','height','minHeight','maxHeight','marginBottom'].forEach(k=>{origStyle[k]=card.style[k];});
   card.style.borderRadius='0';card.style.boxShadow='none';card.style.border='none';
   card.style.width=CARD_W+'px';card.style.maxWidth=CARD_W+'px';
   card.style.height=CARD_H+'px';card.style.minHeight=CARD_H+'px';card.style.maxHeight=CARD_H+'px';
+  card.style.marginBottom='0';
   await new Promise(r=>requestAnimationFrame(r));
   try{
     const canvas=await html2canvas(card,{
@@ -769,7 +760,6 @@ async function captureCard(){
   }finally{
     hideEls.forEach((el,i)=>{el.style.display=prevDisplay[i];});
     Object.keys(origStyle).forEach(k=>{card.style[k]=origStyle[k];});
-    if(spacer.parentNode)spacer.parentNode.removeChild(spacer);
   }
 }
 
