@@ -26,7 +26,7 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
 .profile-input{flex:1;padding:7px 10px;border:1px solid #e0e0e0;border-radius:7px;font-size:12px;font-family:inherit;outline:none;color:#0f1419}
 .btn-change-photo{padding:7px 12px;font-size:11px;font-weight:600;background:#111;color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:inherit;align-self:flex-start}
 .text-area{padding:0 22px 10px;overflow:hidden}
-.text-display{font-size:18.5px;line-height:1.5;color:#0f1419;white-space:pre-line;cursor:text;min-height:60px;padding:2px 0}
+.text-display{font-size:18px;line-height:1.4;color:#0f1419;white-space:pre-line;cursor:text;min-height:60px;padding:2px 0}
 .text-display strong{font-weight:700}
 .edit-textarea{width:100%;min-height:180px;border:1.5px solid #1d9bf0;border-radius:10px;padding:12px 14px;font-size:16px;font-family:inherit;line-height:1.6;resize:vertical;outline:none;color:#0f1419;background:#fafcff;box-sizing:border-box}
 .edit-actions{display:flex;gap:6px;margin-top:8px;align-items:center}

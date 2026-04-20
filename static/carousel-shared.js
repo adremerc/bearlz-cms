@@ -568,9 +568,9 @@ if(_origRender){
 function getTextStyle(){
   return {
     family: document.getElementById('fontFamily').value,
-    size: parseFloat(document.getElementById('fontSize').value)||18.5,
-    lh: parseFloat(document.getElementById('lineHeight').value)||1.5,
-    pg: parseInt(document.getElementById('paraGap').value)||16
+    size: parseFloat(document.getElementById('fontSize').value)||18,
+    lh: parseFloat(document.getElementById('lineHeight').value)||1.4,
+    pg: parseInt(document.getElementById('paraGap').value)||20
   };
 }
 function applyTextStyle(){
@@ -600,10 +600,12 @@ function loadTextStyle(){
   applyTextStyle();
 }
 function resetTextStyle(){
+  // Padrao Bearlz: Open Sans, 18px (=Canva 34pt), LH 1.4, gap 20px
   document.getElementById('fontFamily').value='Open Sans,sans-serif';
-  document.getElementById('fontSize').value=18.5;
-  document.getElementById('lineHeight').value=1.5;
-  document.getElementById('paraGap').value=16;
+  document.getElementById('fontSize').value=18;
+  document.getElementById('lineHeight').value=1.4;
+  document.getElementById('paraGap').value=20;
+  try{localStorage.removeItem(LS_KEY+'_style');}catch(e){}
   applyTextStyle();
 }
 let _previewCanvas=null;
