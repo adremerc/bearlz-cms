@@ -951,11 +951,13 @@ def api_gerar():
             def _esc(t):
                 return t.replace("\\","\\\\").replace("`","\\`").replace("${","\\${").replace("\n","\\n")
 
+            # Sem raw string: precisamos de newlines reais para o _esc() converter
+            # em '\n' JS (que eh quebra de linha no template literal).
             CTA_TEXT = (
-                r"Dólar em baixa e Ibovespa em alta podem esconder um **cenário estrutural frágil** no Brasil.\n\n"
-                r"Existem boas oportunidades de investimento no país, mas estar com o patrimônio 100% exposto a esses riscos é uma decisão arriscada.\n\n"
-                r"Posso te ajudar a montar uma **Estratégia de Investimento Global**.\n\n"
-                r'Comenta **"Estratégia"** aqui embaixo.'
+                "Dólar em baixa e Ibovespa em alta podem esconder um **cenário estrutural frágil** no Brasil.\n\n"
+                "Existem boas oportunidades de investimento no país, mas estar com o patrimônio 100% exposto a esses riscos é uma decisão arriscada.\n\n"
+                "Posso te ajudar a montar uma **Estratégia de Investimento Global**.\n\n"
+                'Comenta **"Estratégia"** aqui embaixo.'
             )
             linhas = [
                 f"  {{id:{i+1},text:`{_esc(s['texto'])}`,image:'{s['image_url']}',zoom:1,ox:50,oy:50}}"
