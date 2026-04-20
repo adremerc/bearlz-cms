@@ -926,9 +926,19 @@ def api_gerar():
             html = re.sub(r"(<h1>).*?(</h1>)", rf"\g<1>{titulo_gerado}\g<2>", html)
             html = re.sub(r'(<p id="subtitle">).*?(</p>)',
                           rf"\g<1>{len(slides_out)+1} slides · Gabriel Bearlz\g<2>", html)
-            html = re.sub(r"LS_KEY='[^']*'", f"LS_KEY='bearlz_{slug}_v1'", html)
+            # Slug JS para sync com servidor (identifica o carrossel no /api/carrossel/<slug>/...)
+            html = re.sub(r"window\.CAROUSEL_SLUG='[^']*'",
+                          f"window.CAROUSEL_SLUG='{slug}'", html)
+            # Chave do localStorage (convertendo hifens para underscores)
+            ls_key_slug = slug.replace("-", "_")
+            html = re.sub(r"window\.CAROUSEL_LS_KEY='[^']*'",
+                          f"window.CAROUSEL_LS_KEY='bearlz_{ls_key_slug}_v1'", html)
+            # Compatibilidade com templates antigos que ainda tenham LS_KEY sem prefixo window.
+            html = re.sub(r"(?<!window\.CAROUSEL_)LS_KEY='[^']*'",
+                          f"LS_KEY='bearlz_{ls_key_slug}_v1'", html)
 
-            # Garante que a foto do Gabriel está embutida
+            # Garante que a foto do Gabriel está embutida (template refatorado ja tem base64,
+            # mas se um template antigo ainda tiver avatarDataUrl=null, embutimos aqui)
             avatar_path = BASE_DIR / "static" / "gabriel.png"
             if avatar_path.exists() and 'avatarDataUrl=null' in html:
                 import base64 as _b64
