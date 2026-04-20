@@ -21,7 +21,7 @@
     <p id="subtitle">10 slides · Gabriel Bearlz</p>
   </div>
   <div style="display:flex;align-items:center;gap:8px">
-    <span class="save-badge" id="saveIndicator"></span>
+    <span class="save-badge" id="saveIndicator"></span><span class="cloud-status" id="cloudStatus" style="font-size:10px;color:#1d9bf0;font-weight:600;margin-right:4px"></span><span class="user-indicator" id="userIndicator" style="font-size:10px;color:#999;font-weight:600" onclick="if(confirm('Trocar de usuário?')){localStorage.removeItem('bearlz_user');location.reload();}" title="Clique para trocar"></span>
     <div class="header-btns">
       <button class="btn-add" onclick="addSlide()">+ Slide</button>
       <button class="btn-rem" id="btnRem" onclick="removeSlide()">Remover</button>

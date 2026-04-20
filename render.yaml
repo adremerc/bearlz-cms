@@ -11,6 +11,10 @@ services:
       - key: CMS_API_KEY
         generateValue: true
     disk:
-      name: carrosseis-data
-      mountPath: /opt/render/project/src/carrosseis
+      # Mount path APENAS para dados persistentes (DB + edits compartilhadas).
+      # Os HTMLs dos carrosseis ficam no repo e são atualizados a cada deploy.
+      # Se o mountPath cobrisse carrosseis/, ele "sombrearia" os arquivos do repo
+      # e nunca veriamos atualizações.
+      name: bearlz-data
+      mountPath: /opt/render/project/src/data
       sizeGB: 1

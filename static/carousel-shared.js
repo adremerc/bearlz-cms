@@ -11,35 +11,145 @@ function toHTML(text){
   }).join('');
 }
 
-/* ── Auto-save / Auto-load ── */
+/* ── Auto-save / Auto-load (local + servidor compartilhado) ── */
 const LS_KEY=window.CAROUSEL_LS_KEY||'bearlz_carousel_v1';
-let _saveTimer;
+let _saveTimer,_serverSaveTimer,_lastServerUpdate=null,_myAutor='Anonimo';
+
+function _getUserIdentity(){
+  let u=localStorage.getItem('bearlz_user');
+  if(!u){
+    u=prompt('Quem está editando? (digite: Adre ou Gabriel)')||'Anonimo';
+    u=u.trim()||'Anonimo';
+    localStorage.setItem('bearlz_user',u);
+  }
+  _myAutor=u;
+  const ui=document.getElementById('userIndicator');
+  if(ui)ui.textContent='Você: '+_myAutor;
+}
+
+function _buildState(){
+  return{
+    slides:slides.map(s=>{
+      const c={...s};
+      if(c.image&&c.image.startsWith('data:image/svg+xml'))c.image=null;
+      return c;
+    }),
+    profile:{...profile},
+    avatar:avatarDataUrl,
+    style:(typeof getTextStyle==='function'?getTextStyle():null),
+    v:2
+  };
+}
+
 function autoSave(){
   clearTimeout(_saveTimer);
   _saveTimer=setTimeout(()=>{
     try{
-      const state={
-        slides:slides.map(s=>{
-          const c={...s};
-          // Don't persist SVG chart images (they're rebuilt from code)
-          if(c.image&&c.image.startsWith('data:image/svg+xml'))c.image=null;
-          return c;
-        }),
-        profile:{...profile},
-        avatar:avatarDataUrl,
-        v:1
-      };
-      localStorage.setItem(LS_KEY,JSON.stringify(state));
+      localStorage.setItem(LS_KEY,JSON.stringify(_buildState()));
       flashSaved();
     }catch(e){
-      // If quota exceeded try without uploaded images
       try{
-        const state={slides:slides.map(s=>{const c={...s};if(c.image&&c.image.startsWith('data:'))c.image=null;return c;}),profile:{...profile},v:1};
-        localStorage.setItem(LS_KEY,JSON.stringify(state));
+        const lite=_buildState();
+        lite.slides=lite.slides.map(s=>{const c={...s};if(c.image&&c.image.startsWith('data:'))c.image=null;return c;});
+        localStorage.setItem(LS_KEY,JSON.stringify(lite));
         flashSaved();
       }catch(e2){}
     }
+    saveToServer();
   },400);
+}
+
+function saveToServer(){
+  if(!window.CAROUSEL_SLUG)return;
+  clearTimeout(_serverSaveTimer);
+  _serverSaveTimer=setTimeout(async()=>{
+    try{
+      _showCloud('Salvando...');
+      const r=await fetch('/api/carrossel/'+window.CAROUSEL_SLUG+'/save',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({state:_buildState(),autor:_myAutor})
+      });
+      if(r.ok){
+        const d=await r.json();
+        _lastServerUpdate=d.updated_at;
+        _showCloud('✓ Salvo por '+_myAutor);
+      }else{_showCloud('⚠ Erro salvar');}
+    }catch(e){_showCloud('⚠ Offline');}
+  },900);
+}
+
+async function loadFromServer(){
+  if(!window.CAROUSEL_SLUG)return false;
+  try{
+    const r=await fetch('/api/carrossel/'+window.CAROUSEL_SLUG+'/state');
+    if(!r.ok)return false;
+    const d=await r.json();
+    if(!d||!d.state)return false;
+    _lastServerUpdate=d.updated_at;
+    const st=d.state;
+    if(st.slides){
+      st.slides.forEach((saved,i)=>{
+        if(i>=slides.length)return;
+        if(saved.text!=null)slides[i].text=saved.text;
+        if(saved.zoom!=null)slides[i].zoom=saved.zoom;
+        if(saved.ox!=null)slides[i].ox=saved.ox;
+        if(saved.oy!=null)slides[i].oy=saved.oy;
+        slides[i].imgH=saved.imgH??null;
+        if(saved.fit)slides[i].fit=saved.fit;
+        if(saved.image&&!saved.image.startsWith('data:image/svg'))slides[i].image=saved.image;
+      });
+    }
+    if(st.profile){profile.name=st.profile.name;profile.handle=st.profile.handle;}
+    if(st.avatar)avatarDataUrl=st.avatar;
+    if(st.style){
+      const ff=document.getElementById('fontFamily'),fs=document.getElementById('fontSize'),lh=document.getElementById('lineHeight'),pg=document.getElementById('paraGap');
+      if(ff&&st.style.family)ff.value=st.style.family;
+      if(fs&&st.style.size)fs.value=st.style.size;
+      if(lh&&st.style.lh)lh.value=st.style.lh;
+      if(pg&&st.style.pg)pg.value=st.style.pg;
+    }
+    _showCloud('Carregado: '+d.autor+' '+_timeAgo(d.updated_at));
+    return true;
+  }catch(e){return false;}
+}
+
+async function checkRemoteChanges(){
+  if(!window.CAROUSEL_SLUG)return;
+  try{
+    const r=await fetch('/api/carrossel/'+window.CAROUSEL_SLUG+'/state');
+    if(!r.ok)return;
+    const d=await r.json();
+    if(!d.updated_at||d.updated_at===_lastServerUpdate)return;
+    if(d.autor===_myAutor){_lastServerUpdate=d.updated_at;return;}
+    if(confirm(d.autor+' acabou de editar esse carrossel.\n\nRecarregar para ver as mudanças? (Suas edições locais não salvas podem ser perdidas)')){
+      location.reload();
+    }else{_lastServerUpdate=d.updated_at;}
+  }catch(e){}
+}
+
+function _showCloud(msg){
+  const el=document.getElementById('cloudStatus');
+  if(el)el.textContent=msg;
+}
+
+function _timeAgo(iso){
+  try{
+    const s=Math.round((Date.now()-new Date(iso).getTime())/1000);
+    if(s<60)return 'há '+s+'s';
+    if(s<3600)return 'há '+Math.round(s/60)+'min';
+    return 'há '+Math.round(s/3600)+'h';
+  }catch(e){return ''}
+}
+
+async function initHydrate(){
+  _getUserIdentity();
+  const serverOK=await loadFromServer();
+  if(!serverOK)autoLoad();
+  if(typeof render==='function')render();
+  if(typeof loadTextStyle==='function')loadTextStyle();
+  if(typeof checkOverflow==='function')checkOverflow();
+  setInterval(checkRemoteChanges,15000);
 }
 function flashSaved(){
   const el=document.getElementById('saveIndicator');
@@ -694,7 +804,7 @@ async function downloadAll(){
   setStatus('Todos os slides baixados!');setTimeout(()=>setStatus(''),3000);
 }
 
-autoLoad();
+// autoLoad() removido daqui — agora é fallback dentro de initHydrate() no fim do arquivo
 
 async function downloadZip(){
   if(typeof JSZip==='undefined'){setStatus('JSZip nao carregou. Verifique conexao.');return;}
@@ -726,6 +836,6 @@ async function downloadZip(){
   setTimeout(()=>setStatus(''),3500);
 }
 
-render();
-loadTextStyle();
-checkOverflow();
+// Hidratação: tenta carregar do servidor primeiro, fallback pra localStorage
+// Depois chama render(), loadTextStyle(), checkOverflow() e inicia polling
+initHydrate();

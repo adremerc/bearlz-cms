@@ -39,8 +39,19 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "bearlz-dev-2026")
 
 BASE_DIR      = Path(__file__).parent
-DB_PATH       = BASE_DIR / "bearlz.db"
+# Dados persistentes (DB + edits compartilhadas) ficam em /data,
+# que é onde o disco persistente do Render é montado.
+# Os HTMLs dos carrosseis ficam no repo (carrosseis/) e são atualizados a cada deploy.
+DATA_DIR       = BASE_DIR / "data"
+DATA_DIR.mkdir(exist_ok=True)
+DB_PATH        = DATA_DIR / "bearlz.db"
 CARROSSEIS_DIR = BASE_DIR / "carrosseis"
+
+# Migração: se existir bearlz.db no diretório antigo (raiz), move pro novo lugar
+_old_db = BASE_DIR / "bearlz.db"
+if _old_db.exists() and not DB_PATH.exists():
+    import shutil
+    shutil.copy2(_old_db, DB_PATH)
 
 # Chave para a API interna (usada por gerar-lote.py para registrar carrosseis)
 CMS_API_KEY = os.environ.get("CMS_API_KEY", "bearlz-local-key")
@@ -283,6 +294,65 @@ def arquivo_carrossel(slug):
     if not row or not row["arquivo"]:
         abort(404)
     return send_from_directory(CARROSSEIS_DIR, row["arquivo"])
+
+
+# ── Edits compartilhadas (ambos editam, ambos veem) ───────────────────────────
+
+EDITS_DIR = DATA_DIR / "edits"
+EDITS_DIR.mkdir(exist_ok=True)
+
+# Migração: se existir carrosseis/edits/ (lugar antigo), move pro novo
+_old_edits = CARROSSEIS_DIR / "edits"
+if _old_edits.exists() and _old_edits.is_dir():
+    import shutil
+    for _f in _old_edits.glob("*.json"):
+        _target = EDITS_DIR / _f.name
+        if not _target.exists():
+            shutil.copy2(_f, _target)
+
+
+def _edits_path(slug: str) -> Path:
+    # Sanitize slug para nao permitir path traversal
+    safe = re.sub(r"[^a-zA-Z0-9_\-]", "", slug)
+    return EDITS_DIR / f"{safe}.json"
+
+
+@app.route("/api/carrossel/<slug>/state", methods=["GET"])
+def api_carrossel_state(slug):
+    """Retorna o estado salvo (slides editados, perfil, estilo). None se nunca editado."""
+    p = _edits_path(slug)
+    if not p.exists():
+        return jsonify({"state": None, "updated_at": None, "autor": None})
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+        return jsonify(data)
+    except Exception:
+        return jsonify({"state": None, "updated_at": None, "autor": None})
+
+
+@app.route("/api/carrossel/<slug>/save", methods=["POST"])
+def api_carrossel_save(slug):
+    """Salva o estado atual do editor. Body JSON: {state:{slides,profile,style}, autor:'Adre'|'Gabriel'}"""
+    data = request.get_json(silent=True) or {}
+    state = data.get("state")
+    autor = data.get("autor") or "Anônimo"
+    if not state or not isinstance(state, dict):
+        return jsonify({"error": "state obrigatorio"}), 400
+    p = _edits_path(slug)
+    payload = {
+        "state": state,
+        "autor": autor,
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+    }
+    try:
+        p.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE carrosseis SET updated_at=datetime('now') WHERE slug=?", (slug,)
+            )
+        return jsonify({"ok": True, "updated_at": payload["updated_at"], "autor": autor})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ── API JSON ──────────────────────────────────────────────────────────────────
