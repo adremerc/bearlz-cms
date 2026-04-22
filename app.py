@@ -1140,6 +1140,38 @@ def static_files(filename):
     return send_from_directory(BASE_DIR / "static", filename)
 
 
+# ── Diagnostico temporario: ver o que esta no filesystem do Render ────────────
+@app.route("/api/debug/fs")
+def api_debug_fs():
+    def _info(p):
+        d = {"path": str(p), "exists": p.exists(), "is_dir": p.is_dir() if p.exists() else False}
+        if p.exists() and p.is_dir():
+            try:
+                d["files"] = sorted([f.name for f in p.iterdir() if f.is_file()])
+                d["n"] = len(d["files"])
+            except Exception as e:
+                d["err"] = str(e)
+        return d
+    with get_db() as conn:
+        rows = conn.execute("SELECT slug, arquivo FROM carrosseis").fetchall()
+    return jsonify({
+        "base_dir":      _info(BASE_DIR),
+        "data_dir":      _info(DATA_DIR),
+        "carrosseis":    _info(CARROSSEIS_DIR),
+        "generated":     _info(GENERATED_DIR),
+        "db_rows":       [{"slug": r["slug"], "arquivo": r["arquivo"]} for r in rows],
+        "git_commit":    os.environ.get("RENDER_GIT_COMMIT", "unknown"),
+    })
+
+
+@app.route("/api/debug/rescan", methods=["POST"])
+def api_debug_rescan():
+    scan_carrosseis_dir()
+    with get_db() as conn:
+        n = conn.execute("SELECT COUNT(*) FROM carrosseis").fetchone()[0]
+    return jsonify({"ok": True, "total_apos_rescan": n})
+
+
 # ── Run ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
