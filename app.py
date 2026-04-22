@@ -73,6 +73,155 @@ CMS_API_KEY = os.environ.get("CMS_API_KEY", "bearlz-local-key")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
 
+# ── Persistencia via GitHub API ───────────────────────────────────────────────
+#
+# O disco "persistente" do Render no plano free eh resetado a cada deploy.
+# Como workaround, a gente commita os arquivos gerados (HTMLs + edits JSON) em
+# uma branch separada do repo (`data-generated`) via API do GitHub. No boot,
+# a gente puxa essa branch de volta pra dentro de data/.
+#
+# Branch separada = nao dispara auto-deploy (que so observa `main`).
+#
+# Requer: env var GITHUB_TOKEN (Personal Access Token com escopo `repo`).
+# Opcional: GITHUB_REPO (default `adremerc/bearlz-cms`).
+import base64 as _b64
+import threading as _threading
+try:
+    import requests as _requests
+    _REQUESTS_OK = True
+except ImportError:
+    _REQUESTS_OK = False
+
+GITHUB_TOKEN  = os.environ.get("GITHUB_TOKEN", "")
+GITHUB_REPO   = os.environ.get("GITHUB_REPO", "adremerc/bearlz-cms")
+GITHUB_BRANCH = os.environ.get("GITHUB_BRANCH", "data-generated")
+
+def _gh_enabled():
+    return bool(GITHUB_TOKEN and _REQUESTS_OK)
+
+def _gh_api(method, path, **kwargs):
+    headers = kwargs.pop("headers", {})
+    headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+    headers["Accept"] = "application/vnd.github+json"
+    headers["X-GitHub-Api-Version"] = "2022-11-28"
+    url = f"https://api.github.com/repos/{GITHUB_REPO}{path}"
+    try:
+        return _requests.request(method, url, headers=headers, timeout=15, **kwargs)
+    except Exception:
+        return None
+
+def _gh_ensure_branch():
+    """Cria a branch data-generated a partir de main se nao existir."""
+    br = _gh_api("GET", f"/branches/{GITHUB_BRANCH}")
+    if br and br.status_code == 200:
+        return True
+    main = _gh_api("GET", "/branches/main")
+    if not main or main.status_code != 200:
+        return False
+    main_sha = main.json()["commit"]["sha"]
+    r = _gh_api("POST", "/git/refs",
+                json={"ref": f"refs/heads/{GITHUB_BRANCH}", "sha": main_sha})
+    return bool(r and r.status_code in (200, 201))
+
+def _gh_save(repo_path: str, content_bytes: bytes, message: str):
+    """Faz commit de `content_bytes` em `repo_path` na branch data-generated.
+    Se o arquivo ja existe, atualiza (precisa do sha). Roda de forma silenciosa:
+    nunca levanta exception pra nao quebrar a request principal."""
+    if not _gh_enabled():
+        return False
+    try:
+        _gh_ensure_branch()
+        # Pega sha atual (se existir) pra fazer update
+        get_resp = _gh_api("GET", f"/contents/{repo_path}",
+                           params={"ref": GITHUB_BRANCH})
+        sha = None
+        if get_resp and get_resp.status_code == 200:
+            try:
+                sha = get_resp.json().get("sha")
+            except Exception:
+                pass
+        body = {
+            "message": message,
+            "content": _b64.b64encode(content_bytes).decode("ascii"),
+            "branch":  GITHUB_BRANCH,
+        }
+        if sha:
+            body["sha"] = sha
+        put = _gh_api("PUT", f"/contents/{repo_path}", json=body)
+        return bool(put and put.status_code in (200, 201))
+    except Exception:
+        return False
+
+def _gh_save_async(repo_path: str, content_bytes: bytes, message: str):
+    """Versao assincrona: nao bloqueia a request HTTP principal."""
+    if not _gh_enabled():
+        return
+    t = _threading.Thread(
+        target=_gh_save,
+        args=(repo_path, content_bytes, message),
+        daemon=True
+    )
+    t.start()
+
+def _gh_delete(repo_path: str, message: str):
+    if not _gh_enabled():
+        return False
+    try:
+        get_resp = _gh_api("GET", f"/contents/{repo_path}",
+                           params={"ref": GITHUB_BRANCH})
+        if not get_resp or get_resp.status_code != 200:
+            return True  # nada pra deletar
+        sha = get_resp.json().get("sha")
+        r = _gh_api("DELETE", f"/contents/{repo_path}",
+                    json={"message": message, "sha": sha, "branch": GITHUB_BRANCH})
+        return bool(r and r.status_code == 200)
+    except Exception:
+        return False
+
+def _gh_hydrate():
+    """No boot, puxa todos os arquivos da branch `data-generated` pra dentro
+    de data/. Roda uma vez, silencioso se falhar."""
+    if not _gh_enabled():
+        return 0
+    n = 0
+    try:
+        br = _gh_api("GET", f"/branches/{GITHUB_BRANCH}")
+        if not br or br.status_code != 200:
+            # branch nao existe ainda; cria e sai
+            _gh_ensure_branch()
+            return 0
+        tree_sha = br.json()["commit"]["commit"]["tree"]["sha"]
+        tree = _gh_api("GET", f"/git/trees/{tree_sha}",
+                       params={"recursive": "1"})
+        if not tree or tree.status_code != 200:
+            return 0
+        for item in tree.json().get("tree", []):
+            if item.get("type") != "blob":
+                continue
+            repo_path = item.get("path", "")
+            # So nos interessam arquivos dentro de data/generated/ e data/edits/
+            if not (repo_path.startswith("data/generated/")
+                    or repo_path.startswith("data/edits/")):
+                continue
+            blob = _gh_api("GET", f"/git/blobs/{item['sha']}")
+            if not blob or blob.status_code != 200:
+                continue
+            try:
+                content = _b64.b64decode(blob.json()["content"])
+            except Exception:
+                continue
+            local = BASE_DIR / repo_path
+            try:
+                local.parent.mkdir(parents=True, exist_ok=True)
+                local.write_bytes(content)
+                n += 1
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return n
+
+
 # ── Banco de dados (SQLite) ───────────────────────────────────────────────────
 
 def get_db():
@@ -171,6 +320,9 @@ def load_anthropic_key():
 
 # Inicializa DB e escaneia pasta na startup
 init_db()
+# Hidrata a partir do branch data-generated ANTES do scan, pra que os
+# arquivos gerados em prod voltem pro filesystem antes do scan os registrar.
+_gh_hydrate()
 scan_carrosseis_dir()
 load_anthropic_key()
 
@@ -369,11 +521,18 @@ def api_carrossel_save(slug):
         "updated_at": datetime.utcnow().isoformat() + "Z",
     }
     try:
-        p.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        body = json.dumps(payload, ensure_ascii=False)
+        p.write_text(body, encoding="utf-8")
         with get_db() as conn:
             conn.execute(
                 "UPDATE carrosseis SET updated_at=datetime('now') WHERE slug=?", (slug,)
             )
+        # Commita os edits no branch data-generated (sobrevive deploys).
+        _gh_save_async(
+            f"data/edits/{p.name}",
+            body.encode("utf-8"),
+            f"Edit: {slug} por {autor}"
+        )
         return jsonify({"ok": True, "updated_at": payload["updated_at"], "autor": autor})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -578,6 +737,9 @@ def api_deletar_carrossel(slug):
                     html_path.unlink()
             except Exception:
                 pass
+            # Propaga delete pro branch data-generated (gerados + edits).
+            _gh_delete(f"data/generated/{row['arquivo']}", f"Delete: {slug}")
+            _gh_delete(f"data/edits/{slug}.json",          f"Delete edits: {slug}")
         conn.execute("DELETE FROM notas WHERE slug=?", (slug,))
         conn.execute("DELETE FROM carrosseis WHERE slug=?", (slug,))
     return jsonify({"ok": True})
@@ -995,9 +1157,15 @@ def api_gerar():
             )
             novo_array = "const slides=[\n" + ",\n".join(linhas) + "\n];"
             html = re.sub(r"const slides=\[.*?\];", lambda _: novo_array, html, flags=re.DOTALL)
-            # Grava em GENERATED_DIR (disco persistente do Render) em vez de
-            # CARROSSEIS_DIR (que eh resetado a cada deploy).
+            # Grava em GENERATED_DIR. Como o disco do Render free tier eh
+            # resetado a cada deploy, tambem commitamos no GitHub em branch
+            # separada pra sobreviver.
             (GENERATED_DIR / nome).write_text(html, encoding="utf-8")
+            _gh_save_async(
+                f"data/generated/{nome}",
+                html.encode("utf-8"),
+                f"Carrossel gerado: {titulo_gerado}"
+            )
 
         # Register in DB
         with get_db() as conn:
