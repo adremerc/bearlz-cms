@@ -64,11 +64,9 @@ def _find_carrossel_file(nome: str):
         return p2
     return None
 
-# Migração: se existir bearlz.db no diretório antigo (raiz), move pro novo lugar
-_old_db = BASE_DIR / "bearlz.db"
-if _old_db.exists() and not DB_PATH.exists():
-    import shutil
-    shutil.copy2(_old_db, DB_PATH)
+# NOTA: a migracao antiga (copiar bearlz.db da raiz pro data/) foi removida.
+# Ela estava sobrescrevendo o DB persistente com uma versao stale do repo a
+# cada deploy, fazendo os posts gerados em prod sumirem.
 
 # Chave para a API interna (usada por gerar-lote.py para registrar carrosseis)
 CMS_API_KEY = os.environ.get("CMS_API_KEY", "bearlz-local-key")
