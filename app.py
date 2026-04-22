@@ -1172,6 +1172,47 @@ def api_debug_rescan():
     return jsonify({"ok": True, "total_apos_rescan": n})
 
 
+@app.route("/api/debug/walk")
+def api_debug_walk():
+    """Varre todos os .html em BASE_DIR, DATA_DIR, /tmp — acha arquivos 'perdidos'."""
+    hits = []
+    roots = [BASE_DIR, DATA_DIR, Path("/tmp")]
+    for root in roots:
+        if not root.exists():
+            continue
+        try:
+            for p in root.rglob("carrossel-*.html"):
+                try:
+                    hits.append({
+                        "path": str(p),
+                        "size": p.stat().st_size,
+                        "mtime": p.stat().st_mtime,
+                    })
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    return jsonify({"n": len(hits), "hits": hits})
+
+
+@app.route("/api/debug/marker", methods=["POST"])
+def api_debug_marker():
+    """Cria arquivo em DATA_DIR para testar persistencia entre deploys."""
+    marker = DATA_DIR / "marker.txt"
+    from datetime import datetime as _dt
+    marker.write_text(f"created_at={_dt.utcnow().isoformat()}Z\n", encoding="utf-8")
+    return jsonify({"ok": True, "marker_path": str(marker),
+                    "content": marker.read_text(encoding="utf-8")})
+
+
+@app.route("/api/debug/marker")
+def api_debug_marker_get():
+    marker = DATA_DIR / "marker.txt"
+    if not marker.exists():
+        return jsonify({"exists": False})
+    return jsonify({"exists": True, "content": marker.read_text(encoding="utf-8")})
+
+
 # ── Run ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
