@@ -141,9 +141,9 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
 .overflow-warn.active{display:block}
 
 /* ── Modal de 3 Hooks (Curiosidade / Dor / Promessa) ── */
-.hooks-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto}
+.hooks-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99999;align-items:flex-start;justify-content:center;padding:20px 12px;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .hooks-modal.active{display:flex}
-.hooks-inner{background:#fff;border-radius:14px;max-width:560px;width:100%;padding:18px 20px;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:'Open Sans',sans-serif}
+.hooks-inner{background:#fff;border-radius:14px;max-width:560px;width:100%;padding:16px 18px;display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:'Open Sans',sans-serif;margin:auto 0}
 .hooks-head{display:flex;justify-content:space-between;align-items:center}
 .hooks-head strong{font-size:14px;color:#111}
 .hooks-x{background:none;border:none;font-size:22px;cursor:pointer;color:#999;line-height:1;padding:0 6px}

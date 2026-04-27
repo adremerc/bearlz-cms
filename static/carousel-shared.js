@@ -873,16 +873,27 @@ async function downloadZip(){
 /* ── Feature: 3 hooks (Curiosidade / Dor / Promessa) para o slide 1 ── */
 
 function _ensureHookButton(){
-  if(document.getElementById('btnHooks'))return;
+  if(document.getElementById('btnHooks'))return true;
   const footerActions=document.querySelector('.footer-actions');
-  if(!footerActions)return;
+  if(!footerActions)return false;
   const btn=document.createElement('button');
   btn.id='btnHooks';
   btn.className='footer-btn';
   btn.textContent='✨ Hooks';
   btn.title='Gera 3 variações do slide 1: Curiosidade / Dor / Promessa';
-  btn.onclick=_abrirHooksModal;
+  btn.style.color='#a855f7'; // roxinho pra destacar
+  btn.addEventListener('click',function(e){
+    e.preventDefault();e.stopPropagation();
+    _abrirHooksModal();
+  });
   footerActions.appendChild(btn);
+  return true;
+}
+// Tenta inserir o botao varias vezes ate conseguir (mais robusto que setTimeout unico).
+function _retryHookButton(tries){
+  if(_ensureHookButton())return;
+  if(tries<=0)return;
+  setTimeout(()=>_retryHookButton(tries-1),200);
 }
 
 function _ensureHooksModal(){
@@ -891,21 +902,28 @@ function _ensureHooksModal(){
   modal.id='hooksModal';
   modal.className='hooks-modal';
   modal.innerHTML=`
-    <div class="hooks-inner" onclick="event.stopPropagation()">
+    <div class="hooks-inner" id="hooksInner">
       <div class="hooks-head">
         <strong>3 variações do slide 1</strong>
-        <button class="hooks-x" onclick="_fecharHooksModal()">×</button>
+        <button class="hooks-x" id="hooksClose" type="button">×</button>
       </div>
       <div id="hooksBody" class="hooks-body">
         <div class="hooks-loading">Gerando com Claude… (15–30s)</div>
       </div>
     </div>`;
-  modal.addEventListener('click',_fecharHooksModal);
   document.body.appendChild(modal);
+  // Listeners ROBUSTOS: clique no backdrop fecha; clique dentro do inner nao
+  // fecha (sem stopPropagation inline pra nao quebrar listeners delegados).
+  modal.addEventListener('click',function(e){
+    if(e.target===modal) _fecharHooksModal();
+  });
+  document.getElementById('hooksClose').addEventListener('click',function(e){
+    e.preventDefault();e.stopPropagation();
+    _fecharHooksModal();
+  });
 }
 
-function _fecharHooksModal(e){
-  if(e&&e.target&&e.target.closest('.hooks-inner')&&!e.target.classList.contains('hooks-x'))return;
+function _fecharHooksModal(){
   const m=document.getElementById('hooksModal');
   if(m)m.classList.remove('active');
 }
@@ -918,7 +936,10 @@ async function _abrirHooksModal(){
   modal.classList.add('active');
   body.innerHTML='<div class="hooks-loading">Gerando com Claude… (15–30s)</div>';
   const slug=window.CAROUSEL_SLUG;
-  if(!slug){body.innerHTML='<div class="hooks-err">Slug do carrossel não encontrado.</div>';return;}
+  if(!slug){
+    body.innerHTML='<div class="hooks-err">Slug do carrossel não encontrado. Recarregue a página.</div>';
+    return;
+  }
   try{
     const r=await fetch(`/api/hooks/${encodeURIComponent(slug)}`,{
       method:'POST',headers:{'Content-Type':'application/json'},body:'{}'
@@ -926,7 +947,8 @@ async function _abrirHooksModal(){
     const raw=await r.text();
     let d;
     try{d=JSON.parse(raw);}
-    catch{
+    catch(parseErr){
+      console.error('[Hooks] Falha parse JSON:',parseErr,'status:',r.status,'raw:',raw.slice(0,200));
       if(r.status===500||r.status===502||r.status===504){
         body.innerHTML='<div class="hooks-err">Servidor demorou demais. Tente novamente em 30s.</div>';
       }else{
@@ -935,38 +957,56 @@ async function _abrirHooksModal(){
       return;
     }
     if(!d.ok){
+      console.error('[Hooks] API retornou erro:',d);
       body.innerHTML=`<div class="hooks-err">${d.error||'Erro ao gerar hooks'}</div>`;
       return;
     }
     const corMap={Curiosidade:'curi',Dor:'dor',Promessa:'prom'};
+    window._hooksVariantes=d.variantes;
     body.innerHTML=d.variantes.map((v,i)=>{
       const klass=corMap[v.tipo]||'curi';
       const esc=(v.texto||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      // Render negritos **x** como <strong>
       const html=esc.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
       return `<div class="hook-card" data-idx="${i}">
         <div class="hook-label hook-${klass}">${v.tipo}</div>
         <div class="hook-text">${html}</div>
-        <button class="hook-apply" onclick="_aplicarHook(${i})">Usar este</button>
+        <button class="hook-apply" type="button" data-hook-idx="${i}">Usar este</button>
       </div>`;
     }).join('');
-    window._hooksVariantes=d.variantes;
+    // Listeners por click event (em vez de inline onclick — funciona melhor
+    // dentro de iframe e nao depende de funcoes globais)
+    body.querySelectorAll('.hook-apply').forEach(btn=>{
+      btn.addEventListener('click',function(e){
+        e.preventDefault();e.stopPropagation();
+        const idx=parseInt(btn.dataset.hookIdx,10);
+        _aplicarHook(idx);
+      });
+    });
   }catch(e){
-    body.innerHTML=`<div class="hooks-err">Erro de conexão: ${e.message}</div>`;
+    console.error('[Hooks] Erro de fetch:',e);
+    body.innerHTML=`<div class="hooks-err">Erro de conexão: ${e.message||'desconhecido'}</div>`;
   }
 }
 window._abrirHooksModal=_abrirHooksModal;
 
 function _aplicarHook(i){
   const v=(window._hooksVariantes||[])[i];
-  if(!v||!slides[0])return;
+  if(!v||!slides[0]){
+    console.warn('[Hooks] Variante invalida ou slide 0 ausente. i=',i,'v=',v);
+    return;
+  }
+  // Aplica o texto e navega pro slide 1 pra usuario ver a mudanca
   slides[0].text=v.texto;
+  if(typeof cur!=='undefined')cur=0;
+  if(typeof editingText!=='undefined')editingText=false;
+  // Esconde painel de ajuste de imagem caso esteja aberto
+  const panel=document.getElementById('imgCtrlPanel');
+  if(panel)panel.style.display='none';
   if(typeof render==='function')render();
   if(typeof autoSave==='function')autoSave();
-  if(typeof saveToServer==='function')saveToServer();
   if(typeof checkOverflow==='function')checkOverflow();
   _fecharHooksModal();
-  if(typeof setStatus==='function')setStatus(`Hook "${v.tipo}" aplicado no slide 1!`);
+  if(typeof setStatus==='function')setStatus(`✓ Hook "${v.tipo}" aplicado no slide 1`);
   setTimeout(()=>{if(typeof setStatus==='function')setStatus('');},3500);
 }
 window._aplicarHook=_aplicarHook;
@@ -974,5 +1014,6 @@ window._aplicarHook=_aplicarHook;
 // Hidratação: tenta carregar do servidor primeiro, fallback pra localStorage
 // Depois chama render(), loadTextStyle(), checkOverflow() e inicia polling
 initHydrate();
-// Adiciona botão Hooks no footer apos o DOM estar pronto
-setTimeout(_ensureHookButton,100);
+// Adiciona botão Hooks no footer apos o DOM estar pronto. Tenta varias vezes
+// caso o footer ainda nao tenha sido renderizado pelo initHydrate.
+setTimeout(()=>_retryHookButton(20),100);
