@@ -943,10 +943,130 @@ def api_revisar(slug):
 
 # ── Generator ─────────────────────────────────────────────────────────────────
 
+# ── System prompt do gerador (extraido pra constante pra ser editavel via UI) ──
+SYSTEM_GERAR_DEFAULT = (
+    "Você é redator sênior de conteúdo financeiro para @gabriel.bearlz no Instagram.\n"
+    "Estilo: thread do Twitter/X analítico. Público: investidores brasileiros, 25-45 anos.\n\n"
+
+    "VOZ E LINGUAGEM — REGRAS ABSOLUTAS:\n"
+    "- Parágrafos de 2-3 linhas com estrutura de argumento: premissa → consequência\n"
+    "- Conectores naturais obrigatórios: 'Com isso,', 'Só que,', 'O que acontece é que,', 'Na prática,'\n"
+    "- Estruturas preferidas: 'Se X, então Y' / 'Enquanto todos olham para A, o verdadeiro risco é B'\n"
+    "- NUNCA use travessão (—) em hipótese alguma — regra absoluta inegociável\n"
+    "- NUNCA use frases picotadas estilo IA: 'Queda. Recuperação. Oportunidade.' — proibido\n"
+    "- NUNCA use palavras de enchimento: 'é importante ressaltar', 'vale destacar', 'é fundamental', 'cabe destacar'\n"
+    "- Tom: analítico, assertivo, levemente provocador — analista que vê o que outros não veem\n"
+    "- Sem emoji, sem hashtag\n"
+    "- Números e datas sempre com formatação brasileira (vírgula decimal, % colado ao número)\n\n"
+
+    "USO DE FONTES E DADOS — REGRA DE OURO:\n"
+    "- Se houver [CONTEÚDO DO LINK ...] no brief, USE APENAS dados que aparecem ali\n"
+    "- NUNCA invente números, datas, citações ou estatísticas\n"
+    "- Se o brief não tiver dado suficiente pra um slide específico, prefira fazer um slide\n"
+    "  conceitual (sem número fabricado) a inventar uma estatística falsa\n"
+    "- Quando citar um dado, ele DEVE estar literalmente no brief ou no conteúdo dos links\n\n"
+
+    "NEGRITOS — use de 2 a 4 por slide:\n"
+    "- Negrite palavras-chave, números importantes e expressões de impacto (2 a 6 palavras)\n"
+    "- Pode incluir dados numéricos em negrito: **9%**, **R$ 1,2 trilhão**, **maior alta em 10 anos**\n"
+    "- NUNCA negrite frases longas, períodos inteiros ou parágrafos completos\n\n"
+
+    "TAMANHO: 280 a 420 caracteres por slide. "
+    "Se um ponto exige mais espaço, DIVIDA em 2 slides. NUNCA comprima — divida.\n\n"
+
+    "ESTRUTURA DO CARROSSEL:\n"
+    "- Slide 1: Hook forte — afirmação provocadora ou dado surpreendente que prende atenção\n"
+    "- Slides intermediários: desenvolvimento com dados concretos, causa-efeito, comparações\n"
+    "- Slide final: implicação prática para o investidor brasileiro\n\n"
+
+    "IMAGENS — para cada slide escolha image_type:\n"
+    "- 'chart': slides com dados numéricos comparáveis (inclua chart_data com labels, values, unit, highlight)\n"
+    "  chart_type: 'bar' (comparação entre categorias), 'horizontal_bar' (rankings), 'line' (evolução temporal)\n"
+    "  highlight: true no ponto mais importante do gráfico\n"
+    "- 'photo': slides de contexto, hook ou implicação (inclua photo_topic em inglês específico e visual)\n"
+    "  photo_topic deve ser descritivo: 'US dollar bills close-up' NÃO 'money'\n\n"
+
+    "RETORNE SOMENTE JSON VÁLIDO, sem markdown, sem texto fora do JSON:\n"
+    '{"titulo":"...","slides":[{"texto":"...","tema":"bitcoin|economia|mercado|geopolitica|ia|tecnologia",'
+    '"image_type":"chart|photo","chart_title":"...","chart_type":"bar|horizontal_bar|line",'
+    '"chart_data":[{"label":"...","value":0,"unit":"%","highlight":false}],'
+    '"photo_topic":"..."}]}'
+)
+
+
+# ── Fetcher de URLs no brief ──────────────────────────────────────────────────
+# Quando o usuario cola um link no brief, a gente baixa o texto da pagina e
+# injeta no prompt como [CONTEÚDO DO LINK ...]. Assim o Claude le o artigo
+# em vez de inventar dados.
+URL_PATTERN = re.compile(r'https?://[^\s<>"\'\)]+', re.IGNORECASE)
+
+def _fetch_url_text(url: str, max_chars: int = 4000):
+    """Baixa o HTML da URL e extrai o texto principal. Retorna None se falhar."""
+    try:
+        import requests as _req
+        from bs4 import BeautifulSoup
+    except ImportError:
+        return None
+    try:
+        r = _req.get(url, timeout=12, headers={
+            "User-Agent": "Mozilla/5.0 (compatible; BearlzCMS/1.0; +https://bearlz-cms.fly.dev)",
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+        })
+        if r.status_code != 200:
+            return None
+        soup = BeautifulSoup(r.text, "html.parser")
+        # Remove ruido: scripts, estilos, nav, footer, aside, formularios
+        for tag in soup(["script", "style", "nav", "footer", "aside",
+                         "form", "noscript", "iframe", "header"]):
+            tag.decompose()
+        # Tenta achar o conteudo principal (article > main > body)
+        main = soup.find("article") or soup.find("main") or soup.body
+        if not main:
+            return None
+        text = main.get_text(separator="\n", strip=True)
+        # Colapsa newlines duplicados
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        text = re.sub(r"[ \t]+", " ", text)
+        if len(text) < 80:  # provavelmente paywall/erro
+            return None
+        return text[:max_chars]
+    except Exception:
+        return None
+
+def _processar_brief_com_urls(brief: str):
+    """Detecta URLs no brief, baixa o conteudo de cada uma e devolve:
+    - brief com cada URL substituida por bloco [CONTEÚDO DO LINK ...]
+    - lista de info por URL (sucesso/falha + chars extraidos) pra mostrar na UI"""
+    if not brief:
+        return brief, []
+    urls = URL_PATTERN.findall(brief)
+    # Remove duplicatas mantendo ordem
+    seen = set()
+    urls = [u for u in urls if not (u in seen or seen.add(u))]
+    info = []
+    enriched = brief
+    for url in urls:
+        text = _fetch_url_text(url)
+        if text:
+            bloco = f"\n\n[CONTEÚDO DO LINK {url}]\n{text}\n[/CONTEÚDO]\n"
+            enriched = enriched.replace(url, bloco, 1)
+            info.append({"url": url, "ok": True, "chars": len(text)})
+        else:
+            info.append({"url": url, "ok": False, "chars": 0})
+    return enriched, info
+
+
 @app.route("/gerar")
 def pagina_gerar():
     has_key = bool(ANTHROPIC_API_KEY and ANTHROPIC_API_KEY.startswith("sk-ant-api"))
     return render_template("gerar.html", has_key=has_key)
+
+
+@app.route("/api/gerar/system-prompt", methods=["GET"])
+def api_gerar_system_prompt():
+    """Retorna o system prompt padrao pra UI exibir/editar."""
+    return jsonify({"system": SYSTEM_GERAR_DEFAULT})
 
 
 @app.route("/api/gerar", methods=["POST"])
@@ -960,56 +1080,21 @@ def api_gerar():
     topico     = data.get("topico", "").strip()
     brief      = data.get("brief", "").strip()
     num_slides = min(max(int(data.get("num_slides", 8)), 4), 14)
+    # Override do system prompt vindo da UI (opcional). Se vazio, usa o default.
+    system_override = (data.get("system_override") or "").strip()
 
     if not topico:
         return jsonify({"error": "Tópico obrigatório"}), 400
 
-    SYSTEM = (
-        "Você é redator sênior de conteúdo financeiro para @gabriel.bearlz no Instagram.\n"
-        "Estilo: thread do Twitter/X analítico. Público: investidores brasileiros, 25-45 anos.\n\n"
+    SYSTEM = system_override if system_override else SYSTEM_GERAR_DEFAULT
 
-        "VOZ E LINGUAGEM — REGRAS ABSOLUTAS:\n"
-        "- Parágrafos de 2-3 linhas com estrutura de argumento: premissa → consequência\n"
-        "- Conectores naturais obrigatórios: 'Com isso,', 'Só que,', 'O que acontece é que,', 'Na prática,'\n"
-        "- Estruturas preferidas: 'Se X, então Y' / 'Enquanto todos olham para A, o verdadeiro risco é B'\n"
-        "- NUNCA use travessão (—) em hipótese alguma — regra absoluta inegociável\n"
-        "- NUNCA use frases picotadas estilo IA: 'Queda. Recuperação. Oportunidade.' — proibido\n"
-        "- NUNCA use palavras de enchimento: 'é importante ressaltar', 'vale destacar', 'é fundamental', 'cabe destacar'\n"
-        "- Tom: analítico, assertivo, levemente provocador — analista que vê o que outros não veem\n"
-        "- Sem emoji, sem hashtag\n"
-        "- Números e datas sempre com formatação brasileira (vírgula decimal, % colado ao número)\n\n"
-
-        "NEGRITOS — use de 2 a 4 por slide:\n"
-        "- Negrite palavras-chave, números importantes e expressões de impacto (2 a 6 palavras)\n"
-        "- Pode incluir dados numéricos em negrito: **9%**, **R$ 1,2 trilhão**, **maior alta em 10 anos**\n"
-        "- NUNCA negrite frases longas, períodos inteiros ou parágrafos completos\n\n"
-
-        "TAMANHO: 280 a 420 caracteres por slide. "
-        "Se um ponto exige mais espaço, DIVIDA em 2 slides. NUNCA comprima — divida.\n\n"
-
-        "ESTRUTURA DO CARROSSEL:\n"
-        "- Slide 1: Hook forte — afirmação provocadora ou dado surpreendente que prende atenção\n"
-        "- Slides intermediários: desenvolvimento com dados concretos, causa-efeito, comparações\n"
-        "- Slide final: implicação prática para o investidor brasileiro\n\n"
-
-        "IMAGENS — para cada slide escolha image_type:\n"
-        "- 'chart': slides com dados numéricos comparáveis (inclua chart_data com labels, values, unit, highlight)\n"
-        "  chart_type: 'bar' (comparação entre categorias), 'horizontal_bar' (rankings), 'line' (evolução temporal)\n"
-        "  highlight: true no ponto mais importante do gráfico\n"
-        "- 'photo': slides de contexto, hook ou implicação (inclua photo_topic em inglês específico e visual)\n"
-        "  photo_topic deve ser descritivo: 'US dollar bills close-up' NÃO 'money'\n\n"
-
-        "RETORNE SOMENTE JSON VÁLIDO, sem markdown, sem texto fora do JSON:\n"
-        '{"titulo":"...","slides":[{"texto":"...","tema":"bitcoin|economia|mercado|geopolitica|ia|tecnologia",'
-        '"image_type":"chart|photo","chart_title":"...","chart_type":"bar|horizontal_bar|line",'
-        '"chart_data":[{"label":"...","value":0,"unit":"%","highlight":false}],'
-        '"photo_topic":"..."}]}'
-    )
+    # Baixa conteudo dos links no brief antes de mandar pro Claude
+    brief_enriched, urls_info = _processar_brief_com_urls(brief)
 
     prompt = (
         f"Crie exatamente {num_slides} slides sobre:\n\n"
         f"TÓPICO: {topico}\n"
-        f"CONTEÚDO/BRIEF: {brief or topico}\n\n"
+        f"CONTEÚDO/BRIEF: {brief_enriched or topico}\n\n"
         f"Slide 1: Hook. Slides 2-{num_slides-1}: desenvolvimento com dados. "
         f"Slide {num_slides}: implicação para o investidor.\n"
         "Retorne SOMENTE JSON válido."
@@ -1177,10 +1262,21 @@ def api_gerar():
                     num_slides=excluded.num_slides, updated_at=datetime('now')
             """, (slug, titulo_gerado, nome, len(slides_out)+1))
 
-        return jsonify({"ok": True, "slug": slug, "titulo": titulo_gerado, "url": f"/c/{slug}"})
+        return jsonify({
+            "ok": True, "slug": slug, "titulo": titulo_gerado, "url": f"/c/{slug}",
+            "debug": {
+                "system_used":   SYSTEM,
+                "user_prompt":   prompt,
+                "urls_fetched":  urls_info,
+                "system_is_custom": bool(system_override),
+                "model": "claude-sonnet-4-5",
+            }
+        })
 
     except json.JSONDecodeError as e:
-        return jsonify({"error": f"Resposta inválida do Claude: {e}"}), 500
+        return jsonify({"error": f"Resposta inválida do Claude: {e}",
+                        "debug": {"system_used": SYSTEM, "user_prompt": prompt,
+                                  "urls_fetched": urls_info}}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

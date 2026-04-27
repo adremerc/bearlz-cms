@@ -77,8 +77,41 @@
         Gerar Carrossel
       </button>
 
+      <!-- Discreto: dica sobre links no brief -->
+      <p class="text-xs text-gray-400 -mt-1">
+        💡 Cole URLs no brief — o sistema baixa o conteúdo da página antes de mandar pro Claude (ele lê o artigo, não inventa dados)
+      </p>
+
     </fieldset>
   </div>
+
+  <!-- Configurações avançadas (colapsado) -->
+  <details class="mt-3 group">
+    <summary class="flex items-center gap-2 cursor-pointer text-xs font-medium text-gray-500 hover:text-gray-700 select-none px-1 py-2">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+      </svg>
+      Configurações avançadas (prompt do sistema)
+      <span id="prompt-status" class="ml-auto text-[10px] text-gray-400"></span>
+    </summary>
+    <div class="mt-2 bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+      <div class="flex items-center justify-between">
+        <p class="text-xs text-gray-500">
+          Esse é o prompt que o Claude recebe. Você pode editar e suas mudanças ficam salvas no navegador.
+        </p>
+        <button onclick="restaurarPromptPadrao()" class="text-xs text-blue-600 hover:underline whitespace-nowrap ml-3">
+          Restaurar padrão
+        </button>
+      </div>
+      <textarea id="system-prompt" rows="14"
+        placeholder="Carregando prompt..."
+        oninput="onPromptChange()"
+        class="w-full text-xs font-mono border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y leading-relaxed"></textarea>
+      <p class="text-[10px] text-gray-400">
+        Vazio = usa o padrão do servidor. Modificar afeta apenas suas próximas gerações neste navegador.
+      </p>
+    </div>
+  </details>
 
   <!-- Loading state -->
   <div id="loading-box" class="hidden mt-4 bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center gap-3">
@@ -101,13 +134,25 @@
       <p class="text-sm font-semibold text-green-800">Carrossel gerado!</p>
     </div>
     <p id="success-titulo" class="text-sm text-green-700 mb-3 font-medium"></p>
-    <a id="success-link" href="#"
-       class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-500 text-white text-sm font-semibold rounded-lg hover:bg-blue-600 transition-colors">
-      Ver e revisar
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
-      </svg>
-    </a>
+    <!-- Linha de URLs baixadas (so aparece se tiver) -->
+    <div id="success-urls" class="hidden text-xs text-green-700 mb-3 space-y-1"></div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <a id="success-link" href="#"
+         class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-500 text-white text-sm font-semibold rounded-lg hover:bg-blue-600 transition-colors">
+        Ver e revisar
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+        </svg>
+      </a>
+      <button onclick="abrirInspector()"
+        class="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/>
+        </svg>
+        Ver o que o Claude recebeu
+      </button>
+    </div>
   </div>
 
   <!-- Error state -->
@@ -115,18 +160,177 @@
     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
       <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
     </svg>
-    <div>
+    <div class="flex-1">
       <p class="text-sm font-semibold text-red-700">Erro ao gerar</p>
       <p id="error-msg" class="text-sm text-red-600 mt-0.5"></p>
+      <button id="error-debug-btn" onclick="abrirInspector()"
+        class="hidden mt-2 text-xs text-red-700 underline hover:text-red-900">
+        Ver o que foi enviado pro Claude
+      </button>
     </div>
   </div>
 
+</div>
+
+<!-- ── Modal: Inspector de prompts ─────────────────────────────────── -->
+<div id="inspector-modal" class="hidden fixed inset-0 z-50 bg-black/60 items-start justify-center overflow-y-auto p-4 sm:p-8" style="display:none">
+  <div class="bg-white rounded-xl shadow-xl max-w-3xl w-full my-4 flex flex-col" style="max-height:calc(100vh - 4rem)">
+    <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 flex-shrink-0">
+      <h2 class="text-base font-bold text-gray-900">Inspector — o que o Claude recebeu</h2>
+      <button onclick="fecharInspector()" class="p-1 rounded-lg hover:bg-gray-100 text-gray-500">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="overflow-y-auto px-5 py-4 space-y-4 flex-1">
+      <!-- Modelo -->
+      <div>
+        <p class="text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-1">Modelo</p>
+        <p id="insp-model" class="text-xs font-mono text-gray-800"></p>
+      </div>
+      <!-- URLs baixadas -->
+      <div id="insp-urls-block">
+        <p class="text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-1">Links no brief (status do fetch)</p>
+        <div id="insp-urls" class="text-xs space-y-1"></div>
+      </div>
+      <!-- Prompt do user -->
+      <div>
+        <p class="text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-1">User message (o que veio do brief, com conteúdo dos links injetado)</p>
+        <pre id="insp-user" class="text-[11px] font-mono bg-gray-50 border border-gray-200 rounded-lg p-3 whitespace-pre-wrap break-words max-h-64 overflow-y-auto"></pre>
+      </div>
+      <!-- System prompt -->
+      <div>
+        <p class="text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-1">
+          System prompt <span id="insp-system-flag" class="hidden text-blue-600 ml-1">(seu prompt customizado)</span>
+        </p>
+        <pre id="insp-system" class="text-[11px] font-mono bg-gray-50 border border-gray-200 rounded-lg p-3 whitespace-pre-wrap break-words max-h-64 overflow-y-auto"></pre>
+      </div>
+    </div>
+    <div class="px-5 py-3 border-t border-gray-200 flex justify-end gap-2 flex-shrink-0">
+      <button onclick="copiarPrompts()" class="px-3 py-1.5 text-xs font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg">
+        Copiar tudo
+      </button>
+      <button onclick="fecharInspector()" class="px-3 py-1.5 text-xs font-medium bg-blue-500 hover:bg-blue-600 text-white rounded-lg">
+        Fechar
+      </button>
+    </div>
+  </div>
 </div>
 
 {% endblock %}
 
 {% block scripts %}
 <script>
+  // ── Estado global do inspector (debug do ultimo /api/gerar) ──
+  let _ultimoDebug = null;
+  let _systemPadrao = "";
+  const LS_KEY_PROMPT = 'bearlz_system_prompt_v1';
+
+  // ── Carrega o prompt padrao do servidor ao abrir a pagina ──
+  async function carregarPromptPadrao() {
+    try {
+      const r = await fetch('/api/gerar/system-prompt');
+      const d = await r.json();
+      _systemPadrao = d.system || "";
+      const ta = document.getElementById('system-prompt');
+      // Se usuario ja tem um prompt customizado salvo, carrega esse; senao, padrao
+      const salvo = localStorage.getItem(LS_KEY_PROMPT);
+      ta.value = salvo || _systemPadrao;
+      atualizarStatusPrompt();
+    } catch(e) {
+      console.error('Falha ao carregar system prompt padrao:', e);
+    }
+  }
+
+  function atualizarStatusPrompt() {
+    const ta = document.getElementById('system-prompt');
+    const status = document.getElementById('prompt-status');
+    if (ta.value === _systemPadrao || !ta.value) {
+      status.textContent = 'padrão';
+      status.style.color = '';
+    } else {
+      status.textContent = '✏ editado';
+      status.style.color = '#1d9bf0';
+    }
+  }
+
+  function onPromptChange() {
+    const ta = document.getElementById('system-prompt');
+    if (ta.value === _systemPadrao || !ta.value) {
+      localStorage.removeItem(LS_KEY_PROMPT);
+    } else {
+      localStorage.setItem(LS_KEY_PROMPT, ta.value);
+    }
+    atualizarStatusPrompt();
+  }
+
+  function restaurarPromptPadrao() {
+    document.getElementById('system-prompt').value = _systemPadrao;
+    localStorage.removeItem(LS_KEY_PROMPT);
+    atualizarStatusPrompt();
+    toast('Prompt restaurado pro padrão');
+  }
+
+  // ── Inspector modal ──
+  function abrirInspector() {
+    if (!_ultimoDebug) {
+      toast('Nada pra inspecionar ainda');
+      return;
+    }
+    const m = document.getElementById('inspector-modal');
+    document.getElementById('insp-model').textContent  = _ultimoDebug.model || '—';
+    document.getElementById('insp-system').textContent = _ultimoDebug.system_used || '';
+    document.getElementById('insp-user').textContent   = _ultimoDebug.user_prompt || '';
+
+    // Flag de prompt customizado
+    document.getElementById('insp-system-flag').classList.toggle('hidden', !_ultimoDebug.system_is_custom);
+
+    // URLs baixadas
+    const urlsBlock = document.getElementById('insp-urls-block');
+    const urlsDiv   = document.getElementById('insp-urls');
+    const urls = _ultimoDebug.urls_fetched || [];
+    if (urls.length === 0) {
+      urlsBlock.classList.add('hidden');
+    } else {
+      urlsBlock.classList.remove('hidden');
+      urlsDiv.innerHTML = urls.map(u => {
+        const ok = u.ok;
+        const icon  = ok ? '✓' : '✗';
+        const color = ok ? 'text-green-700' : 'text-red-700';
+        const info  = ok ? `${u.chars.toLocaleString()} caracteres extraídos` : 'falhou (timeout, 404, paywall ou bloqueio)';
+        return `<div class="${color}"><span class="font-bold mr-1">${icon}</span><span class="font-mono break-all">${u.url}</span> <span class="text-gray-500">— ${info}</span></div>`;
+      }).join('');
+    }
+
+    m.style.display = 'flex';
+  }
+
+  function fecharInspector() {
+    document.getElementById('inspector-modal').style.display = 'none';
+  }
+
+  function copiarPrompts() {
+    if (!_ultimoDebug) return;
+    const texto =
+      `MODELO: ${_ultimoDebug.model}\n\n` +
+      `=== SYSTEM ===\n${_ultimoDebug.system_used}\n\n` +
+      `=== USER ===\n${_ultimoDebug.user_prompt}`;
+    navigator.clipboard.writeText(texto).then(
+      () => toast('Copiado!'),
+      () => toast('Falha ao copiar')
+    );
+  }
+
+  // Fechar modal clicando fora
+  document.getElementById('inspector-modal').addEventListener('click', e => {
+    if (e.target.id === 'inspector-modal') fecharInspector();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') fecharInspector();
+  });
+
+  // ── Geração ──
   async function gerarCarrossel() {
     const topico    = document.getElementById('topico').value.trim();
     const brief     = document.getElementById('brief').value.trim();
@@ -138,18 +342,23 @@
       return;
     }
 
+    // System prompt customizado: so envia se diferente do padrao
+    const systemAtual = document.getElementById('system-prompt').value;
+    const system_override = (systemAtual && systemAtual !== _systemPadrao) ? systemAtual : '';
+
     // UI: loading state
     const btn = document.getElementById('gerar-btn');
     btn.disabled = true;
     document.getElementById('loading-box').classList.remove('hidden');
     document.getElementById('success-box').classList.add('hidden');
     document.getElementById('error-box').classList.add('hidden');
+    document.getElementById('error-debug-btn').classList.add('hidden');
 
     try {
       const r = await fetch('/api/gerar', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({topico, brief, num_slides})
+        body: JSON.stringify({topico, brief, num_slides, system_override})
       });
 
       // Tenta ler como JSON; se falhar, provavel timeout do gunicorn (retorna HTML).
@@ -166,14 +375,36 @@
 
       document.getElementById('loading-box').classList.add('hidden');
 
+      // Guarda debug em qualquer caso
+      _ultimoDebug = d.debug || null;
+
       if (d.ok) {
         document.getElementById('success-titulo').textContent = d.titulo;
         document.getElementById('success-link').href = d.url;
+
+        // Mostra resumo de URLs baixadas no card de sucesso
+        const urlsBox = document.getElementById('success-urls');
+        const urls    = (d.debug && d.debug.urls_fetched) || [];
+        if (urls.length > 0) {
+          urlsBox.innerHTML = urls.map(u => {
+            const icon = u.ok ? '✓' : '✗';
+            const desc = u.ok ? `${u.chars} chars lidos` : 'falhou';
+            return `<div><span class="font-bold">${icon}</span> ${u.url.length > 60 ? u.url.slice(0,60)+'…' : u.url} <span class="text-green-600/70">— ${desc}</span></div>`;
+          }).join('');
+          urlsBox.classList.remove('hidden');
+        } else {
+          urlsBox.classList.add('hidden');
+        }
+
         document.getElementById('success-box').classList.remove('hidden');
         toast('Carrossel gerado com sucesso!');
       } else {
         document.getElementById('error-msg').textContent = d.error || 'Erro desconhecido';
         document.getElementById('error-box').classList.remove('hidden');
+        // Se temos debug do erro, deixa o botao de inspecao disponivel
+        if (_ultimoDebug) {
+          document.getElementById('error-debug-btn').classList.remove('hidden');
+        }
         btn.disabled = false;
       }
     } catch(e) {
@@ -188,5 +419,8 @@
   document.getElementById('brief').addEventListener('keydown', e => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) gerarCarrossel();
   });
+
+  // Boot: carrega o system prompt padrao
+  carregarPromptPadrao();
 </script>
 {% endblock %}
