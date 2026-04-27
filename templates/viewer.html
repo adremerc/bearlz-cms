@@ -283,8 +283,9 @@
           <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
           </svg>
-          Revisar agora
+          Gerar prévia
         </button>
+        <p class="text-[10px] text-gray-400 mt-1.5 text-center">Você revisa as sugestões antes de aplicar</p>
 
         <!-- Estado de loading -->
         <div id="revisar-loading" class="hidden mt-3 flex flex-col items-center gap-2 py-2">
@@ -345,6 +346,21 @@
     </button>
 
   </div><!-- /panel -->
+</div>
+
+<!-- ── Modal de Prévia da revisão Claude ─────────── -->
+<div id="revisarPreviewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99999;padding:24px 16px;overflow-y:auto" onclick="if(event.target===this)closeRevisarPreview()">
+  <div style="background:#fff;border-radius:14px;max-width:760px;width:100%;margin:0 auto;padding:18px 22px;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.4);font-family:'Open Sans',sans-serif">
+    <div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;padding-bottom:8px;border-bottom:1px solid #f0f0f0">
+      <strong style="font-size:15px;color:#111">Prévia das alterações sugeridas</strong>
+      <button onclick="closeRevisarPreview()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#999;line-height:1;padding:0 6px">×</button>
+    </div>
+    <div id="revisarPreviewBody" style="display:flex;flex-direction:column;gap:14px"></div>
+    <div id="revisarPreviewActions" style="display:flex;justify-content:flex-end;gap:10px;padding-top:8px;border-top:1px solid #f0f0f0">
+      <button onclick="closeRevisarPreview()" style="padding:8px 16px;font-size:12px;font-weight:600;background:#f3f4f6;color:#374151;border:none;border-radius:8px;cursor:pointer">Cancelar</button>
+      <button id="revisarApplyBtn" onclick="aplicarRevisao()" style="padding:8px 18px;font-size:12px;font-weight:700;background:linear-gradient(to right,#8b5cf6,#7c3aed);color:#fff;border:none;border-radius:8px;cursor:pointer">Aplicar todas</button>
+    </div>
+  </div>
 </div>
 
 <!-- ── Modal de Hooks renderizado no parent (sai do iframe) ─────────── -->
@@ -722,6 +738,20 @@
     input.focus();
   }
 
+  // ── Fluxo Revisar com Claude: preview -> aprovacao -> apply ──
+  let _revisarPropostas = null;
+
+  function closeRevisarPreview(){
+    document.getElementById('revisarPreviewModal').style.display = 'none';
+  }
+
+  function escHtml(s){
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function renderTexto(t){
+    return escHtml(t).replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+  }
+
   async function revisarComClaude() {
     const instrucoes = document.getElementById('revisar-input').value.trim();
     if (!instrucoes) { toast('Escreva as instruções antes de revisar'); return; }
@@ -737,7 +767,7 @@
     error.classList.add('hidden');
 
     try {
-      const r = await fetch(`/api/revisar/${SLUG}`, {
+      const r = await fetch(`/api/revisar/${SLUG}/preview`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({instrucoes})
@@ -745,35 +775,110 @@
       const d = await r.json();
 
       loading.classList.add('hidden');
+      btn.classList.remove('hidden');
 
       if (!d.ok) {
         document.getElementById('revisar-error-msg').textContent = d.error || 'Erro desconhecido';
         error.classList.remove('hidden');
-        btn.classList.remove('hidden');
         return;
       }
 
-      const msg = d.alterados
-        ? `${d.alterados} slide(s) alterado(s) de ${d.num_slides}. Recarregando...`
-        : `Nenhuma alteração necessária.`;
-      document.getElementById('revisar-result-msg').textContent = msg;
-      result.classList.remove('hidden');
+      if (!d.propostas || d.propostas.length === 0) {
+        document.getElementById('revisar-result-msg').textContent =
+          `Claude analisou os ${d.num_slides} slides mas não propôs alterações.`;
+        result.classList.remove('hidden');
+        setTimeout(()=>result.classList.add('hidden'), 4000);
+        return;
+      }
 
-      // Reload iframe with cache bust
-      const iframe = document.getElementById('carrossel-frame');
-      const src = iframe.src.split('?')[0];
-      iframe.src = src + '?t=' + Date.now();
-
-      document.getElementById('revisar-input').value = '';
-      setTimeout(() => btn.classList.remove('hidden'), 2000);
+      _revisarPropostas = d.propostas;
+      mostrarPreviewRevisao(d.propostas, d.num_slides);
 
     } catch(e) {
       loading.classList.add('hidden');
+      btn.classList.remove('hidden');
       document.getElementById('revisar-error-msg').textContent = 'Erro de conexão. Tente novamente.';
       error.classList.remove('hidden');
-      btn.classList.remove('hidden');
     }
   }
+
+  function mostrarPreviewRevisao(propostas, numSlides){
+    const modal = document.getElementById('revisarPreviewModal');
+    const body  = document.getElementById('revisarPreviewBody');
+    body.innerHTML = `
+      <p style="font-size:12px;color:#6b7280;margin:0 0 4px">
+        ${propostas.length} de ${numSlides} slides têm sugestões. Revise e aplique se concordar.
+      </p>
+    ` + propostas.map((p, i) => `
+      <div data-prop-idx="${i}" style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;background:#fafafa">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:11px;font-weight:700;color:#7c3aed;letter-spacing:.5px">SLIDE ${p.slide}</span>
+          <label style="font-size:11px;color:#6b7280;cursor:pointer;display:flex;align-items:center;gap:4px">
+            <input type="checkbox" class="prop-check" data-idx="${i}" checked style="cursor:pointer">
+            aplicar
+          </label>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr;gap:8px">
+          <div style="background:#fff;border:1px solid #fee2e2;border-radius:6px;padding:10px 12px">
+            <div style="font-size:10px;color:#991b1b;font-weight:700;margin-bottom:4px;letter-spacing:.5px">ANTES</div>
+            <div style="font-size:13px;line-height:1.5;color:#525252">${renderTexto(p.atual)}</div>
+          </div>
+          <div style="background:#fff;border:1px solid #d1fae5;border-radius:6px;padding:10px 12px">
+            <div style="font-size:10px;color:#065f46;font-weight:700;margin-bottom:4px;letter-spacing:.5px">DEPOIS</div>
+            <div style="font-size:13px;line-height:1.5;color:#1f2937">${renderTexto(p.novo)}</div>
+          </div>
+        </div>
+      </div>
+    `).join('');
+    modal.style.display = 'block';
+  }
+
+  async function aplicarRevisao(){
+    if (!_revisarPropostas) return;
+    const btn = document.getElementById('revisarApplyBtn');
+    btn.disabled = true; btn.textContent = 'Aplicando...';
+    // Filtra so as marcadas
+    const checks = document.querySelectorAll('.prop-check');
+    const aplicar = [];
+    checks.forEach(c => {
+      if (c.checked) {
+        const idx = parseInt(c.dataset.idx, 10);
+        const p = _revisarPropostas[idx];
+        if (p) aplicar.push({slide: p.slide, novo: p.novo});
+      }
+    });
+    if (aplicar.length === 0) {
+      toast('Nenhuma alteração marcada');
+      btn.disabled = false; btn.textContent = 'Aplicar todas';
+      return;
+    }
+    try {
+      const r = await fetch(`/api/revisar/${SLUG}/apply`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({alteracoes: aplicar})
+      });
+      const d = await r.json();
+      if (!d.ok) {
+        toast('Erro: ' + (d.error || 'desconhecido'));
+        btn.disabled = false; btn.textContent = 'Aplicar todas';
+        return;
+      }
+      toast(`✓ ${d.aplicados} slide(s) atualizado(s)`);
+      closeRevisarPreview();
+      // Recarrega iframe pra mostrar novo conteudo
+      const iframe = document.getElementById('carrossel-frame');
+      const src = iframe.src.split('?')[0];
+      iframe.src = src + '?t=' + Date.now();
+      document.getElementById('revisar-input').value = '';
+      _revisarPropostas = null;
+    } catch(e) {
+      toast('Erro de conexão');
+      btn.disabled = false; btn.textContent = 'Aplicar todas';
+    }
+  }
+  window.closeRevisarPreview = closeRevisarPreview;
+  window.aplicarRevisao = aplicarRevisao;
 
   async function deletarCarrossel() {
     if (!confirm('Excluir este carrossel permanentemente? Esta ação não pode ser desfeita.')) return;

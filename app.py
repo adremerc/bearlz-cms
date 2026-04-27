@@ -381,9 +381,33 @@ def fmt_tempo(segundos: int) -> str:
         return f"{m}m {s:02d}s"
     return f"{s}s"
 
+try:
+    from zoneinfo import ZoneInfo
+    _TZ_BR = ZoneInfo("America/Sao_Paulo")
+    _TZ_UTC = ZoneInfo("UTC")
+except Exception:
+    # Python <3.9 fallback: deslocamento fixo de -3h (BR nao tem mais horario
+    # de verao desde 2019)
+    from datetime import timezone, timedelta
+    _TZ_BR = timezone(timedelta(hours=-3))
+    _TZ_UTC = timezone.utc
+
 def fmt_data(iso: str) -> str:
+    """Formata ISO timestamp pra dd/mm/yyyy hh:mm em America/Sao_Paulo.
+    Aceita strings com 'Z', com offset, ou naive (assume UTC nesse caso)."""
     try:
-        dt = datetime.fromisoformat(iso)
+        s = (iso or "").strip()
+        # SQLite datetime('now') retorna 'YYYY-MM-DD HH:MM:SS' (sem T, sem Z)
+        # Substitui espaco por T pra fromisoformat aceitar
+        if " " in s and "T" not in s:
+            s = s.replace(" ", "T", 1)
+        # 'Z' nao e aceito por fromisoformat antes de Python 3.11
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=_TZ_UTC)  # assume UTC pra dados antigos
+        dt = dt.astimezone(_TZ_BR)
         return dt.strftime("%d/%m/%Y %H:%M")
     except Exception:
         return iso or ""
@@ -950,6 +974,263 @@ def api_revisar(slug):
         return jsonify({"error": f"Resposta inválida do Claude: {e}"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ── Revisar: preview (gera alteracoes propostas SEM escrever) + apply ─────────
+# Permite usuario ver as mudancas antes de aplicar (igual ao fluxo de hooks).
+
+def _revisar_carrega_html(slug):
+    """Helper compartilhado: pega o HTML do carrossel e parseia os slides.
+    Retorna (html_path, html, slide_objs, escape_js, unescape_js) ou
+    (None, None, None, None, None) com error_response setado."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT arquivo FROM carrosseis WHERE slug=?", (slug,)
+        ).fetchone()
+    if not row or not row["arquivo"]:
+        return None, jsonify({"error": "Carrossel não encontrado"}), 404
+    html_path = _find_carrossel_file(row["arquivo"])
+    if not html_path:
+        return None, jsonify({"error": "Arquivo HTML não encontrado"}), 404
+    html = html_path.read_text(encoding="utf-8")
+    arr_start = html.find('const slides=[')
+    if arr_start == -1:
+        return None, jsonify({"error": "Não foi possível ler os slides"}), 400
+    bracket_pos = html.index('[', arr_start)
+    depth, i = 0, bracket_pos
+    while i < len(html):
+        if html[i] == '[':
+            depth += 1
+        elif html[i] == ']':
+            depth -= 1
+            if depth == 0:
+                break
+        i += 1
+    slides_raw = html[arr_start: i + 1]
+    slide_objs = re.findall(
+        r'\{id:(\d+),text:`(.*?)`,\s*(image:.*?),\s*zoom:([\d.]+),\s*ox:([\d.]+),\s*oy:([\d.]+)\}',
+        slides_raw, re.DOTALL
+    )
+    if not slide_objs:
+        return None, jsonify({"error": "Não foi possível interpretar os slides"}), 400
+    return (html_path, html, slide_objs), None, 0
+
+def _parse_claude_json(texto: str):
+    """Tenta parsear JSON do Claude com varios fallbacks pra lidar com:
+    - control chars (json.loads strict=True nao aceita)
+    - aspas duplas dentro de valores nao escapadas
+    - newlines literais dentro de strings
+    - texto antes/depois do JSON
+    Retorna dict ou None."""
+    if not texto:
+        return None
+    # 1. Tentativa direta com strict=False (aceita control chars)
+    try:
+        return json.loads(texto, strict=False)
+    except Exception:
+        pass
+    # 2. Extrai apenas o primeiro { ... } balanceado
+    try:
+        start = texto.find('{')
+        if start == -1:
+            return None
+        depth = 0
+        for i in range(start, len(texto)):
+            ch = texto[i]
+            if ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0:
+                    candidate = texto[start:i+1]
+                    return json.loads(candidate, strict=False)
+    except Exception:
+        pass
+    # 3. Tenta extrair pares "chave": "valor" via regex tolerante a aspas
+    try:
+        out = {}
+        for m in re.finditer(
+            r'"(\d+)"\s*:\s*"((?:[^"\\]|\\.)*)"',
+            texto, re.DOTALL
+        ):
+            chave = m.group(1)
+            # Desescape JSON
+            valor = m.group(2)
+            valor = (valor.replace('\\"', '"')
+                          .replace('\\n', '\n')
+                          .replace('\\t', '\t')
+                          .replace('\\\\', '\\'))
+            out[chave] = valor
+        return out if out else None
+    except Exception:
+        return None
+
+def _revisar_unescape_js(t):
+    return t.replace("\\n", "\n").replace("\\`", "`").replace("\\\\", "\\")
+
+def _revisar_escape_js(t):
+    return (t.replace("\\", "\\\\")
+             .replace("`",  "\\`")
+             .replace("${", "\\${")
+             .replace("\n", "\\n"))
+
+
+SYSTEM_REVISAO_PREVIEW = """Você é editor sênior de carrosseis para @gabriel.bearlz no Instagram.
+Receberá slides numerados [SLIDE 1], [SLIDE 2], etc. e instruções de revisão.
+
+VOZ E REGRAS:
+- Parágrafos de 2-3 linhas separados por linha em branco (\\n\\n)
+- Conectores naturais: "Com isso,", "Só que,", "O que acontece é que,", "Na prática,"
+- NUNCA use travessão (—) em hipótese alguma
+- NUNCA use frases picotadas estilo IA: "Queda. Alta. Oportunidade." é proibido
+- NUNCA use enchimento: "vale destacar", "é importante ressaltar", "cabe destacar"
+- Sem emoji, sem hashtag
+- 2 a 4 negritos por slide (**palavra**) com numeros/expressoes de impacto
+- 280 a 420 caracteres por slide
+- Se exigir mais espaco, NAO comprima — divida em 2 slides
+
+FORMATO DA RESPOSTA — REGRA CRITICA:
+- Retorne SOMENTE um JSON valido
+- Chave: numero do slide como string ("1", "2", etc)
+- Valor: novo texto do slide (string, com \\n\\n entre paragrafos)
+- INCLUA TODOS os slides (mesmo os que NAO mudaram, copiando texto original)
+- Use SEMPRE aspas duplas em chaves e valores
+- Escape aspas duplas dentro do texto com \\"
+
+EXEMPLO CORRETO:
+{"1": "Texto do slide 1.\\n\\nSegundo paragrafo.", "2": "Texto inalterado do slide 2."}
+
+NAO retorne markdown, NAO retorne array, NAO retorne texto fora do JSON."""
+
+
+@app.route("/api/revisar/<slug>/preview", methods=["POST"])
+def api_revisar_preview(slug):
+    """Pede sugestoes ao Claude e retorna SEM escrever. Frontend mostra
+    diff e usuario aprova manualmente via /apply."""
+    if not ANTHROPIC_AVAILABLE:
+        return jsonify({"error": "Biblioteca anthropic não instalada"}), 400
+    if not ANTHROPIC_API_KEY or not ANTHROPIC_API_KEY.startswith("sk-ant-api"):
+        return jsonify({"error": "ANTHROPIC_API_KEY não configurada"}), 400
+
+    data       = request.get_json() or {}
+    instrucoes = data.get("instrucoes", "").strip()
+    if not instrucoes:
+        return jsonify({"error": "Instruções obrigatórias"}), 400
+
+    loaded, err_resp, err_status = _revisar_carrega_html(slug)
+    if not loaded:
+        return err_resp, err_status
+    html_path, html, slide_objs = loaded
+
+    slides_numerados = "\n\n".join(
+        f"[SLIDE {i+1}]\n{_revisar_unescape_js(text)}"
+        for i, (sid, text, *_) in enumerate(slide_objs)
+    )
+    prompt = (
+        f"Carrossel com {len(slide_objs)} slides:\n\n"
+        f"{slides_numerados}\n\n"
+        f"INSTRUÇÕES: {instrucoes}\n\n"
+        f"Altere SOMENTE os slides que as instruções mencionam. "
+        f"Slides não mencionados devem ser retornados EXATAMENTE iguais ao original.\n"
+        f"Retorne SOMENTE JSON onde a chave é o número do slide (string) e o valor é o texto:\n"
+        f'{{ "1": "texto do slide 1 se mudou", "3": "texto do slide 3 se mudou" }}\n'
+        f"Inclua TODOS os slides na resposta, mesmo os que não mudaram."
+    )
+
+    try:
+        client = _anthropic_lib.Anthropic(api_key=ANTHROPIC_API_KEY)
+        resp = client.messages.create(
+            model="claude-sonnet-4-5", max_tokens=5000,
+            system=SYSTEM_REVISAO_PREVIEW,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        texto = resp.content[0].text.strip()
+        if texto.startswith("```"):
+            texto = re.sub(r"^```[a-z]*\n?", "", texto)
+            texto = re.sub(r"\n?```$", "", texto).strip()
+        alteracoes = _parse_claude_json(texto)
+        if alteracoes is None:
+            return jsonify({
+                "error": "Resposta do Claude veio malformada. Tente reformular as instruções.",
+                "raw": texto[:500]
+            }), 500
+
+        # Monta lista de mudancas REAIS (so onde o texto difere)
+        propostas = []
+        for i, (sid, old_text_raw, *_) in enumerate(slide_objs):
+            chave = str(i + 1)
+            if chave not in alteracoes:
+                continue
+            texto_atual = _revisar_unescape_js(old_text_raw)
+            texto_novo  = _sanitizar_slide(alteracoes[chave])
+            if texto_novo.strip() == texto_atual.strip():
+                continue  # sem mudanca real
+            propostas.append({
+                "slide": i + 1,
+                "atual": texto_atual,
+                "novo":  texto_novo,
+            })
+
+        return jsonify({
+            "ok": True,
+            "num_slides": len(slide_objs),
+            "propostas": propostas,
+        })
+    except json.JSONDecodeError as e:
+        return jsonify({"error": f"Resposta inválida do Claude: {e}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/revisar/<slug>/apply", methods=["POST"])
+def api_revisar_apply(slug):
+    """Aplica alteracoes ja aprovadas pelo usuario. Body: {alteracoes:
+    [{slide:1, novo:'texto'}, {slide:3, novo:'texto'}]}"""
+    data = request.get_json() or {}
+    alteracoes = data.get("alteracoes", [])
+    if not alteracoes or not isinstance(alteracoes, list):
+        return jsonify({"error": "Nenhuma alteração para aplicar"}), 400
+
+    loaded, err_resp, err_status = _revisar_carrega_html(slug)
+    if not loaded:
+        return err_resp, err_status
+    html_path, html, slide_objs = loaded
+
+    html_novo = html
+    aplicados = 0
+    for alt in alteracoes:
+        idx = alt.get("slide")
+        novo = alt.get("novo")
+        if not isinstance(idx, int) or not isinstance(novo, str):
+            continue
+        if idx < 1 or idx > len(slide_objs):
+            continue
+        sid, old_text_raw, *_ = slide_objs[idx - 1]
+        novo_san = _sanitizar_slide(novo)
+        novo_raw = _revisar_escape_js(novo_san)
+        if novo_raw == old_text_raw:
+            continue
+        old_js = f"text:`{old_text_raw}`"
+        new_js = f"text:`{novo_raw}`"
+        if old_js in html_novo:
+            html_novo = html_novo.replace(old_js, new_js, 1)
+            aplicados += 1
+
+    if aplicados == 0:
+        return jsonify({"ok": True, "aplicados": 0,
+                        "msg": "Nenhuma alteração efetiva"})
+
+    html_path.write_text(html_novo, encoding="utf-8")
+    with get_db() as conn:
+        conn.execute("UPDATE carrosseis SET updated_at=datetime('now') WHERE slug=?", (slug,))
+    # Persiste no branch GitHub data-generated (se enabled)
+    _gh_save_async(
+        f"data/generated/{html_path.name}",
+        html_novo.encode("utf-8"),
+        f"Revisao aplicada: {slug}"
+    )
+    return jsonify({"ok": True, "aplicados": aplicados,
+                    "num_slides": len(slide_objs)})
 
 
 # ── Generator ─────────────────────────────────────────────────────────────────
