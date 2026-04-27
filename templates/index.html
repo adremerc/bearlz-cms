@@ -11,11 +11,11 @@
   </div>
 </div>
 
-<!-- Filters row -->
-<div class="flex flex-wrap items-center gap-3 mb-6">
+<!-- Filters row: scrolla horizontal no mobile, wrap no desktop -->
+<div class="flex flex-nowrap sm:flex-wrap items-center gap-3 mb-6 overflow-x-auto no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0">
 
   <!-- Status tabs -->
-  <div class="flex bg-white border border-gray-200 rounded-lg p-1 gap-0.5">
+  <div class="flex bg-white border border-gray-200 rounded-lg p-1 gap-0.5 flex-shrink-0">
     {% for key, label, count in [
       ('todos',           'Todos',            counts.todos),
       ('rascunho',        'Rascunho',         counts.rascunho),
@@ -37,7 +37,7 @@
   </div>
 
   <!-- Priority filter -->
-  <div class="flex bg-white border border-gray-200 rounded-lg p-1 gap-0.5">
+  <div class="flex bg-white border border-gray-200 rounded-lg p-1 gap-0.5 flex-shrink-0">
     {% for key, label, color in [
       ('todos', 'Prioridade', 'gray'),
       ('alta',  'Alta',       'red'),

@@ -909,7 +909,9 @@ def api_revisar(slug):
             chave = str(i + 1)
             if chave not in alteracoes:
                 continue
-            novo_texto = alteracoes[chave]
+            # Sanitiza: remove travessoes que o Claude insiste em colocar e
+            # garante quebras de paragrafo
+            novo_texto = _sanitizar_slide(alteracoes[chave])
             novo_raw   = escape_js(novo_texto)
 
             # Só substitui se realmente mudou
@@ -972,10 +974,17 @@ SYSTEM_GERAR_DEFAULT = (
     "- NUNCA negrite frases longas, períodos inteiros ou parágrafos completos\n\n"
 
     "TAMANHO: 280 a 420 caracteres por slide. "
-    "Se um ponto exige mais espaço, DIVIDA em 2 slides. NUNCA comprima — divida.\n\n"
+    "Se um ponto exige mais espaço, DIVIDA em 2 slides. NUNCA comprima, divida.\n\n"
+
+    "QUEBRA DE PARÁGRAFOS — REGRA OBRIGATÓRIA:\n"
+    "- Cada slide DEVE ter 2 ou 3 parágrafos separados por LINHA EM BRANCO\n"
+    "- No JSON, use \\n\\n (duas quebras) entre parágrafos\n"
+    "- NÃO escreva o slide como um bloco corrido de texto, sempre quebre\n"
+    "- Exemplo de texto certo (com \\n\\n entre parágrafos):\n"
+    "  'O dólar caiu **9%** em 2026. Não foi acaso, foi consequência direta da política do Fed.\\n\\nCom isso, o Ibovespa subiu **22%** no mesmo período, atraindo fluxo gringo recorde.\\n\\nNa prática, isso muda toda a tese de alocação pra investidor brasileiro.'\n\n"
 
     "ESTRUTURA DO CARROSSEL:\n"
-    "- Slide 1: Hook forte — afirmação provocadora ou dado surpreendente que prende atenção\n"
+    "- Slide 1: Hook forte, afirmação provocadora ou dado surpreendente que prende atenção\n"
     "- Slides intermediários: desenvolvimento com dados concretos, causa-efeito, comparações\n"
     "- Slide final: implicação prática para o investidor brasileiro\n\n"
 
@@ -992,6 +1001,61 @@ SYSTEM_GERAR_DEFAULT = (
     '"chart_data":[{"label":"...","value":0,"unit":"%","highlight":false}],'
     '"photo_topic":"..."}]}'
 )
+
+
+# ── Sanitizers do texto dos slides ────────────────────────────────────────────
+# O Claude as vezes ignora a regra "nao usar travessao" e tambem retorna o
+# slide inteiro como bloco corrido sem quebrar paragrafos. A gente forca o
+# resultado pra cumprir as regras.
+
+def _strip_em_dash(text: str) -> str:
+    """Remove travessoes (—) substituindo por virgula/espaco conforme contexto."""
+    if not text or "—" not in text:
+        return text
+    # Variacoes ordenadas (maior pra menor pra evitar substituicao parcial)
+    text = text.replace(" — ", ", ")
+    text = text.replace(" —",  ",")
+    text = text.replace("— ",  "")
+    text = text.replace("—",   "")
+    return text
+
+def _ensure_paragraphs(text: str) -> str:
+    """Se o slide for longo (>180 chars) e nao tiver \\n\\n, divide em paragrafos
+    no fim de frases. Garante legibilidade mesmo se o Claude ignorar a regra."""
+    if not text:
+        return text
+    if "\n\n" in text:
+        return text  # ja tem paragrafos
+    if len(text) < 180:
+        return text  # texto curto nao precisa quebrar
+    # Divide em frases (final de frase = . ! ? seguido de espaco)
+    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+    if len(sentences) <= 1:
+        return text
+    # Agrupa em paragrafos de ~2 frases ou ~120 chars
+    paragraphs = []
+    current = []
+    current_len = 0
+    for s in sentences:
+        current.append(s)
+        current_len += len(s) + 1
+        if current_len >= 110 or len(current) >= 2:
+            paragraphs.append(" ".join(current))
+            current = []
+            current_len = 0
+    if current:
+        if paragraphs and current_len < 60:
+            # frase final muito curta: anexa no ultimo paragrafo
+            paragraphs[-1] += " " + " ".join(current)
+        else:
+            paragraphs.append(" ".join(current))
+    return "\n\n".join(paragraphs) if len(paragraphs) > 1 else text
+
+def _sanitizar_slide(text: str) -> str:
+    """Pipeline completo: tira travessao + garante quebras de paragrafo."""
+    text = _strip_em_dash(text or "")
+    text = _ensure_paragraphs(text)
+    return text
 
 
 # ── Fetcher de URLs no brief ──────────────────────────────────────────────────
@@ -1179,7 +1243,9 @@ def api_gerar():
                 ids  = PEXELS_FALLBACK.get(tema, ["4386469", "6770610", "5831251"])
                 fid  = ids[i % len(ids)]
                 img  = f"{PX}{fid}/pexels-photo-{fid}.jpeg{Q}"
-            slides_out.append({"texto": s.get("texto",""), "image_url": img})
+            # Sanitiza texto: remove travessoes e garante quebras de paragrafo
+            texto_sanit = _sanitizar_slide(s.get("texto", ""))
+            slides_out.append({"texto": texto_sanit, "image_url": img})
 
         # Build slug
         slug_base = re.sub(r"[^a-z0-9]+" , "-", titulo_gerado.lower())[:40].strip("-")
