@@ -38,8 +38,18 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
 .img-placeholder:hover{border-color:#1d9bf0}
 .img-placeholder-icon{font-size:20px;margin-bottom:2px}
 .img-placeholder-txt{font-size:12px;font-weight:600;color:#999}
-.img-container{flex:1;min-height:40px;position:relative;border-radius:0;overflow:hidden;cursor:grab;user-select:none;background-size:cover;background-position:50% 50%;background-repeat:no-repeat}
+.img-container{flex:1;min-height:40px;position:relative;border-radius:0;overflow:hidden;cursor:grab;user-select:none}
 .img-container:active{cursor:grabbing}
+/* <img> real dentro do container: posicionado absolutamente via JS pra
+   replicar cover/contain. html2canvas usa o src original em vez de capturar
+   o raster do display, preservando qualidade no export. */
+.img-container .img-real{
+  position:absolute;
+  pointer-events:none;
+  user-select:none;
+  -webkit-user-drag:none;
+  max-width:none;max-height:none;
+}
 .img-overlay-btn{position:absolute;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;border:none;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2}
 .img-ctrl-panel{margin-top:8px;padding:10px 14px;background:#f8f8f8;border-radius:10px;display:flex;flex-direction:column;gap:8px}
 .ctrl-row-inner{display:flex;align-items:center;gap:10px}

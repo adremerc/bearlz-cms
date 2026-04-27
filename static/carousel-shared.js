@@ -277,14 +277,18 @@ function renderImgSection(){
   if(s.image){
     const fit=getEffectiveFit(s);
     const hStyle=s.imgH?`height:${s.imgH}px;flex:none`:'';
-    const bgStyle=fit==='contain'
-      ?`background-image:url('${s.image}');background-size:contain;background-position:center;background-repeat:no-repeat;background-color:#f8f8f8;${hStyle}`
-      :`background-image:url('${s.image}');background-size:cover;background-position:${s.ox||50}% ${s.oy||50}%;${hStyle}`;
+    // Usa <img> real em vez de background-image. Isso preserva qualidade no
+    // export via html2canvas (que reusa o src original em vez de capturar o
+    // raster do display, que ficava embacado).
+    const bgColor=fit==='contain'?'#f8f8f8':'transparent';
     sec.innerHTML=`<div class="img-section">
-      <div class="img-container" id="imgContainer" style="${bgStyle}">
+      <div class="img-container" id="imgContainer" style="${hStyle};background:${bgColor}">
+        <img id="imgReal" class="img-real" src="${s.image}" alt="" draggable="false">
         <button class="img-overlay-btn" style="top:8px;right:8px" onclick="clearImage()">×</button>
       </div>
     </div>`;
+    // Aguarda layout pra calcular posicao (precisa de offsetWidth/Height reais)
+    requestAnimationFrame(()=>applyBgSize(s));
     document.getElementById('btnAjustar').style.display='inline';
     if(fit==='cover')initDrag();
     updateImgCtrlUI(s);
@@ -367,7 +371,7 @@ function initDrag(){
     const dy=((pt.clientY-startY)/r.height)*100;
     slides[cur].ox=Math.max(0,Math.min(100,Math.round(startOx-dx)));
     slides[cur].oy=Math.max(0,Math.min(100,Math.round(startOy-dy)));
-    cont.style.backgroundPosition=`${slides[cur].ox}% ${slides[cur].oy}%`;
+    applyBgSize(slides[cur]); // reposiciona o <img> via JS
   };
   const onUp=()=>{
     dragging=false;
@@ -421,21 +425,49 @@ function onImgFile(input){
 }
 function clearImage(){slides[cur].image=null;slides[cur].zoom=1;slides[cur].ox=50;slides[cur].oy=50;slides[cur].imgH=null;slides[cur].fit=null;slides[cur].imgNW=null;slides[cur].imgNH=null;document.getElementById('imgCtrlPanel').style.display='none';render();autoSave();}
 function toggleImgCtrl(){const panel=document.getElementById('imgCtrlPanel');const showing=panel.style.display!=='none';panel.style.display=showing?'none':'block';}
+// applyBgSize: nome historico, hoje aplica posicao+tamanho no <img> real
+// dentro de #imgContainer. Espelha exatamente a logica do drawSlideToCanvas
+// (cover crop com ox/oy/zoom) pra que preview e export batam pixel a pixel.
 function applyBgSize(s){
-  const cont=document.getElementById('imgContainer');if(!cont)return;
-  const z=s.zoom||1;
+  const cont=document.getElementById('imgContainer');
+  const img =document.getElementById('imgReal');
+  if(!cont||!img)return;
+  // Carrega dimensoes naturais se ainda nao temos
   if(!s.imgNW||!s.imgNH){
-    if(z>1){const t=new Image();t.crossOrigin='anonymous';t.onload=()=>{s.imgNW=t.naturalWidth;s.imgNH=t.naturalHeight;applyBgSize(s);};t.src=s.image;}
-    cont.style.backgroundSize='cover';return;
+    if(img.naturalWidth&&img.naturalHeight){
+      s.imgNW=img.naturalWidth;s.imgNH=img.naturalHeight;
+    }else{
+      img.addEventListener('load',()=>{
+        s.imgNW=img.naturalWidth;s.imgNH=img.naturalHeight;applyBgSize(s);
+      },{once:true});
+      return;
+    }
   }
   const cw=cont.offsetWidth,ch=cont.offsetHeight;if(!cw||!ch)return;
-  const base=Math.max(cw/s.imgNW,ch/s.imgNH);
-  cont.style.backgroundSize=`${Math.round(s.imgNW*base*z)}px ${Math.round(s.imgNH*base*z)}px`;
+  const z=s.zoom||1;
+  const fit=getEffectiveFit(s);
+  if(fit==='contain'){
+    const scale=Math.min(cw/s.imgNW,ch/s.imgNH);
+    const fw=s.imgNW*scale,fh=s.imgNH*scale;
+    img.style.left=((cw-fw)/2)+'px';
+    img.style.top =((ch-fh)/2)+'px';
+    img.style.width =fw+'px';
+    img.style.height=fh+'px';
+  }else{
+    const base=Math.max(cw/s.imgNW,ch/s.imgNH);
+    const fw=s.imgNW*base*z,fh=s.imgNH*base*z;
+    const ox=s.ox||50,oy=s.oy||50;
+    const dx=(ox/100)*(cw-fw),dy=(oy/100)*(ch-fh);
+    img.style.left=dx+'px';
+    img.style.top =dy+'px';
+    img.style.width =fw+'px';
+    img.style.height=fh+'px';
+  }
 }
 function updateZoom(val){slides[cur].zoom=parseFloat(val);document.getElementById('valZoom').textContent=Math.round(val*100)+'%';applyBgSize(slides[cur]);updateImgCtrlUI(slides[cur]);autoSave();}
-function updateOx(val){slides[cur].ox=parseInt(val);document.getElementById('valOx').textContent=val+'%';const cont=document.getElementById('imgContainer');if(cont)cont.style.backgroundPosition=`${slides[cur].ox}% ${slides[cur].oy}%`;updateImgCtrlUI(slides[cur]);autoSave();}
-function updateOy(val){slides[cur].oy=parseInt(val);document.getElementById('valOy').textContent=val+'%';const cont=document.getElementById('imgContainer');if(cont)cont.style.backgroundPosition=`${slides[cur].ox}% ${slides[cur].oy}%`;updateImgCtrlUI(slides[cur]);autoSave();}
-function updateImgH(val){slides[cur].imgH=parseInt(val);document.getElementById('valH').textContent=val+'px';const cont=document.getElementById('imgContainer');if(cont){cont.style.height=val+'px';cont.style.flex='none';}updateImgCtrlUI(slides[cur]);autoSave();}
+function updateOx(val){slides[cur].ox=parseInt(val);document.getElementById('valOx').textContent=val+'%';applyBgSize(slides[cur]);updateImgCtrlUI(slides[cur]);autoSave();}
+function updateOy(val){slides[cur].oy=parseInt(val);document.getElementById('valOy').textContent=val+'%';applyBgSize(slides[cur]);updateImgCtrlUI(slides[cur]);autoSave();}
+function updateImgH(val){slides[cur].imgH=parseInt(val);document.getElementById('valH').textContent=val+'px';const cont=document.getElementById('imgContainer');if(cont){cont.style.height=val+'px';cont.style.flex='none';}applyBgSize(slides[cur]);updateImgCtrlUI(slides[cur]);autoSave();}
 function resetImgCtrl(){
   slides[cur].zoom=1;slides[cur].ox=50;slides[cur].oy=50;slides[cur].imgH=null;slides[cur].fit=null;
   renderImgSection();
@@ -738,9 +770,9 @@ function downloadFromPreview(){
 
 async function captureCard(){
   const card=document.getElementById('theCard');
+  // Card: 420x525 px (preview). Export em 2160x2700 (5.14x), que eh a
+  // resolucao 2x do tamanho 1080x1350 do Instagram. Boa qualidade pra zoom.
   const CARD_W=420,CARD_H=525,SCALE=2160/CARD_W;
-  // Dots e footer agora estao em position:absolute (fora do fluxo do card),
-  // entao nao precisamos mais do spacer. Basta esconder os controles de edicao.
   const hideEls=Array.from(document.querySelectorAll('.card-dots-row,.card-footer,#imgCtrlPanel,.img-overlay-btn,.profile-edit-panel'));
   const prevDisplay=hideEls.map(el=>el.style.display);
   hideEls.forEach(el=>{el.style.display='none';});
@@ -750,11 +782,23 @@ async function captureCard(){
   card.style.width=CARD_W+'px';card.style.maxWidth=CARD_W+'px';
   card.style.height=CARD_H+'px';card.style.minHeight=CARD_H+'px';card.style.maxHeight=CARD_H+'px';
   card.style.marginBottom='0';
+  // Aguarda imagens dos slides carregarem (caso sejam URLs externas/Pexels)
+  const imgs=Array.from(card.querySelectorAll('img'));
+  await Promise.all(imgs.map(im=>{
+    if(im.complete&&im.naturalWidth)return Promise.resolve();
+    return new Promise(res=>{
+      im.addEventListener('load',res,{once:true});
+      im.addEventListener('error',res,{once:true});
+      setTimeout(res,5000); // timeout de seguranca
+    });
+  }));
   await new Promise(r=>requestAnimationFrame(r));
   try{
     const canvas=await html2canvas(card,{
       scale:SCALE,width:CARD_W,height:CARD_H,
-      useCORS:true,allowTaint:false,logging:false,backgroundColor:'#ffffff'
+      useCORS:true,allowTaint:false,logging:false,
+      backgroundColor:'#ffffff',
+      imageTimeout:15000, // 15s pra CDNs lentas (Pexels, investing.com)
     });
     return canvas;
   }finally{
