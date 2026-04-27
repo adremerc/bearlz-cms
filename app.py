@@ -1086,24 +1086,151 @@ def _sanitizar_slide(text: str) -> str:
 # em vez de inventar dados.
 URL_PATTERN = re.compile(r'https?://[^\s<>"\'\)]+', re.IGNORECASE)
 
+# Headers que imitam Chrome desktop real, com Accept-Language PT-BR.
+# Necessario pra passar por anti-bot basico de muitos sites.
+_BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Sec-Ch-Ua": '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
+    "Sec-Ch-Ua-Mobile": "?0",
+    "Sec-Ch-Ua-Platform": '"Windows"',
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+}
+
+def _wayback_fetch(url: str, max_chars: int = 4000):
+    """Ultimo fallback: Wayback Machine. Util pra paginas de noticia
+    especificas (URL estavel) que estao indexadas pelo Internet Archive."""
+    try:
+        import requests as _req
+        from bs4 import BeautifulSoup
+        from urllib.parse import urljoin
+    except ImportError:
+        return None
+    try:
+        # Pergunta qual snapshot mais recente existe
+        api = _req.get(f"https://archive.org/wayback/available?url={url}",
+                       timeout=10, headers={"User-Agent": _BROWSER_HEADERS["User-Agent"]})
+        if api.status_code != 200:
+            return None
+        info = api.json()
+        snap = info.get("archived_snapshots", {}).get("closest")
+        if not snap or not snap.get("available") or not snap.get("url"):
+            return None
+        # Baixa o snapshot
+        r = _req.get(snap["url"], timeout=15, headers=_BROWSER_HEADERS)
+        if r.status_code != 200 or len(r.text) < 500:
+            return None
+        soup = BeautifulSoup(r.text, "html.parser")
+        # Wayback adiciona barras de navegacao (#wm-ipp). Remove.
+        for sel in ["#wm-ipp-base", "#wm-ipp", "#donato", "[id^=wm-]"]:
+            for el in soup.select(sel):
+                el.decompose()
+        for tag in soup(["script", "style", "nav", "footer", "aside",
+                         "form", "noscript", "iframe", "header"]):
+            tag.decompose()
+        main = soup.find("article") or soup.find("main") or soup.body
+        if not main:
+            return None
+        text = main.get_text(separator="\n", strip=True)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        text = re.sub(r"[ \t]+", " ", text)
+        if len(text) < 200:
+            return None
+        return {"text": text[:max_chars], "images": []}
+    except Exception:
+        return None
+
+def _jina_fetch(url: str, max_chars: int = 4000):
+    """Fallback robusto via Jina AI Reader (r.jina.ai). Retorna markdown
+    limpo do conteudo. Funciona em sites com Cloudflare/anti-bot/JS-only.
+    Free tier: ~200 req/min sem API key."""
+    try:
+        import requests as _req
+    except ImportError:
+        return None
+    try:
+        jr = _req.get(
+            f"https://r.jina.ai/{url}",
+            timeout=20,
+            headers={
+                "Accept": "text/plain",
+                "X-Return-Format": "markdown",
+                "User-Agent": _BROWSER_HEADERS["User-Agent"],
+            }
+        )
+        if jr.status_code != 200 or len(jr.text) < 80:
+            return None
+        md = jr.text
+        # Extrai imagens do markdown: ![alt](url)
+        imgs = re.findall(r'!\[[^\]]*\]\(([^)]+)\)', md)
+        imgs_clean, seen = [], set()
+        for u in imgs:
+            if u in seen: continue
+            if any(skip in u.lower() for skip in
+                   ["logo","avatar","icon","pixel","tracking","blank.","1x1","spacer"]):
+                continue
+            if u.lower().endswith((".gif",".svg")):
+                continue
+            seen.add(u); imgs_clean.append(u)
+        # Markdown -> texto puro
+        text = re.sub(r'!\[[^\]]*\]\([^)]+\)', '', md)
+        text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
+        text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
+        text = re.sub(r'\*\*|__|`', '', text)
+        text = re.sub(r'\n{3,}', '\n\n', text).strip()
+        if len(text) < 80:
+            return None
+        return {"text": text[:max_chars], "images": imgs_clean[:6]}
+    except Exception:
+        return None
+
 def _fetch_url_text(url: str, max_chars: int = 4000):
     """Baixa o HTML da URL e extrai (texto principal, imagens candidatas).
-    Retorna None se falhar; senao dict com {text, images, base_url}."""
+    Tenta 3 estrategias em sequencia:
+    1) Direto com headers de Chrome real (rapido, sem deps externos)
+    2) Jina Reader (r.jina.ai) — bypassa anti-bot/JS-only/paywall fraco
+    3) Wayback Machine — pra sites bloqueados pelo Jina (Investing, Reuters)
+    Retorna dict com {text, images, source} no sucesso, ou None se nao
+    conseguir extrair em nenhuma estrategia."""
     try:
         import requests as _req
         from bs4 import BeautifulSoup
     except ImportError:
+        return _jina_fetch(url, max_chars) or _wayback_fetch(url, max_chars)
+
+    html_text = None
+    direct_status = 0
+    try:
+        r = _req.get(url, timeout=12, headers=_BROWSER_HEADERS, allow_redirects=True)
+        direct_status = r.status_code
+        if r.status_code == 200 and len(r.text) > 500:
+            html_text = r.text
+    except Exception:
+        pass
+
+    if not html_text:
+        # Tenta Jina, depois Wayback como ultimo recurso
+        result = _jina_fetch(url, max_chars)
+        if result:
+            result["source"] = "jina"
+            return result
+        result = _wayback_fetch(url, max_chars)
+        if result:
+            result["source"] = "wayback"
+            return result
         return None
+
+    # Caminho normal: html funcionou
     try:
         from urllib.parse import urljoin
-        r = _req.get(url, timeout=12, headers={
-            "User-Agent": "Mozilla/5.0 (compatible; BearlzCMS/1.0; +https://bearlz-cms.fly.dev)",
-            "Accept": "text/html,application/xhtml+xml",
-            "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
-        })
-        if r.status_code != 200:
-            return None
-        soup = BeautifulSoup(r.text, "html.parser")
+        soup = BeautifulSoup(html_text, "html.parser")
 
         # ── Extrai imagens candidatas ANTES de remover scripts/header ───────
         # (precisa de meta tags do head)
@@ -1141,21 +1268,32 @@ def _fetch_url_text(url: str, max_chars: int = 4000):
         candidate_images = candidate_images[:6]
 
         # ── Texto principal ─────────────────────────────────────────────────
-        # Remove ruido: scripts, estilos, nav, footer, aside, formularios
         for tag in soup(["script", "style", "nav", "footer", "aside",
                          "form", "noscript", "iframe", "header"]):
             tag.decompose()
         main = soup.find("article") or soup.find("main") or soup.body
         if not main:
-            return None
+            j = _jina_fetch(url, max_chars) or _wayback_fetch(url, max_chars)
+            if j: j.setdefault("source", "jina")
+            return j
         text = main.get_text(separator="\n", strip=True)
         text = re.sub(r"\n{3,}", "\n\n", text)
         text = re.sub(r"[ \t]+", " ", text)
-        if len(text) < 80:
-            return None
-        return {"text": text[:max_chars], "images": candidate_images}
+        # Se extracao deu pouco texto (paywall, JS-only, layout incomum),
+        # tenta Jina + Wayback. Pega o que tiver mais texto.
+        if len(text) < 200:
+            for fb_fn, src in ((_jina_fetch, "jina"), (_wayback_fetch, "wayback")):
+                fb = fb_fn(url, max_chars)
+                if fb and len(fb["text"]) > len(text):
+                    fb["source"] = src
+                    return fb
+            if len(text) < 80:
+                return None
+        return {"text": text[:max_chars], "images": candidate_images, "source": "direct"}
     except Exception:
-        return None
+        j = _jina_fetch(url, max_chars) or _wayback_fetch(url, max_chars)
+        if j: j.setdefault("source", "jina")
+        return j
 
 def _processar_brief_com_urls(brief: str):
     """Detecta URLs no brief, baixa o conteudo de cada uma e devolve:
@@ -1178,12 +1316,14 @@ def _processar_brief_com_urls(brief: str):
             info.append({
                 "url": url, "ok": True,
                 "chars": len(result["text"]),
-                "imgs": len(result["images"])
+                "imgs": len(result["images"]),
+                "source": result.get("source", "direct"),
             })
             for img_url in result["images"]:
                 all_images.append({"url_imagem": img_url, "origem": url})
         else:
-            info.append({"url": url, "ok": False, "chars": 0, "imgs": 0})
+            info.append({"url": url, "ok": False, "chars": 0, "imgs": 0,
+                         "reason": "blocked"})
     return enriched, info, all_images
 
 

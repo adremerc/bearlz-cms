@@ -78,8 +78,10 @@
       </button>
 
       <!-- Discreto: dica sobre links no brief -->
-      <p class="text-xs text-gray-400 -mt-1">
-        💡 Cole URLs no brief — o sistema baixa o conteúdo da página antes de mandar pro Claude (ele lê o artigo, não inventa dados)
+      <p class="text-xs text-gray-400 -mt-1 leading-relaxed">
+        💡 Cole URLs no brief — o sistema baixa o conteúdo da página antes de mandar pro Claude (ele lê o artigo, não inventa dados).
+        <br>
+        <span class="text-gray-500">Se o site bloquear (ex: Investing, Reuters), copie o texto da matéria e cole direto no brief.</span>
       </p>
 
     </fieldset>
@@ -312,7 +314,10 @@
         const icon  = ok ? '✓' : '✗';
         const color = ok ? 'text-green-700' : 'text-red-700';
         const imgsExtra = u.imgs ? `, ${u.imgs} imagem(ns)` : '';
-        const info  = ok ? `${u.chars.toLocaleString()} caracteres${imgsExtra}` : 'falhou (timeout, 404, paywall ou bloqueio)';
+        const sourceLabel = ok && u.source && u.source !== 'direct' ? ` via ${u.source}` : '';
+        const info  = ok
+          ? `${u.chars.toLocaleString()} caracteres${imgsExtra}${sourceLabel}`
+          : 'site bloqueia leitura automática — cole o texto manualmente no brief';
         return `<div class="${color}"><span class="font-bold mr-1">${icon}</span><span class="font-mono break-all">${u.url}</span> <span class="text-gray-500">— ${info}</span></div>`;
       }).join('');
     }
@@ -431,7 +436,8 @@
         if (urls.length > 0) {
           urlsBox.innerHTML = urls.map(u => {
             const icon = u.ok ? '✓' : '✗';
-            const desc = u.ok ? `${u.chars} chars lidos` : 'falhou';
+            const src  = u.ok && u.source && u.source !== 'direct' ? ` (via ${u.source})` : '';
+            const desc = u.ok ? `${u.chars} chars lidos${src}` : 'site bloqueado — cole texto manual';
             return `<div><span class="font-bold">${icon}</span> ${u.url.length > 60 ? u.url.slice(0,60)+'…' : u.url} <span class="text-green-600/70">— ${desc}</span></div>`;
           }).join('');
           urlsBox.classList.remove('hidden');
