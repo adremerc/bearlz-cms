@@ -950,6 +950,17 @@ function _fecharHooksModal(){
 window._fecharHooksModal=_fecharHooksModal;
 
 async function _abrirHooksModal(){
+  // Se estamos dentro de iframe (viewer page), pede pro parent renderizar.
+  // Parent tem viewport de janela inteira, modal nao corta.
+  if(window.parent && window.parent !== window){
+    try{
+      window.parent.postMessage({type:'bearlz-hooks-open',slug:window.CAROUSEL_SLUG},'*');
+      return;
+    }catch(e){
+      console.warn('[Hooks] postMessage falhou, abrindo modal local',e);
+    }
+  }
+  // Standalone (sem iframe): renderiza modal aqui mesmo
   _ensureHooksModal();
   const modal=document.getElementById('hooksModal');
   const body=document.getElementById('hooksBody');
@@ -1015,21 +1026,34 @@ function _aplicarHook(i){
     console.warn('[Hooks] Variante invalida ou slide 0 ausente. i=',i,'v=',v);
     return;
   }
-  // Aplica o texto e navega pro slide 1 pra usuario ver a mudanca
+  _aplicarVariante(v);
+  _fecharHooksModal();
+}
+window._aplicarHook=_aplicarHook;
+
+// Aplica uma variante (vinda do modal local OU do parent via postMessage)
+function _aplicarVariante(v){
+  if(!v||!slides[0])return;
   slides[0].text=v.texto;
   if(typeof cur!=='undefined')cur=0;
   if(typeof editingText!=='undefined')editingText=false;
-  // Esconde painel de ajuste de imagem caso esteja aberto
   const panel=document.getElementById('imgCtrlPanel');
   if(panel)panel.style.display='none';
   if(typeof render==='function')render();
   if(typeof autoSave==='function')autoSave();
   if(typeof checkOverflow==='function')checkOverflow();
-  _fecharHooksModal();
   if(typeof setStatus==='function')setStatus(`✓ Hook "${v.tipo}" aplicado no slide 1`);
   setTimeout(()=>{if(typeof setStatus==='function')setStatus('');},3500);
 }
-window._aplicarHook=_aplicarHook;
+
+// Listener: parent posta 'bearlz-hooks-apply' depois que usuario escolhe
+// uma variante no modal renderizado fora do iframe
+window.addEventListener('message',function(e){
+  if(!e.data||typeof e.data!=='object')return;
+  if(e.data.type==='bearlz-hooks-apply' && e.data.variante){
+    _aplicarVariante(e.data.variante);
+  }
+});
 
 // Hidratação: tenta carregar do servidor primeiro, fallback pra localStorage
 // Depois chama render(), loadTextStyle(), checkOverflow() e inicia polling

@@ -140,18 +140,21 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
 }
 .overflow-warn.active{display:block}
 
-/* ── Modal de 3 Hooks (Curiosidade / Dor / Promessa) ── */
-.hooks-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99999;align-items:flex-start;justify-content:center;padding:20px 12px;overflow-y:auto;-webkit-overflow-scrolling:touch}
-.hooks-modal.active{display:flex}
-.hooks-inner{background:#fff;border-radius:14px;max-width:560px;width:100%;padding:16px 18px;display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:'Open Sans',sans-serif;margin:auto 0}
-.hooks-head{display:flex;justify-content:space-between;align-items:center}
+/* ── Modal de 3 Hooks (Curiosidade / Dor / Promessa) ──
+   IMPORTANTE: usa display:block (nao flex) pra que overflow-y:auto funcione
+   de forma confiavel dentro do iframe. Flex com align-items:flex-start +
+   margin:auto 0 fazia o conteudo extrapolar sem scrollar. */
+.hooks-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99999;padding:16px 12px;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.hooks-modal.active{display:block}
+.hooks-inner{background:#fff;border-radius:14px;max-width:560px;width:100%;padding:14px 16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:'Open Sans',sans-serif;margin:0 auto}
+.hooks-head{display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;padding-bottom:6px;margin-bottom:-2px;z-index:1}
 .hooks-head strong{font-size:14px;color:#111}
 .hooks-x{background:none;border:none;font-size:22px;cursor:pointer;color:#999;line-height:1;padding:0 6px}
 .hooks-x:hover{color:#111}
-.hooks-body{display:flex;flex-direction:column;gap:12px}
+.hooks-body{display:flex;flex-direction:column;gap:10px}
 .hooks-loading{padding:30px 10px;text-align:center;font-size:12px;color:#888}
 .hooks-err{padding:12px 14px;background:#fff5f5;border:1px solid #ff3b30;border-radius:8px;font-size:12px;color:#c0392b}
-.hook-card{padding:12px 14px;background:#fafafa;border:1px solid #eee;border-radius:10px;display:flex;flex-direction:column;gap:8px;transition:all .15s}
+.hook-card{padding:10px 12px;background:#fafafa;border:1px solid #eee;border-radius:10px;display:flex;flex-direction:column;gap:6px;transition:all .15s}
 .hook-card:hover{background:#f4f8ff;border-color:#1d9bf0}
 .hook-label{align-self:flex-start;font-size:10px;font-weight:800;letter-spacing:.7px;padding:3px 8px;border-radius:4px;text-transform:uppercase}
 .hook-curi{background:#e0f2fe;color:#0369a1}

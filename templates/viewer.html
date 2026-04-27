@@ -347,6 +347,19 @@
   </div><!-- /panel -->
 </div>
 
+<!-- ── Modal de Hooks renderizado no parent (sai do iframe) ─────────── -->
+<div id="parentHooksModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99999;padding:24px 16px;overflow-y:auto" onclick="if(event.target===this)closeParentHooks()">
+  <div id="parentHooksInner" style="background:#fff;border-radius:14px;max-width:600px;width:100%;margin:0 auto;padding:18px 22px;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.4);font-family:'Open Sans',sans-serif">
+    <div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;padding-bottom:8px;border-bottom:1px solid #f0f0f0">
+      <strong style="font-size:15px;color:#111">3 variações do slide 1</strong>
+      <button onclick="closeParentHooks()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#999;line-height:1;padding:0 6px">×</button>
+    </div>
+    <div id="parentHooksBody" style="display:flex;flex-direction:column;gap:12px">
+      <div style="padding:30px 10px;text-align:center;font-size:13px;color:#888">Gerando com Claude… (15–30s)</div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -355,6 +368,80 @@
   let timerInterval = null;
   let sessionSecs   = 0;
   let totalSecs     = {{ c.tempo_revisao or 0 }};
+
+  // ── Hooks modal renderizado AQUI no parent (em vez de dentro do iframe).
+  // O iframe envia postMessage 'bearlz-hooks-open' quando o usuario clica
+  // ✨ Hooks. A gente faz o fetch + render aqui (full screen viewport),
+  // depois manda 'bearlz-hooks-apply' de volta com o texto escolhido.
+  let _parentHooksVariantes = null;
+
+  function closeParentHooks(){
+    document.getElementById('parentHooksModal').style.display = 'none';
+  }
+
+  async function openParentHooks(){
+    const m = document.getElementById('parentHooksModal');
+    const body = document.getElementById('parentHooksBody');
+    m.style.display = 'block';
+    body.innerHTML = '<div style="padding:30px 10px;text-align:center;font-size:13px;color:#888">Gerando com Claude… (15–30s)</div>';
+    try {
+      const r = await fetch(`/api/hooks/${encodeURIComponent(SLUG)}`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'
+      });
+      const raw = await r.text();
+      let d;
+      try { d = JSON.parse(raw); }
+      catch(e) {
+        body.innerHTML = '<div style="padding:14px;background:#fff5f5;border:1px solid #ff3b30;border-radius:8px;color:#c0392b;font-size:13px">Servidor demorou demais. Tente em 30s.</div>';
+        return;
+      }
+      if (!d.ok) {
+        body.innerHTML = `<div style="padding:14px;background:#fff5f5;border:1px solid #ff3b30;border-radius:8px;color:#c0392b;font-size:13px">${d.error || 'Erro ao gerar'}</div>`;
+        return;
+      }
+      _parentHooksVariantes = d.variantes;
+      const corMap = {
+        Curiosidade: ['#e0f2fe', '#0369a1'],
+        Dor:         ['#fee2e2', '#b91c1c'],
+        Promessa:    ['#dcfce7', '#166534'],
+      };
+      body.innerHTML = d.variantes.map((v, i) => {
+        const cor = corMap[v.tipo] || ['#e0f2fe', '#0369a1'];
+        const esc = (v.texto || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const html = esc.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+        return `<div style="padding:12px 14px;background:#fafafa;border:1px solid #eee;border-radius:10px;display:flex;flex-direction:column;gap:8px">
+          <span style="align-self:flex-start;font-size:10px;font-weight:800;letter-spacing:.7px;padding:3px 8px;border-radius:4px;text-transform:uppercase;background:${cor[0]};color:${cor[1]}">${v.tipo}</span>
+          <div style="font-size:13px;line-height:1.5;color:#1a1a1a">${html}</div>
+          <button data-idx="${i}" onclick="aplicarParentHook(${i})" style="align-self:flex-end;padding:7px 16px;font-size:12px;font-weight:700;background:#1d9bf0;color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:inherit">Usar este</button>
+        </div>`;
+      }).join('');
+    } catch(e) {
+      body.innerHTML = `<div style="padding:14px;background:#fff5f5;border:1px solid #ff3b30;border-radius:8px;color:#c0392b;font-size:13px">Erro de conexão: ${e.message}</div>`;
+    }
+  }
+
+  function aplicarParentHook(i){
+    const v = (_parentHooksVariantes || [])[i];
+    if (!v) return;
+    // Manda pro iframe aplicar o hook nos slides
+    const iframe = document.getElementById('carrossel-frame');
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.postMessage({type: 'bearlz-hooks-apply', variante: v}, '*');
+    }
+    closeParentHooks();
+    toast(`Hook "${v.tipo}" aplicado no slide 1`);
+  }
+
+  // Listener pras mensagens do iframe
+  window.addEventListener('message', (e) => {
+    if (!e.data || typeof e.data !== 'object') return;
+    if (e.data.type === 'bearlz-hooks-open') {
+      openParentHooks();
+    }
+  });
+  window.openParentHooks    = openParentHooks;
+  window.closeParentHooks   = closeParentHooks;
+  window.aplicarParentHook  = aplicarParentHook;
 
   // ── Timer ─────────────────────────────────────────────────────────────────
 
