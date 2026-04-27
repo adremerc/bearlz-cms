@@ -302,18 +302,27 @@ def scan_carrosseis_dir():
             )
 
 
+PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY", "")
+
 def load_anthropic_key():
-    global ANTHROPIC_API_KEY
-    if ANTHROPIC_API_KEY and ANTHROPIC_API_KEY.startswith("sk-ant-api"):
+    global ANTHROPIC_API_KEY, PEXELS_API_KEY
+    have_anthropic = ANTHROPIC_API_KEY and ANTHROPIC_API_KEY.startswith("sk-ant-api")
+    have_pexels    = PEXELS_API_KEY and len(PEXELS_API_KEY) > 20 and "COLE_SUA" not in PEXELS_API_KEY
+    if have_anthropic and have_pexels:
         return
     try:
         config_path = Path(__file__).parent.parent / "idea-bot" / "config.py"
         if config_path.exists():
             ns = {}
             exec(config_path.read_text(encoding="utf-8"), ns)
-            key = ns.get("ANTHROPIC_API_KEY", "")
-            if key.startswith("sk-ant-api"):
-                ANTHROPIC_API_KEY = key
+            if not have_anthropic:
+                key = ns.get("ANTHROPIC_API_KEY", "")
+                if key.startswith("sk-ant-api"):
+                    ANTHROPIC_API_KEY = key
+            if not have_pexels:
+                pkey = ns.get("PEXELS_API_KEY", "")
+                if pkey and len(pkey) > 20 and "COLE_SUA" not in pkey:
+                    PEXELS_API_KEY = pkey
     except:
         pass
 
@@ -993,13 +1002,26 @@ SYSTEM_GERAR_DEFAULT = (
     "  chart_type: 'bar' (comparação entre categorias), 'horizontal_bar' (rankings), 'line' (evolução temporal)\n"
     "  highlight: true no ponto mais importante do gráfico\n"
     "- 'photo': slides de contexto, hook ou implicação (inclua photo_topic em inglês específico e visual)\n"
-    "  photo_topic deve ser descritivo: 'US dollar bills close-up' NÃO 'money'\n\n"
+    "  photo_topic deve ser descritivo: 'US dollar bills close-up' NÃO 'money'\n"
+    "  USE photo_topic ÚNICO POR SLIDE — nunca repita o mesmo tópico em 2 slides do mesmo carrossel\n\n"
+
+    "IMAGENS DOS LINKS — IMPORTANTE:\n"
+    "- Se o brief tiver bloco [IMAGENS DISPONÍVEIS DOS LINKS], significa que os artigos\n"
+    "  citados têm imagens (gráficos, screenshots de dados, fotos contextuais)\n"
+    "- Para usar uma imagem do link num slide, adicione no JSON do slide:\n"
+    '  "image_from_link": <índice 1-based da imagem na lista>\n'
+    "- Quando usar image_from_link, NÃO precisa preencher chart_data ou photo_topic\n"
+    "- Prefira image_from_link sempre que o slide for sobre o dado que aparece no\n"
+    "  gráfico/screenshot do artigo (ex: gráfico de cotação, tabela de dados, screenshot)\n"
+    "- Se a imagem do artigo já é um gráfico do dado que você ia mostrar, use ela em vez\n"
+    "  de chart_data — fica mais autêntico e evita erros de número\n\n"
 
     "RETORNE SOMENTE JSON VÁLIDO, sem markdown, sem texto fora do JSON:\n"
     '{"titulo":"...","slides":[{"texto":"...","tema":"bitcoin|economia|mercado|geopolitica|ia|tecnologia",'
     '"image_type":"chart|photo","chart_title":"...","chart_type":"bar|horizontal_bar|line",'
     '"chart_data":[{"label":"...","value":0,"unit":"%","highlight":false}],'
-    '"photo_topic":"..."}]}'
+    '"photo_topic":"...",'
+    '"image_from_link":null}]}'
 )
 
 
@@ -1065,13 +1087,15 @@ def _sanitizar_slide(text: str) -> str:
 URL_PATTERN = re.compile(r'https?://[^\s<>"\'\)]+', re.IGNORECASE)
 
 def _fetch_url_text(url: str, max_chars: int = 4000):
-    """Baixa o HTML da URL e extrai o texto principal. Retorna None se falhar."""
+    """Baixa o HTML da URL e extrai (texto principal, imagens candidatas).
+    Retorna None se falhar; senao dict com {text, images, base_url}."""
     try:
         import requests as _req
         from bs4 import BeautifulSoup
     except ImportError:
         return None
     try:
+        from urllib.parse import urljoin
         r = _req.get(url, timeout=12, headers={
             "User-Agent": "Mozilla/5.0 (compatible; BearlzCMS/1.0; +https://bearlz-cms.fly.dev)",
             "Accept": "text/html,application/xhtml+xml",
@@ -1080,45 +1104,119 @@ def _fetch_url_text(url: str, max_chars: int = 4000):
         if r.status_code != 200:
             return None
         soup = BeautifulSoup(r.text, "html.parser")
+
+        # ── Extrai imagens candidatas ANTES de remover scripts/header ───────
+        # (precisa de meta tags do head)
+        candidate_images = []
+        # 1. og:image (geralmente a melhor)
+        og = soup.find("meta", property="og:image")
+        if og and og.get("content"):
+            candidate_images.append(urljoin(url, og["content"]))
+        # 2. twitter:image (fallback se og nao existe)
+        tw = soup.find("meta", attrs={"name": "twitter:image"})
+        if tw and tw.get("content"):
+            tw_url = urljoin(url, tw["content"])
+            if tw_url not in candidate_images:
+                candidate_images.append(tw_url)
+        # 3. <img> dentro de article/main
+        article_root = soup.find("article") or soup.find("main") or soup.body
+        if article_root:
+            for img in article_root.find_all("img", limit=20):
+                src = img.get("src") or img.get("data-src") or img.get("data-original")
+                if not src:
+                    continue
+                full = urljoin(url, src)
+                # Filtra ruidos comuns: logos, avatars, icones, pixels de tracking, gifs animados
+                if any(skip in full.lower() for skip in [
+                    "logo", "avatar", "icon", "pixel", "tracking",
+                    "blank.", "1x1", "spacer", "/ad/", "/ads/", "advert",
+                    "thumbnail-small", "_small.", "_thumb."
+                ]):
+                    continue
+                if full.lower().endswith((".gif", ".svg")):
+                    continue
+                if full not in candidate_images:
+                    candidate_images.append(full)
+        # max 6 imagens por URL (evita estourar contexto do prompt)
+        candidate_images = candidate_images[:6]
+
+        # ── Texto principal ─────────────────────────────────────────────────
         # Remove ruido: scripts, estilos, nav, footer, aside, formularios
         for tag in soup(["script", "style", "nav", "footer", "aside",
                          "form", "noscript", "iframe", "header"]):
             tag.decompose()
-        # Tenta achar o conteudo principal (article > main > body)
         main = soup.find("article") or soup.find("main") or soup.body
         if not main:
             return None
         text = main.get_text(separator="\n", strip=True)
-        # Colapsa newlines duplicados
         text = re.sub(r"\n{3,}", "\n\n", text)
         text = re.sub(r"[ \t]+", " ", text)
-        if len(text) < 80:  # provavelmente paywall/erro
+        if len(text) < 80:
             return None
-        return text[:max_chars]
+        return {"text": text[:max_chars], "images": candidate_images}
     except Exception:
         return None
 
 def _processar_brief_com_urls(brief: str):
     """Detecta URLs no brief, baixa o conteudo de cada uma e devolve:
     - brief com cada URL substituida por bloco [CONTEÚDO DO LINK ...]
-    - lista de info por URL (sucesso/falha + chars extraidos) pra mostrar na UI"""
+    - lista de info por URL (sucesso/falha + chars + qtd de imagens)
+    - lista global de imagens candidatas (com origem) que o Claude pode usar"""
     if not brief:
-        return brief, []
+        return brief, [], []
     urls = URL_PATTERN.findall(brief)
-    # Remove duplicatas mantendo ordem
     seen = set()
     urls = [u for u in urls if not (u in seen or seen.add(u))]
     info = []
     enriched = brief
+    all_images = []  # cada item: {"url_imagem": ..., "origem": <url do artigo>}
     for url in urls:
-        text = _fetch_url_text(url)
-        if text:
-            bloco = f"\n\n[CONTEÚDO DO LINK {url}]\n{text}\n[/CONTEÚDO]\n"
+        result = _fetch_url_text(url)
+        if result:
+            bloco = f"\n\n[CONTEÚDO DO LINK {url}]\n{result['text']}\n[/CONTEÚDO]\n"
             enriched = enriched.replace(url, bloco, 1)
-            info.append({"url": url, "ok": True, "chars": len(text)})
+            info.append({
+                "url": url, "ok": True,
+                "chars": len(result["text"]),
+                "imgs": len(result["images"])
+            })
+            for img_url in result["images"]:
+                all_images.append({"url_imagem": img_url, "origem": url})
         else:
-            info.append({"url": url, "ok": False, "chars": 0})
-    return enriched, info
+            info.append({"url": url, "ok": False, "chars": 0, "imgs": 0})
+    return enriched, info, all_images
+
+
+# ── Pexels API search ─────────────────────────────────────────────────────────
+# Usa o photo_topic gerado pelo Claude pra cada slide pra buscar foto unica
+# em vez de rotacionar 3 IDs hardcoded por tema.
+
+def _pexels_search(query: str, used_ids: set, orientation: str = "portrait", n: int = 15):
+    """Busca foto no Pexels matching `query`, retorna URL da primeira foto
+    cujo ID nao esteja em `used_ids`. None se falhar ou nao tiver chave."""
+    if not PEXELS_API_KEY:
+        return None
+    try:
+        import requests as _req
+        r = _req.get(
+            "https://api.pexels.com/v1/search",
+            params={"query": query, "per_page": n, "orientation": orientation},
+            headers={"Authorization": PEXELS_API_KEY},
+            timeout=8
+        )
+        if r.status_code != 200:
+            return None
+        data = r.json()
+        for photo in data.get("photos", []):
+            pid = photo.get("id")
+            if pid and pid not in used_ids:
+                used_ids.add(pid)
+                # Prioriza 'portrait' (1080x1620) que casa com proporcao do slide
+                src = photo.get("src", {})
+                return src.get("portrait") or src.get("large") or src.get("original")
+        return None
+    except Exception:
+        return None
 
 
 @app.route("/gerar")
@@ -1152,13 +1250,24 @@ def api_gerar():
 
     SYSTEM = system_override if system_override else SYSTEM_GERAR_DEFAULT
 
-    # Baixa conteudo dos links no brief antes de mandar pro Claude
-    brief_enriched, urls_info = _processar_brief_com_urls(brief)
+    # Baixa conteudo dos links no brief antes de mandar pro Claude.
+    # all_images: lista de {url_imagem, origem} pra Claude usar via image_from_link.
+    brief_enriched, urls_info, all_images = _processar_brief_com_urls(brief)
+
+    # Bloco com imagens dos links pro Claude saber que existem
+    imagens_block = ""
+    if all_images:
+        linhas = ["\n[IMAGENS DISPONÍVEIS DOS LINKS]"]
+        for i, img in enumerate(all_images, 1):
+            linhas.append(f"{i}. {img['url_imagem']}  (do artigo: {img['origem']})")
+        linhas.append("[/IMAGENS]\n")
+        imagens_block = "\n".join(linhas)
 
     prompt = (
         f"Crie exatamente {num_slides} slides sobre:\n\n"
         f"TÓPICO: {topico}\n"
-        f"CONTEÚDO/BRIEF: {brief_enriched or topico}\n\n"
+        f"CONTEÚDO/BRIEF: {brief_enriched or topico}\n"
+        f"{imagens_block}\n"
         f"Slide 1: Hook. Slides 2-{num_slides-1}: desenvolvimento com dados. "
         f"Slide {num_slides}: implicação para o investidor.\n"
         "Retorne SOMENTE JSON válido."
@@ -1193,10 +1302,22 @@ def api_gerar():
         Q  = "?auto=compress&cs=tinysrgb&w=1080"
 
         slides_out = []
+        # Estado de dedup pra evitar repeticao de imagens
+        used_pexels_ids   = set()
+        used_link_indices = set()
         for i, s in enumerate(slides_raw):
             itype = s.get("image_type", "photo").lower()
             img   = ""
-            if itype == "chart":
+            # ── PRIORIDADE 1: imagem de um link no brief (image_from_link) ──
+            link_idx_raw = s.get("image_from_link")
+            try:
+                link_idx = int(link_idx_raw) if link_idx_raw not in (None, "", 0) else None
+            except (ValueError, TypeError):
+                link_idx = None
+            if link_idx and 1 <= link_idx <= len(all_images) and link_idx not in used_link_indices:
+                img = all_images[link_idx - 1]["url_imagem"]
+                used_link_indices.add(link_idx)
+            if not img and itype == "chart":
                 ctype  = s.get("chart_type", "bar").lower()
                 ctitle = s.get("chart_title", "")
                 cdata  = s.get("chart_data") or []
@@ -1238,10 +1359,34 @@ def api_gerar():
                         + urllib.parse.quote(json.dumps(cfg, separators=(",", ":")))
                         + "&width=1080&height=520&backgroundColor=white&version=2"
                     )
+            # ── PRIORIDADE 2: Pexels API por photo_topic (foto unica por slide) ──
+            if not img:
+                photo_topic = (s.get("photo_topic") or "").strip()
+                if photo_topic:
+                    pexels_url = _pexels_search(photo_topic, used_pexels_ids)
+                    if pexels_url:
+                        img = pexels_url
+            # ── PRIORIDADE 3: Pexels API por tema (fallback se topic vazio/falhou) ──
+            if not img and PEXELS_API_KEY:
+                tema_query = {
+                    "bitcoin": "bitcoin cryptocurrency",
+                    "economia": "economy finance market",
+                    "mercado": "stock market trading",
+                    "geopolitica": "geopolitics world map",
+                    "ia": "artificial intelligence technology",
+                    "tecnologia": "technology innovation",
+                }.get(s.get("tema", "").lower(), "business finance")
+                pexels_url = _pexels_search(tema_query, used_pexels_ids)
+                if pexels_url:
+                    img = pexels_url
+            # ── PRIORIDADE 4: hardcoded por tema (com dedup) ──
             if not img:
                 tema = s.get("tema", "default").lower()
                 ids  = PEXELS_FALLBACK.get(tema, ["4386469", "6770610", "5831251"])
-                fid  = ids[i % len(ids)]
+                # Tenta achar um id ainda nao usado nessa geracao
+                disponiveis = [fid for fid in ids if fid not in used_pexels_ids]
+                fid = (disponiveis[0] if disponiveis else ids[i % len(ids)])
+                used_pexels_ids.add(fid)
                 img  = f"{PX}{fid}/pexels-photo-{fid}.jpeg{Q}"
             # Sanitiza texto: remove travessoes e garante quebras de paragrafo
             texto_sanit = _sanitizar_slide(s.get("texto", ""))
@@ -1331,11 +1476,14 @@ def api_gerar():
         return jsonify({
             "ok": True, "slug": slug, "titulo": titulo_gerado, "url": f"/c/{slug}",
             "debug": {
-                "system_used":   SYSTEM,
-                "user_prompt":   prompt,
-                "urls_fetched":  urls_info,
+                "system_used":      SYSTEM,
+                "user_prompt":      prompt,
+                "urls_fetched":     urls_info,
                 "system_is_custom": bool(system_override),
-                "model": "claude-sonnet-4-5",
+                "model":            "claude-sonnet-4-5",
+                "images_from_links": all_images,           # candidatas extraidas
+                "images_used_from_links": sorted(used_link_indices),  # indices que viraram slide
+                "pexels_api_active": bool(PEXELS_API_KEY),
             }
         })
 

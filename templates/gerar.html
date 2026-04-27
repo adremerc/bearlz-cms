@@ -194,6 +194,19 @@
         <p class="text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-1">Links no brief (status do fetch)</p>
         <div id="insp-urls" class="text-xs space-y-1"></div>
       </div>
+      <!-- Imagens extraidas dos links -->
+      <div id="insp-imgs-block" class="hidden">
+        <p class="text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-1">
+          Imagens extraídas dos links
+          <span id="insp-imgs-count" class="text-blue-600 ml-1"></span>
+        </p>
+        <div id="insp-imgs" class="grid grid-cols-3 sm:grid-cols-4 gap-2"></div>
+      </div>
+      <!-- Pexels API status -->
+      <div id="insp-pexels-block">
+        <p class="text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-1">Pexels API</p>
+        <p id="insp-pexels" class="text-xs"></p>
+      </div>
       <!-- Prompt do user -->
       <div>
         <p class="text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-1">User message (o que veio do brief, com conteúdo dos links injetado)</p>
@@ -298,10 +311,40 @@
         const ok = u.ok;
         const icon  = ok ? '✓' : '✗';
         const color = ok ? 'text-green-700' : 'text-red-700';
-        const info  = ok ? `${u.chars.toLocaleString()} caracteres extraídos` : 'falhou (timeout, 404, paywall ou bloqueio)';
+        const imgsExtra = u.imgs ? `, ${u.imgs} imagem(ns)` : '';
+        const info  = ok ? `${u.chars.toLocaleString()} caracteres${imgsExtra}` : 'falhou (timeout, 404, paywall ou bloqueio)';
         return `<div class="${color}"><span class="font-bold mr-1">${icon}</span><span class="font-mono break-all">${u.url}</span> <span class="text-gray-500">— ${info}</span></div>`;
       }).join('');
     }
+
+    // Imagens extraidas dos links + quais foram usadas
+    const imgsBlock = document.getElementById('insp-imgs-block');
+    const imgsDiv   = document.getElementById('insp-imgs');
+    const imgsCount = document.getElementById('insp-imgs-count');
+    const imgs      = _ultimoDebug.images_from_links || [];
+    const usedIdx   = new Set(_ultimoDebug.images_used_from_links || []);
+    if (imgs.length === 0) {
+      imgsBlock.classList.add('hidden');
+    } else {
+      imgsBlock.classList.remove('hidden');
+      imgsCount.textContent = `(${imgs.length} encontradas, ${usedIdx.size} usadas em slides)`;
+      imgsDiv.innerHTML = imgs.map((im, i) => {
+        const idx1 = i + 1;
+        const used = usedIdx.has(idx1);
+        const ring = used ? 'ring-2 ring-blue-500' : 'opacity-60';
+        const badge = used ? `<span class="absolute top-1 right-1 bg-blue-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">USADA</span>` : '';
+        return `<a href="${im.url_imagem}" target="_blank" class="block relative group">
+          <img src="${im.url_imagem}" loading="lazy" class="w-full h-20 object-cover rounded ${ring}">
+          ${badge}
+          <span class="absolute bottom-1 left-1 bg-black/60 text-white text-[9px] px-1 rounded">#${idx1}</span>
+        </a>`;
+      }).join('');
+    }
+
+    // Pexels status
+    document.getElementById('insp-pexels').innerHTML = _ultimoDebug.pexels_api_active
+      ? '<span class="text-green-700">✓ Ativa — buscou foto única por slide via API</span>'
+      : '<span class="text-yellow-700">⚠ Não configurada — usando lista hardcoded (3 fotos rotativas por tema). Adicione PEXELS_API_KEY pra ter fotos únicas e mais variadas.</span>';
 
     m.style.display = 'flex';
   }
