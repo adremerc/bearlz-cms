@@ -1,0 +1,42 @@
+# Config do Fly.io para o Bearlz CMS.
+#
+# Deploy:
+#   fly launch --copy-config --no-deploy   (primeira vez; cria o app)
+#   fly volumes create bearlz_data --size 1 --region gru
+#   fly secrets set ANTHROPIC_API_KEY=sk-ant-...
+#   fly deploy
+#
+# O volume `bearlz_data` eh montado em /app/data, que eh onde o app guarda:
+#   - bearlz.db (SQLite)
+#   - data/edits/*.json (edits compartilhadas)
+#   - data/generated/*.html (carrosseis gerados via /api/gerar)
+# Tudo persiste entre deploys.
+
+app = "bearlz-cms"
+primary_region = "gru"  # Sao Paulo (mais proximo do Brasil)
+
+[build]
+
+[env]
+  PORT = "8080"
+
+[[mounts]]
+  source = "bearlz_data"
+  destination = "/app/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 20
+    hard_limit = 40
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

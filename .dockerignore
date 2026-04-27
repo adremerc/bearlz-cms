@@ -1,0 +1,43 @@
+# Reduz o tamanho da imagem Docker (e do upload pro Fly).
+
+# Python build artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# Virtualenvs
+.venv/
+venv/
+env/
+
+# Dados locais (volume do Fly cuida disso em prod)
+data/
+bearlz.db
+carrosseis/edits/
+
+# Git
+.git/
+.gitignore
+
+# IDE/OS
+.vscode/
+.idea/
+*.swp
+*.DS_Store
+Thumbs.db
+desktop.ini
+
+# Configs de outros hosts (irrelevantes pro Fly)
+render.yaml
+Procfile
+DEPLOY.md
+
+# Backups e scripts auxiliares
+bearlz-cms-backup-*/
+_strip_travessao.py
+
+# Logs
+*.log
