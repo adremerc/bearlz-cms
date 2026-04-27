@@ -228,8 +228,11 @@ function setFit(mode){
   slides[cur].fit=mode;
   const cont=document.getElementById('imgContainer');
   if(cont){
-    if(mode==='contain'){cont.style.backgroundSize='contain';cont.style.backgroundPosition='center';cont.style.backgroundColor='#ffffff';}
-    else{cont.style.backgroundColor='';applyBgSize(slides[cur]);cont.style.backgroundPosition=`${slides[cur].ox||50}% ${slides[cur].oy||50}%`;}
+    // Apos refactor pra <img>, fit eh aplicado dentro do applyBgSize.
+    // Aqui so muda o background do container (cinza claro pra contain mostrar
+    // letras laterais; transparente pra cover).
+    cont.style.background = mode==='contain' ? '#f8f8f8' : 'transparent';
+    applyBgSize(slides[cur]);
   }
   updateImgCtrlUI(slides[cur]);
   autoSave();
@@ -297,20 +300,24 @@ function renderImgSection(){
   if(s.image){
     const fit=getEffectiveFit(s);
     const hStyle=s.imgH?`height:${s.imgH}px;flex:none`:'';
-    // Usa <img> real em vez de background-image. Isso preserva qualidade no
-    // export via html2canvas (que reusa o src original em vez de capturar o
-    // raster do display, que ficava embacado).
     const bgColor=fit==='contain'?'#f8f8f8':'transparent';
+    // Anti-flicker: oculta o <img> com visibility:hidden ate o applyBgSize
+    // posicionar. Sem isso, o <img> pisca em tamanho natural por 1 frame.
     sec.innerHTML=`<div class="img-section">
       <div class="img-container" id="imgContainer" style="${hStyle};background:${bgColor}">
-        <img id="imgReal" class="img-real" src="${s.image}" alt="" draggable="false">
-        <button class="img-overlay-btn" style="top:8px;right:8px" onclick="clearImage()">×</button>
+        <img id="imgReal" class="img-real" src="${s.image}" alt="" draggable="false" style="visibility:hidden">
+        <button class="img-overlay-btn" style="top:8px;right:8px" onclick="event.stopPropagation();clearImage()">×</button>
       </div>
     </div>`;
-    // Aguarda layout pra calcular posicao (precisa de offsetWidth/Height reais)
-    requestAnimationFrame(()=>applyBgSize(s));
+    requestAnimationFrame(()=>{
+      applyBgSize(s);
+      const im=document.getElementById('imgReal');
+      if(im)im.style.visibility='visible';
+    });
     document.getElementById('btnAjustar').style.display='inline';
     if(fit==='cover')initDrag();
+    initWheelZoom();
+    initPinchZoom();
     updateImgCtrlUI(s);
   }else{
     sec.innerHTML=`<div class="img-section">
@@ -375,32 +382,99 @@ function initDrag(){
   const cont=document.getElementById('imgContainer');
   if(!cont)return;
   let dragging=false,startX=0,startY=0,startOx=0,startOy=0;
-  const s=slides[cur];
   const onDown=(e)=>{
+    // Nao inicia drag se clicou no botao X
+    if(e.target&&e.target.classList&&e.target.classList.contains('img-overlay-btn'))return;
+    // Pinch (2 dedos) eh tratado em initPinchZoom — nao inicia pan
+    if(e.touches&&e.touches.length>=2)return;
     e.preventDefault();dragging=true;
     const pt=e.touches?e.touches[0]:e;
+    const s=slides[cur];
     startX=pt.clientX;startY=pt.clientY;startOx=s.ox||50;startOy=s.oy||50;
+    cont.style.cursor='grabbing';
     window.addEventListener('mousemove',onMove);window.addEventListener('mouseup',onUp);
     window.addEventListener('touchmove',onMove,{passive:false});window.addEventListener('touchend',onUp);
   };
   const onMove=(e)=>{
-    if(!dragging)return;e.preventDefault();
+    if(!dragging)return;
+    if(e.touches&&e.touches.length>=2){onUp();return;} // virou pinch, para o pan
+    e.preventDefault();
     const pt=e.touches?e.touches[0]:e;
     const r=cont.getBoundingClientRect();
     const dx=((pt.clientX-startX)/r.width)*100;
     const dy=((pt.clientY-startY)/r.height)*100;
     slides[cur].ox=Math.max(0,Math.min(100,Math.round(startOx-dx)));
     slides[cur].oy=Math.max(0,Math.min(100,Math.round(startOy-dy)));
-    applyBgSize(slides[cur]); // reposiciona o <img> via JS
+    applyBgSize(slides[cur]);
   };
   const onUp=()=>{
+    if(!dragging)return;
     dragging=false;
+    cont.style.cursor='grab';
     window.removeEventListener('mousemove',onMove);window.removeEventListener('mouseup',onUp);
     window.removeEventListener('touchmove',onMove);window.removeEventListener('touchend',onUp);
     updateImgCtrlUI(slides[cur]);autoSave();
   };
   cont.addEventListener('mousedown',onDown);
   cont.addEventListener('touchstart',onDown,{passive:false});
+}
+
+/* ── Mouse wheel zoom (Canva-style) ── */
+function initWheelZoom(){
+  const cont=document.getElementById('imgContainer');
+  if(!cont||cont._wheelBound)return;
+  cont._wheelBound=true;
+  cont.addEventListener('wheel',function(e){
+    const s=slides[cur];
+    if(!s||!s.image)return;
+    e.preventDefault();
+    const cur_z=s.zoom||1;
+    // wheel positivo = zoom out, negativo = zoom in (compativel com pinch)
+    const delta=-e.deltaY*0.0015;
+    const new_z=Math.max(0.5,Math.min(4,cur_z+delta*cur_z));
+    s.zoom=Math.round(new_z*100)/100;
+    if(getEffectiveFit(s)==='contain')s.fit='cover'; // wheel zoom assume cover
+    applyBgSize(s);updateImgCtrlUI(s);
+    clearTimeout(cont._wheelSaveT);
+    cont._wheelSaveT=setTimeout(()=>autoSave(),300);
+  },{passive:false});
+}
+
+/* ── Pinch zoom mobile (2 dedos) ── */
+function initPinchZoom(){
+  const cont=document.getElementById('imgContainer');
+  if(!cont||cont._pinchBound)return;
+  cont._pinchBound=true;
+  let startDist=0,startZoom=1;
+  cont.addEventListener('touchstart',function(e){
+    if(e.touches.length===2){
+      e.preventDefault();
+      const dx=e.touches[0].clientX-e.touches[1].clientX;
+      const dy=e.touches[0].clientY-e.touches[1].clientY;
+      startDist=Math.hypot(dx,dy);
+      startZoom=slides[cur].zoom||1;
+    }
+  },{passive:false});
+  cont.addEventListener('touchmove',function(e){
+    if(e.touches.length===2&&startDist>0){
+      e.preventDefault();
+      const dx=e.touches[0].clientX-e.touches[1].clientX;
+      const dy=e.touches[0].clientY-e.touches[1].clientY;
+      const dist=Math.hypot(dx,dy);
+      const ratio=dist/startDist;
+      const new_z=Math.max(0.5,Math.min(4,startZoom*ratio));
+      const s=slides[cur];
+      s.zoom=Math.round(new_z*100)/100;
+      if(getEffectiveFit(s)==='contain')s.fit='cover';
+      applyBgSize(s);updateImgCtrlUI(s);
+    }
+  },{passive:false});
+  cont.addEventListener('touchend',function(e){
+    if(e.touches.length<2&&startDist>0){
+      startDist=0;
+      autoSave();
+    }
+  });
 }
 
 /* ── Navigation ── */
@@ -497,7 +571,12 @@ function resetImgCtrl(){
 /* ── Add / Remove slides ── */
 function addSlide(){
   const nid=Math.max(...slides.map(x=>x.id))+1;
-  slides.splice(cur+1,0,{id:nid,text:`Novo slide. Use **negrito** para destacar.`,image:null,zoom:1,ox:50,oy:50});
+  slides.splice(cur+1,0,{
+    id:nid,
+    text:`Novo slide. Use **negrito** para destacar.`,
+    image:null,zoom:1,ox:50,oy:50,
+    imgH:null,fit:null,imgNW:null,imgNH:null
+  });
   cur++;editingText=true;render();autoSave();
   setTimeout(()=>document.getElementById('editTA').focus(),10);
 }
