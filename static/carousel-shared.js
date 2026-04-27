@@ -96,8 +96,20 @@ async function loadFromServer(){
         if(saved.ox!=null)slides[i].ox=saved.ox;
         if(saved.oy!=null)slides[i].oy=saved.oy;
         slides[i].imgH=saved.imgH??null;
-        if(saved.fit)slides[i].fit=saved.fit;
-        if(saved.image&&!saved.image.startsWith('data:image/svg'))slides[i].image=saved.image;
+        // fit: respeita null (usuario que removeu imagem zera fit)
+        if('fit' in saved)slides[i].fit=saved.fit;
+        // image: respeita explicitamente null (usuario removeu).
+        // Antes, o "if(saved.image && ...)" ignorava null e mantinha a imagem
+        // padrao do template, fazendo a imagem "voltar" depois de removida.
+        if('image' in saved){
+          if(saved.image===null){
+            slides[i].image=null;
+            slides[i].imgNW=null;
+            slides[i].imgNH=null;
+          }else if(saved.image && !saved.image.startsWith('data:image/svg')){
+            slides[i].image=saved.image;
+          }
+        }
       });
     }
     if(st.profile){profile.name=st.profile.name;profile.handle=st.profile.handle;}
@@ -163,7 +175,8 @@ function autoLoad(){
     const raw=localStorage.getItem(LS_KEY);
     if(!raw)return;
     const state=JSON.parse(raw);
-    if(state.v!==1)return;
+    // Aceita v:1 (legado) e v:2 (atual). Nao quebra dados antigos.
+    if(state.v!==1 && state.v!==2)return;
     if(state.slides){
       state.slides.forEach((saved,i)=>{
         if(i>=slides.length)return;
@@ -172,9 +185,17 @@ function autoLoad(){
         if(saved.ox!=null)slides[i].ox=saved.ox;
         if(saved.oy!=null)slides[i].oy=saved.oy;
         slides[i].imgH=saved.imgH??null;
-        if(saved.fit)slides[i].fit=saved.fit;
-        // Restore image only for non-SVG (Pexels URLs or uploaded photos saved ok)
-        if(saved.image&&!saved.image.startsWith('data:image/svg'))slides[i].image=saved.image;
+        if('fit' in saved)slides[i].fit=saved.fit;
+        // Mesma logica do loadFromServer: respeita null pra remover imagem.
+        if('image' in saved){
+          if(saved.image===null){
+            slides[i].image=null;
+            slides[i].imgNW=null;
+            slides[i].imgNH=null;
+          }else if(saved.image && !saved.image.startsWith('data:image/svg')){
+            slides[i].image=saved.image;
+          }
+        }
       });
     }
     if(state.profile){profile.name=state.profile.name;profile.handle=state.profile.handle;}
@@ -186,8 +207,7 @@ function clearSaved(){if(confirm('Apagar dados salvos e voltar ao original?')){l
 /* ── Quick image controls ── */
 function setPos(ox,oy){
   slides[cur].ox=ox;slides[cur].oy=oy;
-  const cont=document.getElementById('imgContainer');
-  if(cont)cont.style.backgroundPosition=`${ox}% ${oy}%`;
+  applyBgSize(slides[cur]); // reposiciona o <img> real (era backgroundPosition)
   updateImgCtrlUI(slides[cur]);
   autoSave();
 }
