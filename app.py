@@ -1662,7 +1662,8 @@ def api_gerar():
     data       = request.get_json() or {}
     topico     = data.get("topico", "").strip()
     brief      = data.get("brief", "").strip()
-    num_slides = min(max(int(data.get("num_slides", 8)), 4), 14)
+    # Instagram permite ate 20 slides por carrossel. Hard cap aqui.
+    num_slides = min(max(int(data.get("num_slides", 8)), 4), 20)
     # Override do system prompt vindo da UI (opcional). Se vazio, usa o default.
     system_override = (data.get("system_override") or "").strip()
 

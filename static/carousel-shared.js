@@ -90,17 +90,31 @@ async function loadFromServer(){
     const st=d.state;
     if(st.slides){
       st.slides.forEach((saved,i)=>{
-        if(i>=slides.length)return;
+        // Se o estado salvo tem MAIS slides que o template, cria os extras.
+        // Antes esses slides eram silenciosamente descartados — usuario
+        // que adicionasse slides 12+ via "+ Slide" perdia tudo no reload.
+        if(i>=slides.length){
+          const novoId=(slides.length>0?Math.max(...slides.map(x=>x.id)):0)+1;
+          const novo={
+            id:saved.id||novoId,
+            text:saved.text||'',
+            image:(saved.image && !String(saved.image).startsWith('data:image/svg'))?saved.image:null,
+            zoom:saved.zoom||1,
+            ox:saved.ox!=null?saved.ox:50,
+            oy:saved.oy!=null?saved.oy:50,
+            imgH:saved.imgH??null,
+            fit:saved.fit||null,
+            imgNW:null,imgNH:null
+          };
+          slides.push(novo);
+          return;
+        }
         if(saved.text!=null)slides[i].text=saved.text;
         if(saved.zoom!=null)slides[i].zoom=saved.zoom;
         if(saved.ox!=null)slides[i].ox=saved.ox;
         if(saved.oy!=null)slides[i].oy=saved.oy;
         slides[i].imgH=saved.imgH??null;
-        // fit: respeita null (usuario que removeu imagem zera fit)
         if('fit' in saved)slides[i].fit=saved.fit;
-        // image: respeita explicitamente null (usuario removeu).
-        // Antes, o "if(saved.image && ...)" ignorava null e mantinha a imagem
-        // padrao do template, fazendo a imagem "voltar" depois de removida.
         if('image' in saved){
           if(saved.image===null){
             slides[i].image=null;
@@ -111,6 +125,11 @@ async function loadFromServer(){
           }
         }
       });
+      // Se o estado salvo tem MENOS slides que o template (usuario removeu
+      // alguns), trunca o array local pra refletir.
+      if(st.slides.length < slides.length){
+        slides.length=st.slides.length;
+      }
     }
     if(st.profile){profile.name=st.profile.name;profile.handle=st.profile.handle;}
     if(st.avatar)avatarDataUrl=st.avatar;
@@ -179,14 +198,27 @@ function autoLoad(){
     if(state.v!==1 && state.v!==2)return;
     if(state.slides){
       state.slides.forEach((saved,i)=>{
-        if(i>=slides.length)return;
+        if(i>=slides.length){
+          const novoId=(slides.length>0?Math.max(...slides.map(x=>x.id)):0)+1;
+          slides.push({
+            id:saved.id||novoId,
+            text:saved.text||'',
+            image:(saved.image && !String(saved.image).startsWith('data:image/svg'))?saved.image:null,
+            zoom:saved.zoom||1,
+            ox:saved.ox!=null?saved.ox:50,
+            oy:saved.oy!=null?saved.oy:50,
+            imgH:saved.imgH??null,
+            fit:saved.fit||null,
+            imgNW:null,imgNH:null
+          });
+          return;
+        }
         if(saved.text!=null)slides[i].text=saved.text;
         if(saved.zoom!=null)slides[i].zoom=saved.zoom;
         if(saved.ox!=null)slides[i].ox=saved.ox;
         if(saved.oy!=null)slides[i].oy=saved.oy;
         slides[i].imgH=saved.imgH??null;
         if('fit' in saved)slides[i].fit=saved.fit;
-        // Mesma logica do loadFromServer: respeita null pra remover imagem.
         if('image' in saved){
           if(saved.image===null){
             slides[i].image=null;
@@ -197,6 +229,9 @@ function autoLoad(){
           }
         }
       });
+      if(state.slides.length < slides.length){
+        slides.length=state.slides.length;
+      }
     }
     if(state.profile){profile.name=state.profile.name;profile.handle=state.profile.handle;}
     if(state.avatar)avatarDataUrl=state.avatar;
