@@ -348,6 +348,7 @@ function renderImgSection(){
       <div class="img-container${freeClass}" id="imgContainer" style="${hStyle};background:${bgColor}">
         <img id="imgReal" class="img-real" src="${s.image}" alt="" draggable="false" style="visibility:hidden">
         <button class="img-overlay-btn" style="top:8px;right:8px" onclick="event.stopPropagation();clearImage()">×</button>
+        <div class="img-resize-handle" id="imgResizeHandle" title="Arraste pra cima/baixo pra ajustar altura"></div>
       </div>
     </div>`;
     requestAnimationFrame(()=>{
@@ -361,6 +362,7 @@ function renderImgSection(){
     initWheelZoom();
     initPinchZoom();
     initKeyboardImg();
+    initResizeHandle();
     // Sincroniza estado visual do botao "Editar livre"
     setTimeout(()=>{
       const btn=document.getElementById('btnFreeEdit');
@@ -412,7 +414,7 @@ function updateImgCtrlUI(s){
   const hb=document.getElementById('hBtns');
   if(hb){
     const h=s.imgH;
-    const hvals=[120,200,300,null];
+    const hvals=[120,200,300,420,null];
     Array.from(hb.querySelectorAll('button')).forEach((btn,i)=>{
       btn.className='preset-btn'+(h===hvals[i]?' active':'');
     });
@@ -484,6 +486,48 @@ function initDrag(){
   };
   cont.addEventListener('mousedown',onDown);
   cont.addEventListener('touchstart',onDown,{passive:false});
+}
+
+/* ── Resize handle (Canva-style) ──
+   Handle visivel na borda inferior do container; usuario arrasta
+   verticalmente pra ajustar a altura da imagem em pixels. */
+function initResizeHandle(){
+  const handle=document.getElementById('imgResizeHandle');
+  const cont  =document.getElementById('imgContainer');
+  if(!handle||!cont||handle._bound)return;
+  handle._bound=true;
+  let resizing=false,startY=0,startH=0;
+  const onDown=(e)=>{
+    e.preventDefault();e.stopPropagation();
+    resizing=true;
+    const pt=e.touches?e.touches[0]:e;
+    startY=pt.clientY;
+    startH=cont.offsetHeight;
+    document.body.style.cursor='ns-resize';
+    window.addEventListener('mousemove',onMove);window.addEventListener('mouseup',onUp);
+    window.addEventListener('touchmove',onMove,{passive:false});window.addEventListener('touchend',onUp);
+  };
+  const onMove=(e)=>{
+    if(!resizing)return;
+    e.preventDefault();
+    const pt=e.touches?e.touches[0]:e;
+    const newH=Math.max(80,Math.min(900,startH+(pt.clientY-startY)));
+    slides[cur].imgH=Math.round(newH);
+    cont.style.height=slides[cur].imgH+'px';
+    cont.style.flex='none';
+    applyBgSize(slides[cur]);
+  };
+  const onUp=()=>{
+    if(!resizing)return;
+    resizing=false;
+    document.body.style.cursor='';
+    window.removeEventListener('mousemove',onMove);window.removeEventListener('mouseup',onUp);
+    window.removeEventListener('touchmove',onMove);window.removeEventListener('touchend',onUp);
+    updateImgCtrlUI(slides[cur]);autoSave();
+    if(typeof checkOverflow==='function')checkOverflow();
+  };
+  handle.addEventListener('mousedown',onDown);
+  handle.addEventListener('touchstart',onDown,{passive:false});
 }
 
 /* ── Mouse wheel zoom (Canva-style) ── */
