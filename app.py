@@ -362,6 +362,83 @@ STATUS_LABELS = {
     "publicado":     ("Publicado",       "blue"),
 }
 
+
+# ── Admin: historico do estado salvo (via branch GitHub data-generated) ───────
+
+def _admin_check_key():
+    return request.headers.get("X-Admin-Key", "") == CMS_API_KEY
+
+@app.route("/api/_admin/state-history/<slug>", methods=["GET"])
+def api_admin_state_history(slug):
+    """Lista versoes de data/edits/<slug>.json no branch data-generated.
+    Cada item: {sha, date, slides_count, message}. Requer X-Admin-Key."""
+    if not _admin_check_key():
+        return jsonify({"error": "unauthorized"}), 401
+    if not _gh_enabled():
+        return jsonify({"error": "GITHUB_TOKEN nao configurado"}), 400
+    safe_slug = re.sub(r"[^a-zA-Z0-9_\-]", "", slug)
+    repo_path = f"data/edits/{safe_slug}.json"
+    # Lista commits no branch data-generated que tocam esse arquivo
+    r = _gh_api("GET", "/commits",
+                params={"path": repo_path, "sha": GITHUB_BRANCH, "per_page": 30})
+    if not r or r.status_code != 200:
+        return jsonify({"error": f"GitHub API: {r.status_code if r else 'no response'}"}), 500
+    commits = r.json()
+    versions = []
+    for c in commits:
+        sha = c["sha"]
+        date = c["commit"]["committer"]["date"]
+        msg = c["commit"]["message"][:80]
+        # Pega o conteudo desse commit pra contar slides
+        blob = _gh_api("GET", f"/contents/{repo_path}",
+                       params={"ref": sha})
+        slides_count = None
+        if blob and blob.status_code == 200:
+            try:
+                content_b64 = blob.json().get("content", "")
+                content = _b64.b64decode(content_b64).decode("utf-8")
+                payload = json.loads(content)
+                slides = (payload.get("state") or {}).get("slides") or []
+                slides_count = len(slides)
+            except Exception:
+                pass
+        versions.append({
+            "sha": sha[:8],
+            "sha_full": sha,
+            "date": date,
+            "message": msg,
+            "slides": slides_count,
+        })
+    return jsonify({"ok": True, "versions": versions})
+
+@app.route("/api/_admin/state-restore/<slug>", methods=["POST"])
+def api_admin_state_restore(slug):
+    """Restaura state de um commit especifico do branch data-generated.
+    Body: {sha: '<full_sha>'}. Requer X-Admin-Key."""
+    if not _admin_check_key():
+        return jsonify({"error": "unauthorized"}), 401
+    if not _gh_enabled():
+        return jsonify({"error": "GITHUB_TOKEN nao configurado"}), 400
+    data = request.get_json() or {}
+    sha = data.get("sha", "").strip()
+    if not sha:
+        return jsonify({"error": "sha obrigatorio"}), 400
+    safe_slug = re.sub(r"[^a-zA-Z0-9_\-]", "", slug)
+    repo_path = f"data/edits/{safe_slug}.json"
+    blob = _gh_api("GET", f"/contents/{repo_path}", params={"ref": sha})
+    if not blob or blob.status_code != 200:
+        return jsonify({"error": f"versao nao encontrada (status {blob.status_code if blob else 'no response'})"}), 404
+    content = _b64.b64decode(blob.json()["content"]).decode("utf-8")
+    # Sobrescreve o arquivo local em data/edits/
+    p = _edits_path(slug)
+    p.write_text(content, encoding="utf-8")
+    # Re-commita no branch (atualizado)
+    _gh_save_async(repo_path, content.encode("utf-8"),
+                   f"Restore: {slug} para {sha[:8]}")
+    payload = json.loads(content)
+    slides = (payload.get("state") or {}).get("slides") or []
+    return jsonify({"ok": True, "slides_count": len(slides), "from_sha": sha[:8]})
+
 PRIO_LABELS = {
     "alta":  ("Alta",  "red"),
     "media": ("Média", "yellow"),

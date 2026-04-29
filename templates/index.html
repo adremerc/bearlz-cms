@@ -63,14 +63,21 @@
     <input type="text" name="q" value="{{ busca }}" placeholder="Buscar por título..."
       class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
   </form>
+
+  <!-- Toggle ocultar publicados (client-side, persiste em localStorage) -->
+  <label id="toggle-hide-pub" class="flex items-center gap-2 cursor-pointer text-xs text-gray-600 hover:text-gray-900 select-none flex-shrink-0 px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors">
+    <input type="checkbox" id="chk-hide-pub" class="cursor-pointer accent-blue-500">
+    <span>Ocultar publicados</span>
+    <span id="hide-pub-count" class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 hidden"></span>
+  </label>
 </div>
 
 <!-- Cards grid -->
 {% if carrosseis %}
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
   {% for c in carrosseis %}
-  <a href="/c/{{ c.slug }}"
-     class="group bg-white rounded-xl border border-gray-200 overflow-hidden hover:border-blue-300 hover:shadow-md transition-all duration-150 flex flex-col">
+  <a href="/c/{{ c.slug }}" data-status="{{ c.status }}"
+     class="card-item group bg-white rounded-xl border border-gray-200 overflow-hidden hover:border-blue-300 hover:shadow-md transition-all duration-150 flex flex-col">
 
     <!-- Thumbnail -->
     <div class="aspect-[4/5] bg-gradient-to-br
@@ -160,4 +167,42 @@
 </div>
 {% endif %}
 
+{% endblock %}
+
+{% block scripts %}
+<style>
+  body.dash-hide-pub .card-item[data-status="publicado"]{display:none}
+</style>
+<script>
+  // Toggle "Ocultar publicados" — pura UI client-side, persiste em localStorage
+  (function(){
+    const LS_KEY = 'bearlz_dash_hide_published';
+    const chk    = document.getElementById('chk-hide-pub');
+    const cntBox = document.getElementById('hide-pub-count');
+    if (!chk) return;
+
+    const totalPublicados = document.querySelectorAll('.card-item[data-status="publicado"]').length;
+    if (totalPublicados > 0) {
+      cntBox.textContent = totalPublicados;
+      cntBox.classList.remove('hidden');
+    }
+
+    function aplica(){
+      if (chk.checked) {
+        document.body.classList.add('dash-hide-pub');
+      } else {
+        document.body.classList.remove('dash-hide-pub');
+      }
+      try { localStorage.setItem(LS_KEY, chk.checked ? '1' : '0'); } catch(e){}
+    }
+    // Carrega preferencia
+    try {
+      if (localStorage.getItem(LS_KEY) === '1') {
+        chk.checked = true;
+        document.body.classList.add('dash-hide-pub');
+      }
+    } catch(e){}
+    chk.addEventListener('change', aplica);
+  })();
+</script>
 {% endblock %}

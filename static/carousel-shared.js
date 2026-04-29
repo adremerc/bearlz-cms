@@ -353,6 +353,7 @@ function renderImgSection(){
     if(fit==='cover')initDrag();
     initWheelZoom();
     initPinchZoom();
+    initKeyboardImg();
     updateImgCtrlUI(s);
   }else{
     sec.innerHTML=`<div class="img-section">
@@ -511,6 +512,55 @@ function initPinchZoom(){
     }
   });
 }
+
+/* ── Setas do teclado pra mover imagem (Canva-style) ──
+   Funciona quando a imagem esta selecionada/em foco e nao ha edicao de
+   texto ativa. Shift = passo fino (1%), Alt = passo grosso (10%). */
+let _kbBound = false;
+function initKeyboardImg(){
+  if(_kbBound)return;
+  _kbBound=true;
+  document.addEventListener('keydown',function(e){
+    // Ignora se usuario ta editando texto/input
+    const tag=(document.activeElement&&document.activeElement.tagName)||'';
+    if(tag==='TEXTAREA'||tag==='INPUT'||tag==='SELECT')return;
+    const s=slides[cur];
+    if(!s||!s.image)return;
+    if(getEffectiveFit(s)==='contain')return; // setas so fazem sentido em cover
+    let step=5;
+    if(e.shiftKey)step=1;
+    else if(e.altKey)step=10;
+    let mexeu=false;
+    if(e.key==='ArrowLeft'){s.ox=Math.max(0,Math.min(100,(s.ox||50)-step));mexeu=true;}
+    else if(e.key==='ArrowRight'){s.ox=Math.max(0,Math.min(100,(s.ox||50)+step));mexeu=true;}
+    else if(e.key==='ArrowUp'){s.oy=Math.max(0,Math.min(100,(s.oy||50)-step));mexeu=true;}
+    else if(e.key==='ArrowDown'){s.oy=Math.max(0,Math.min(100,(s.oy||50)+step));mexeu=true;}
+    if(mexeu){
+      e.preventDefault();
+      applyBgSize(s);
+      updateImgCtrlUI(s);
+      autoSave();
+    }
+  });
+}
+
+/* ── Modo edicao livre: grid 3x3 + dica de uso ──
+   Ativa via toggleFreeEdit(). Mostra grade + dica de gestos. */
+function toggleFreeEdit(){
+  const cont=document.getElementById('imgContainer');
+  if(!cont)return;
+  const ativo=cont.classList.toggle('free-edit');
+  const btn=document.getElementById('btnFreeEdit');
+  if(btn){
+    btn.classList.toggle('active',ativo);
+    btn.textContent=ativo?'Sair do modo livre':'Editar livre';
+  }
+  if(ativo){
+    if(typeof setStatus==='function')setStatus('Modo livre ativo — arraste, scroll p/ zoom, setas p/ ajustar');
+    setTimeout(()=>{if(typeof setStatus==='function')setStatus('');},4000);
+  }
+}
+window.toggleFreeEdit=toggleFreeEdit;
 
 /* ── Navigation ── */
 function goTo(i){cur=i;editingText=false;showImgCtrl=false;document.getElementById('imgCtrlPanel').style.display='none';render();}

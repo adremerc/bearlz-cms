@@ -62,6 +62,36 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
   z-index:1;
 }
 .img-container:hover::before{border-color:rgba(29,155,240,.3)}
+
+/* Modo edicao livre (Canva-style): grade 3x3 (regra dos tercos) + outline
+   destacado pra deixar evidente que a imagem esta no modo de edicao livre */
+.img-container.free-edit{box-shadow:0 0 0 2px #1d9bf0;cursor:move}
+.img-container.free-edit::before{
+  border:none;
+  background:
+    linear-gradient(rgba(29,155,240,.5),rgba(29,155,240,.5)) 0 33.33% / 100% 1px no-repeat,
+    linear-gradient(rgba(29,155,240,.5),rgba(29,155,240,.5)) 0 66.66% / 100% 1px no-repeat,
+    linear-gradient(90deg,rgba(29,155,240,.5),rgba(29,155,240,.5)) 33.33% 0 / 1px 100% no-repeat,
+    linear-gradient(90deg,rgba(29,155,240,.5),rgba(29,155,240,.5)) 66.66% 0 / 1px 100% no-repeat;
+  z-index:2;
+}
+/* Dica de teclado dentro do modo livre */
+.img-container.free-edit::after{
+  content:'← → ↑ ↓ ajusta · scroll = zoom · arraste pra mover';
+  position:absolute;
+  left:50%;bottom:8px;
+  transform:translateX(-50%);
+  background:rgba(29,155,240,.95);
+  color:#fff;
+  font-size:10px;font-weight:600;
+  padding:4px 10px;border-radius:12px;
+  pointer-events:none;
+  white-space:nowrap;
+  z-index:3;
+  font-family:'Open Sans',sans-serif;
+}
+/* Botao "Editar livre" em estado ativo */
+.preset-btn.active.free-edit-active{background:#1d9bf0;color:#fff;border-color:#1d9bf0}
 .img-overlay-btn{position:absolute;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;border:none;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2}
 .img-ctrl-panel{margin-top:8px;padding:10px 14px;background:#f8f8f8;border-radius:10px;display:flex;flex-direction:column;gap:8px}
 .ctrl-row-inner{display:flex;align-items:center;gap:10px}
