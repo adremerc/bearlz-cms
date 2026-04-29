@@ -93,26 +93,32 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
 /* Botao "Editar livre" em estado ativo */
 .preset-btn.active.free-edit-active{background:#1d9bf0;color:#fff;border-color:#1d9bf0}
 
-/* Resize handle (Canva-style): barra na borda inferior pra arrastar a
-   altura da imagem. Sutil ate o hover, depois fica destacada. */
+/* Resize handles (Canva-style): barras nas bordas superior E inferior
+   pra arrastar a altura da imagem. Sutis ate o hover, depois realce. */
 .img-resize-handle{
   position:absolute;
-  left:0;right:0;bottom:0;
+  left:0;right:0;
   height:10px;
   cursor:ns-resize;
   z-index:4;
   background:transparent;
   transition:background .15s;
 }
+.img-resize-handle-bottom{bottom:0}
+.img-resize-handle-top{top:0}
+
 .img-resize-handle::before{
   content:'';
   position:absolute;
-  left:50%;bottom:3px;
+  left:50%;
   transform:translateX(-50%);
   width:36px;height:3px;border-radius:2px;
   background:rgba(0,0,0,.2);
   transition:background .15s, width .15s;
 }
+.img-resize-handle-bottom::before{bottom:3px}
+.img-resize-handle-top::before{top:3px}
+
 .img-container:hover .img-resize-handle{background:rgba(29,155,240,.08)}
 .img-container:hover .img-resize-handle::before{background:#1d9bf0;width:60px}
 .img-resize-handle:hover{background:rgba(29,155,240,.2)!important}

@@ -348,7 +348,8 @@ function renderImgSection(){
       <div class="img-container${freeClass}" id="imgContainer" style="${hStyle};background:${bgColor}">
         <img id="imgReal" class="img-real" src="${s.image}" alt="" draggable="false" style="visibility:hidden">
         <button class="img-overlay-btn" style="top:8px;right:8px" onclick="event.stopPropagation();clearImage()">×</button>
-        <div class="img-resize-handle" id="imgResizeHandle" title="Arraste pra cima/baixo pra ajustar altura"></div>
+        <div class="img-resize-handle img-resize-handle-top" id="imgResizeHandleTop" title="Arraste pra cima pra esticar / pra baixo pra encolher"></div>
+        <div class="img-resize-handle img-resize-handle-bottom" id="imgResizeHandle" title="Arraste pra baixo pra esticar / pra cima pra encolher"></div>
       </div>
     </div>`;
     requestAnimationFrame(()=>{
@@ -488,12 +489,12 @@ function initDrag(){
   cont.addEventListener('touchstart',onDown,{passive:false});
 }
 
-/* ── Resize handle (Canva-style) ──
-   Handle visivel na borda inferior do container; usuario arrasta
-   verticalmente pra ajustar a altura da imagem em pixels. */
-function initResizeHandle(){
-  const handle=document.getElementById('imgResizeHandle');
-  const cont  =document.getElementById('imgContainer');
+/* ── Resize handles (Canva-style) ──
+   Dois handles: borda inferior (drag baixo = estica) e borda superior
+   (drag cima = estica). Direcao matematica oposta, mas semantica igual:
+   arrastar pra fora cresce, pra dentro encolhe. */
+function _bindResizeHandle(handle, dirSign){
+  const cont=document.getElementById('imgContainer');
   if(!handle||!cont||handle._bound)return;
   handle._bound=true;
   let resizing=false,startY=0,startH=0;
@@ -511,7 +512,10 @@ function initResizeHandle(){
     if(!resizing)return;
     e.preventDefault();
     const pt=e.touches?e.touches[0]:e;
-    const newH=Math.max(80,Math.min(900,startH+(pt.clientY-startY)));
+    // dirSign +1 (handle inferior): arrasta pra baixo cresce
+    // dirSign -1 (handle superior): arrasta pra cima cresce
+    const delta=(pt.clientY-startY)*dirSign;
+    const newH=Math.max(80,Math.min(900,startH+delta));
     slides[cur].imgH=Math.round(newH);
     cont.style.height=slides[cur].imgH+'px';
     cont.style.flex='none';
@@ -528,6 +532,10 @@ function initResizeHandle(){
   };
   handle.addEventListener('mousedown',onDown);
   handle.addEventListener('touchstart',onDown,{passive:false});
+}
+function initResizeHandle(){
+  _bindResizeHandle(document.getElementById('imgResizeHandle'), +1);
+  _bindResizeHandle(document.getElementById('imgResizeHandleTop'), -1);
 }
 
 /* ── Mouse wheel zoom (Canva-style) ── */
