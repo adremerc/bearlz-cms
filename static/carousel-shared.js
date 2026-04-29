@@ -114,6 +114,9 @@ async function loadFromServer(){
         if(saved.ox!=null)slides[i].ox=saved.ox;
         if(saved.oy!=null)slides[i].oy=saved.oy;
         slides[i].imgH=saved.imgH??null;
+        // Modo livre (Canva-style): freeX/Y em px absolutos
+        if('freeX' in saved)slides[i].freeX=saved.freeX;
+        if('freeY' in saved)slides[i].freeY=saved.freeY;
         if('fit' in saved)slides[i].fit=saved.fit;
         if('image' in saved){
           if(saved.image===null){
@@ -209,7 +212,8 @@ function autoLoad(){
             oy:saved.oy!=null?saved.oy:50,
             imgH:saved.imgH??null,
             fit:saved.fit||null,
-            imgNW:null,imgNH:null
+            imgNW:null,imgNH:null,
+            freeX:saved.freeX??null,freeY:saved.freeY??null
           });
           return;
         }
@@ -218,6 +222,9 @@ function autoLoad(){
         if(saved.ox!=null)slides[i].ox=saved.ox;
         if(saved.oy!=null)slides[i].oy=saved.oy;
         slides[i].imgH=saved.imgH??null;
+        // Modo livre (Canva-style): freeX/Y em px absolutos
+        if('freeX' in saved)slides[i].freeX=saved.freeX;
+        if('freeY' in saved)slides[i].freeY=saved.freeY;
         if('fit' in saved)slides[i].fit=saved.fit;
         if('image' in saved){
           if(saved.image===null){
@@ -336,10 +343,9 @@ function renderImgSection(){
     const fit=getEffectiveFit(s);
     const hStyle=s.imgH?`height:${s.imgH}px;flex:none`:'';
     const bgColor=fit==='contain'?'#f8f8f8':'transparent';
-    // Anti-flicker: oculta o <img> com visibility:hidden ate o applyBgSize
-    // posicionar. Sem isso, o <img> pisca em tamanho natural por 1 frame.
+    const freeClass=fit==='free'?' free-edit':'';
     sec.innerHTML=`<div class="img-section">
-      <div class="img-container" id="imgContainer" style="${hStyle};background:${bgColor}">
+      <div class="img-container${freeClass}" id="imgContainer" style="${hStyle};background:${bgColor}">
         <img id="imgReal" class="img-real" src="${s.image}" alt="" draggable="false" style="visibility:hidden">
         <button class="img-overlay-btn" style="top:8px;right:8px" onclick="event.stopPropagation();clearImage()">×</button>
       </div>
@@ -350,10 +356,19 @@ function renderImgSection(){
       if(im)im.style.visibility='visible';
     });
     document.getElementById('btnAjustar').style.display='inline';
-    if(fit==='cover')initDrag();
+    // Drag funciona em cover E free; contain a posicao eh fixa
+    if(fit!=='contain')initDrag();
     initWheelZoom();
     initPinchZoom();
     initKeyboardImg();
+    // Sincroniza estado visual do botao "Editar livre"
+    setTimeout(()=>{
+      const btn=document.getElementById('btnFreeEdit');
+      if(btn){
+        btn.classList.toggle('active',fit==='free');
+        btn.textContent=fit==='free'?'Sair do livre':'Editar livre';
+      }
+    },10);
     updateImgCtrlUI(s);
   }else{
     sec.innerHTML=`<div class="img-section">
@@ -413,35 +428,51 @@ function updateImgCtrlUI(s){
   const vh=document.getElementById('valH');if(vh)vh.textContent=s.imgH?(s.imgH+'px'):'Auto';
 }
 
-/* ── Drag to pan ── */
+/* ── Drag to pan ──
+   Em modo cover/contain: atualiza ox/oy 0-100 com clamp (movimento
+     restrito ao crop).
+   Em modo free: atualiza freeX/freeY em pixels absolutos, sem clamp
+     — imagem pode sair do container. */
 function initDrag(){
   const cont=document.getElementById('imgContainer');
   if(!cont)return;
-  let dragging=false,startX=0,startY=0,startOx=0,startOy=0;
+  let dragging=false,startX=0,startY=0,startOx=0,startOy=0,startFx=0,startFy=0,modeFree=false;
   const onDown=(e)=>{
-    // Nao inicia drag se clicou no botao X
     if(e.target&&e.target.classList&&e.target.classList.contains('img-overlay-btn'))return;
-    // Pinch (2 dedos) eh tratado em initPinchZoom — nao inicia pan
     if(e.touches&&e.touches.length>=2)return;
     e.preventDefault();dragging=true;
     const pt=e.touches?e.touches[0]:e;
     const s=slides[cur];
-    startX=pt.clientX;startY=pt.clientY;startOx=s.ox||50;startOy=s.oy||50;
+    startX=pt.clientX;startY=pt.clientY;
+    modeFree=getEffectiveFit(s)==='free';
+    if(modeFree){
+      startFx=s.freeX||0;startFy=s.freeY||0;
+    }else{
+      startOx=s.ox||50;startOy=s.oy||50;
+    }
     cont.style.cursor='grabbing';
     window.addEventListener('mousemove',onMove);window.addEventListener('mouseup',onUp);
     window.addEventListener('touchmove',onMove,{passive:false});window.addEventListener('touchend',onUp);
   };
   const onMove=(e)=>{
     if(!dragging)return;
-    if(e.touches&&e.touches.length>=2){onUp();return;} // virou pinch, para o pan
+    if(e.touches&&e.touches.length>=2){onUp();return;}
     e.preventDefault();
     const pt=e.touches?e.touches[0]:e;
-    const r=cont.getBoundingClientRect();
-    const dx=((pt.clientX-startX)/r.width)*100;
-    const dy=((pt.clientY-startY)/r.height)*100;
-    slides[cur].ox=Math.max(0,Math.min(100,Math.round(startOx-dx)));
-    slides[cur].oy=Math.max(0,Math.min(100,Math.round(startOy-dy)));
-    applyBgSize(slides[cur]);
+    const s=slides[cur];
+    if(modeFree){
+      // Pixels absolutos — sem clamp, imagem pode sair do container
+      const dx=pt.clientX-startX, dy=pt.clientY-startY;
+      s.freeX=Math.round(startFx+dx);
+      s.freeY=Math.round(startFy+dy);
+    }else{
+      const r=cont.getBoundingClientRect();
+      const dx=((pt.clientX-startX)/r.width)*100;
+      const dy=((pt.clientY-startY)/r.height)*100;
+      s.ox=Math.max(0,Math.min(100,Math.round(startOx-dx)));
+      s.oy=Math.max(0,Math.min(100,Math.round(startOy-dy)));
+    }
+    applyBgSize(s);
   };
   const onUp=()=>{
     if(!dragging)return;
@@ -514,27 +545,35 @@ function initPinchZoom(){
 }
 
 /* ── Setas do teclado pra mover imagem (Canva-style) ──
-   Funciona quando a imagem esta selecionada/em foco e nao ha edicao de
-   texto ativa. Shift = passo fino (1%), Alt = passo grosso (10%). */
+   Em cover: ox/oy 0-100, Shift=1, Alt=10
+   Em free: freeX/Y em pixels, Shift=2px, default=10px, Alt=50px */
 let _kbBound = false;
 function initKeyboardImg(){
   if(_kbBound)return;
   _kbBound=true;
   document.addEventListener('keydown',function(e){
-    // Ignora se usuario ta editando texto/input
     const tag=(document.activeElement&&document.activeElement.tagName)||'';
     if(tag==='TEXTAREA'||tag==='INPUT'||tag==='SELECT')return;
     const s=slides[cur];
     if(!s||!s.image)return;
-    if(getEffectiveFit(s)==='contain')return; // setas so fazem sentido em cover
-    let step=5;
-    if(e.shiftKey)step=1;
-    else if(e.altKey)step=10;
+    const fit=getEffectiveFit(s);
+    if(fit==='contain')return;
     let mexeu=false;
-    if(e.key==='ArrowLeft'){s.ox=Math.max(0,Math.min(100,(s.ox||50)-step));mexeu=true;}
-    else if(e.key==='ArrowRight'){s.ox=Math.max(0,Math.min(100,(s.ox||50)+step));mexeu=true;}
-    else if(e.key==='ArrowUp'){s.oy=Math.max(0,Math.min(100,(s.oy||50)-step));mexeu=true;}
-    else if(e.key==='ArrowDown'){s.oy=Math.max(0,Math.min(100,(s.oy||50)+step));mexeu=true;}
+    if(fit==='free'){
+      // Pixels — passo padrao 10, Shift=2 (fino), Alt=50 (grosso)
+      let step=10; if(e.shiftKey)step=2; else if(e.altKey)step=50;
+      if(s.freeX==null||s.freeY==null){applyBgSize(s);} // forca init
+      if(e.key==='ArrowLeft'){s.freeX=(s.freeX||0)-step;mexeu=true;}
+      else if(e.key==='ArrowRight'){s.freeX=(s.freeX||0)+step;mexeu=true;}
+      else if(e.key==='ArrowUp'){s.freeY=(s.freeY||0)-step;mexeu=true;}
+      else if(e.key==='ArrowDown'){s.freeY=(s.freeY||0)+step;mexeu=true;}
+    }else{
+      let step=5; if(e.shiftKey)step=1; else if(e.altKey)step=10;
+      if(e.key==='ArrowLeft'){s.ox=Math.max(0,Math.min(100,(s.ox||50)-step));mexeu=true;}
+      else if(e.key==='ArrowRight'){s.ox=Math.max(0,Math.min(100,(s.ox||50)+step));mexeu=true;}
+      else if(e.key==='ArrowUp'){s.oy=Math.max(0,Math.min(100,(s.oy||50)-step));mexeu=true;}
+      else if(e.key==='ArrowDown'){s.oy=Math.max(0,Math.min(100,(s.oy||50)+step));mexeu=true;}
+    }
     if(mexeu){
       e.preventDefault();
       applyBgSize(s);
@@ -544,21 +583,36 @@ function initKeyboardImg(){
   });
 }
 
-/* ── Modo edicao livre: grid 3x3 + dica de uso ──
-   Ativa via toggleFreeEdit(). Mostra grade + dica de gestos. */
+/* ── Modo edicao livre estilo Canva ──
+   Pixels absolutos: imagem pode sair do container (cropped por overflow).
+   Toggle troca s.fit entre 'cover' e 'free'. Quando volta pra cover,
+   preserva ox/oy original (que nunca foram tocados em modo free). */
 function toggleFreeEdit(){
+  const s=slides[cur];
+  if(!s||!s.image)return;
   const cont=document.getElementById('imgContainer');
   if(!cont)return;
-  const ativo=cont.classList.toggle('free-edit');
+  const ativando=getEffectiveFit(s)!=='free';
+  if(ativando){
+    s.fit='free';
+    // freeX/Y serao calculados no proximo applyBgSize a partir de ox/oy
+    s.freeX=null;s.freeY=null;
+    cont.classList.add('free-edit');
+    if(typeof setStatus==='function')setStatus('Modo livre — arraste sem limites, scroll = zoom, setas = ajuste');
+  }else{
+    s.fit='cover';
+    cont.classList.remove('free-edit');
+    if(typeof setStatus==='function')setStatus('Voltou pro modo Preencher');
+  }
   const btn=document.getElementById('btnFreeEdit');
   if(btn){
-    btn.classList.toggle('active',ativo);
-    btn.textContent=ativo?'Sair do modo livre':'Editar livre';
+    btn.classList.toggle('active',ativando);
+    btn.textContent=ativando?'Sair do livre':'Editar livre';
   }
-  if(ativo){
-    if(typeof setStatus==='function')setStatus('Modo livre ativo — arraste, scroll p/ zoom, setas p/ ajustar');
-    setTimeout(()=>{if(typeof setStatus==='function')setStatus('');},4000);
-  }
+  applyBgSize(s);
+  updateImgCtrlUI(s);
+  autoSave();
+  setTimeout(()=>{if(typeof setStatus==='function')setStatus('');},4000);
 }
 window.toggleFreeEdit=toggleFreeEdit;
 
@@ -605,8 +659,8 @@ function onImgFile(input){
 function clearImage(){slides[cur].image=null;slides[cur].zoom=1;slides[cur].ox=50;slides[cur].oy=50;slides[cur].imgH=null;slides[cur].fit=null;slides[cur].imgNW=null;slides[cur].imgNH=null;document.getElementById('imgCtrlPanel').style.display='none';render();autoSave();}
 function toggleImgCtrl(){const panel=document.getElementById('imgCtrlPanel');const showing=panel.style.display!=='none';panel.style.display=showing?'none':'block';}
 // applyBgSize: nome historico, hoje aplica posicao+tamanho no <img> real
-// dentro de #imgContainer. Espelha exatamente a logica do drawSlideToCanvas
-// (cover crop com ox/oy/zoom) pra que preview e export batam pixel a pixel.
+// dentro de #imgContainer. Tres modos: cover (constrained crop), contain
+// (letterbox), free (pixels absolutos, pode sair do container).
 function applyBgSize(s){
   const cont=document.getElementById('imgContainer');
   const img =document.getElementById('imgReal');
@@ -630,6 +684,26 @@ function applyBgSize(s){
     const fw=s.imgNW*scale,fh=s.imgNH*scale;
     img.style.left=((cw-fw)/2)+'px';
     img.style.top =((ch-fh)/2)+'px';
+    img.style.width =fw+'px';
+    img.style.height=fh+'px';
+  }else if(fit==='free'){
+    // Modo livre estilo Canva: pixels absolutos, sem clamp.
+    // Inicia com tamanho "cover" pra ficar igual ao que o usuario vinha
+    // editando, mas dali em diante o user controla por px direto.
+    const baseFree=Math.max(cw/s.imgNW,ch/s.imgNH);
+    const fw=s.imgNW*baseFree*z,fh=s.imgNH*baseFree*z;
+    // Se ainda nao tem freeX/Y, deriva do ox/oy atual pra continuar
+    // de onde estava (transicao suave de cover -> free)
+    if(s.freeX==null){
+      const ox=s.ox!=null?s.ox:50;
+      s.freeX=(ox/100)*(cw-fw);
+    }
+    if(s.freeY==null){
+      const oy=s.oy!=null?s.oy:50;
+      s.freeY=(oy/100)*(ch-fh);
+    }
+    img.style.left=s.freeX+'px';
+    img.style.top =s.freeY+'px';
     img.style.width =fw+'px';
     img.style.height=fh+'px';
   }else{
