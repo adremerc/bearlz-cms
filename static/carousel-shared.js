@@ -500,6 +500,36 @@ function initDrag(){
    margin-top negativa). Permite ocupar espacos do card que antes
    ficavam fixos pelo flex layout. */
 
+/* Maximizar imagem: estica a area da imagem ate o LIMITE DO POST (525px do
+   card no preview = 1350px no Instagram). Tambem puxa pra cima invadindo
+   o espaco do texto se possivel, pra eliminar gaps. */
+function maximizarImg(){
+  const s=slides[cur];
+  if(!s)return;
+  const card=document.getElementById('theCard')||document.querySelector('.card');
+  const sec=document.querySelector('.img-section');
+  const cont=document.getElementById('imgContainer');
+  if(!card||!sec)return;
+  // 1. Encosta no texto: imgMarginTop negativa pequena (-12px elimina padding)
+  s.imgMarginTop=-12;
+  // 2. Calcula altura max ate o limite do post (525px do card preview)
+  // Pega top do imgSection relativo ao card e subtrai de 525.
+  const cardRect=card.getBoundingClientRect();
+  const secRect=sec.getBoundingClientRect();
+  const topDoSec=secRect.top-cardRect.top;
+  const limite=525;
+  const alturaDisp=Math.max(120,limite-topDoSec+12); // +12 pra compensar margin-top
+  s.imgH=Math.round(alturaDisp);
+  _applyImgFraming(s);
+  applyBgSize(s);
+  updateImgCtrlUI(s);
+  autoSave();
+  if(typeof checkOverflow==='function')checkOverflow();
+  if(typeof setStatus==='function')setStatus(`Imagem maximizada (${s.imgH}px)`);
+  setTimeout(()=>{if(typeof setStatus==='function')setStatus('');},2500);
+}
+window.maximizarImg=maximizarImg;
+
 function _applyImgFraming(s){
   const sec=document.querySelector('.img-section');
   const cont=document.getElementById('imgContainer');
