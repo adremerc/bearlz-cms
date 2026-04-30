@@ -509,16 +509,16 @@ function maximizarImg(){
   const card=document.getElementById('theCard')||document.querySelector('.card');
   const sec=document.querySelector('.img-section');
   if(!card||!sec)return;
-  // 1. Pra cima: invade o espaco do texto com margin negativa de 60px
-  // (suave mas visivel, nao destroi a leitura do texto totalmente)
-  s.imgMarginTop=-60;
+  // 1. Pra cima: invade o espaco do texto com margin negativa de 20px
+  // (suave, mantem profile e texto sempre visiveis acima da imagem)
+  s.imgMarginTop=-20;
   // 2. Pra baixo: calcula altura ate a linha vermelha (525px do card)
   const cardRect=card.getBoundingClientRect();
   const secRect =sec.getBoundingClientRect();
   const topDoSec=secRect.top-cardRect.top;
   const limite=525;
-  // Altura disponivel = limite - top original + os 60px que ganhou pra cima
-  const alturaDisp=Math.max(150,limite-topDoSec+60);
+  // Altura disponivel = limite - top original + os 20px que ganhou pra cima
+  const alturaDisp=Math.max(150,limite-topDoSec+20);
   s.imgH=Math.round(alturaDisp);
   _applyImgFraming(s);
   applyBgSize(s);
@@ -572,10 +572,11 @@ function _bindResizeHandle(handle, role){
       // Drag pra baixo (delta>0) = estica; pra cima = encolhe
       s.imgH=Math.round(Math.max(80,Math.min(900,startH+delta)));
     }else{
-      // role==='top': drag pra cima (delta<0) = invade espaco acima
-      // (margin-top mais negativa) E aumenta altura na mesma medida pra
-      // imagem encostar no que tem em cima
-      const newMt=Math.round(Math.max(-300,Math.min(60,startMt+delta)));
+      // role==='top': drag pra cima invade espaco do texto via margin
+      // negativa. Limite -100 (suave) pra nao cobrir profile/avatar.
+      // text-area tem z-index:3 entao texto nunca eh coberto, mas a
+      // limitacao mantem a UX intuitiva.
+      const newMt=Math.round(Math.max(-100,Math.min(40,startMt+delta)));
       const dMt=newMt-startMt;
       s.imgMarginTop=newMt;
       s.imgH=Math.round(Math.max(80,Math.min(900,startH-dMt)));
