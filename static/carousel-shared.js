@@ -117,6 +117,8 @@ async function loadFromServer(){
         // Modo livre (Canva-style): freeX/Y em px absolutos
         if('freeX' in saved)slides[i].freeX=saved.freeX;
         if('freeY' in saved)slides[i].freeY=saved.freeY;
+        // imgMarginTop: deixa imagem invadir espaco acima (margin negativa)
+        if('imgMarginTop' in saved)slides[i].imgMarginTop=saved.imgMarginTop;
         if('fit' in saved)slides[i].fit=saved.fit;
         if('image' in saved){
           if(saved.image===null){
@@ -225,6 +227,8 @@ function autoLoad(){
         // Modo livre (Canva-style): freeX/Y em px absolutos
         if('freeX' in saved)slides[i].freeX=saved.freeX;
         if('freeY' in saved)slides[i].freeY=saved.freeY;
+        // imgMarginTop: deixa imagem invadir espaco acima (margin negativa)
+        if('imgMarginTop' in saved)slides[i].imgMarginTop=saved.imgMarginTop;
         if('fit' in saved)slides[i].fit=saved.fit;
         if('image' in saved){
           if(saved.image===null){
@@ -353,6 +357,7 @@ function renderImgSection(){
       </div>
     </div>`;
     requestAnimationFrame(()=>{
+      _applyImgFraming(s); // aplica margin-top + altura customizadas
       applyBgSize(s);
       const im=document.getElementById('imgReal');
       if(im)im.style.visibility='visible';
@@ -490,20 +495,39 @@ function initDrag(){
 }
 
 /* ── Resize handles (Canva-style) ──
-   Dois handles: borda inferior (drag baixo = estica) e borda superior
-   (drag cima = estica). Direcao matematica oposta, mas semantica igual:
-   arrastar pra fora cresce, pra dentro encolhe. */
-function _bindResizeHandle(handle, dirSign){
+   Handle BOTTOM: estica/encolhe altura via imgH.
+   Handle TOP: faz a imagem SUBIR invadindo o espaco do texto (via
+   margin-top negativa). Permite ocupar espacos do card que antes
+   ficavam fixos pelo flex layout. */
+
+function _applyImgFraming(s){
+  const sec=document.querySelector('.img-section');
+  const cont=document.getElementById('imgContainer');
+  if(!cont)return;
+  const mt=s.imgMarginTop||0;
+  if(sec)sec.style.marginTop=mt+'px';
+  if(s.imgH){
+    cont.style.height=s.imgH+'px';
+    cont.style.flex='none';
+  }else{
+    cont.style.height='';
+    cont.style.flex='';
+  }
+}
+
+function _bindResizeHandle(handle, role){
+  // role: 'bottom' (mexe imgH) | 'top' (mexe imgMarginTop, deixa imagem subir)
   const cont=document.getElementById('imgContainer');
   if(!handle||!cont||handle._bound)return;
   handle._bound=true;
-  let resizing=false,startY=0,startH=0;
+  let resizing=false,startY=0,startH=0,startMt=0;
   const onDown=(e)=>{
     e.preventDefault();e.stopPropagation();
     resizing=true;
     const pt=e.touches?e.touches[0]:e;
     startY=pt.clientY;
     startH=cont.offsetHeight;
+    startMt=slides[cur].imgMarginTop||0;
     document.body.style.cursor='ns-resize';
     window.addEventListener('mousemove',onMove);window.addEventListener('mouseup',onUp);
     window.addEventListener('touchmove',onMove,{passive:false});window.addEventListener('touchend',onUp);
@@ -512,14 +536,22 @@ function _bindResizeHandle(handle, dirSign){
     if(!resizing)return;
     e.preventDefault();
     const pt=e.touches?e.touches[0]:e;
-    // dirSign +1 (handle inferior): arrasta pra baixo cresce
-    // dirSign -1 (handle superior): arrasta pra cima cresce
-    const delta=(pt.clientY-startY)*dirSign;
-    const newH=Math.max(80,Math.min(900,startH+delta));
-    slides[cur].imgH=Math.round(newH);
-    cont.style.height=slides[cur].imgH+'px';
-    cont.style.flex='none';
-    applyBgSize(slides[cur]);
+    const delta=pt.clientY-startY;
+    const s=slides[cur];
+    if(role==='bottom'){
+      // Drag pra baixo (delta>0) = estica; pra cima = encolhe
+      s.imgH=Math.round(Math.max(80,Math.min(900,startH+delta)));
+    }else{
+      // role==='top': drag pra cima (delta<0) = invade espaco acima
+      // (margin-top mais negativa) E aumenta altura na mesma medida pra
+      // imagem encostar no que tem em cima
+      const newMt=Math.round(Math.max(-300,Math.min(60,startMt+delta)));
+      const dMt=newMt-startMt;
+      s.imgMarginTop=newMt;
+      s.imgH=Math.round(Math.max(80,Math.min(900,startH-dMt)));
+    }
+    _applyImgFraming(s);
+    applyBgSize(s);
   };
   const onUp=()=>{
     if(!resizing)return;
@@ -534,8 +566,8 @@ function _bindResizeHandle(handle, dirSign){
   handle.addEventListener('touchstart',onDown,{passive:false});
 }
 function initResizeHandle(){
-  _bindResizeHandle(document.getElementById('imgResizeHandle'), +1);
-  _bindResizeHandle(document.getElementById('imgResizeHandleTop'), -1);
+  _bindResizeHandle(document.getElementById('imgResizeHandle'), 'bottom');
+  _bindResizeHandle(document.getElementById('imgResizeHandleTop'), 'top');
 }
 
 /* ── Mouse wheel zoom (Canva-style) ── */
@@ -1083,7 +1115,14 @@ async function captureCard(){
   // Card: 420x525 px (preview). Export em 2160x2700 (5.14x), que eh a
   // resolucao 2x do tamanho 1080x1350 do Instagram. Boa qualidade pra zoom.
   const CARD_W=420,CARD_H=525,SCALE=2160/CARD_W;
-  const hideEls=Array.from(document.querySelectorAll('.card-dots-row,.card-footer,#imgCtrlPanel,.img-overlay-btn,.profile-edit-panel'));
+  // Esconde TUDO que eh UI de edicao no export final.
+  // Inclui: dots, footer, controles de imagem, botao X, profile edit,
+  // handles de resize (cima/baixo) e placeholder "Adicionar imagem"
+  // (quando o slide nao tem imagem, area fica branca em vez de tracejado).
+  const hideEls=Array.from(document.querySelectorAll(
+    '.card-dots-row,.card-footer,#imgCtrlPanel,.img-overlay-btn,'+
+    '.profile-edit-panel,.img-resize-handle,.img-placeholder'
+  ));
   const prevDisplay=hideEls.map(el=>el.style.display);
   hideEls.forEach(el=>{el.style.display='none';});
   const origStyle={};
@@ -1092,6 +1131,10 @@ async function captureCard(){
   card.style.width=CARD_W+'px';card.style.maxWidth=CARD_W+'px';
   card.style.height=CARD_H+'px';card.style.minHeight=CARD_H+'px';card.style.maxHeight=CARD_H+'px';
   card.style.marginBottom='0';
+  // Remove temporariamente classe free-edit (grade 3x3 + tooltip) durante o export
+  const imgCont=document.getElementById('imgContainer');
+  const freeEditWasOn=imgCont&&imgCont.classList.contains('free-edit');
+  if(freeEditWasOn)imgCont.classList.remove('free-edit');
   // Aguarda imagens dos slides carregarem (caso sejam URLs externas/Pexels)
   const imgs=Array.from(card.querySelectorAll('img'));
   await Promise.all(imgs.map(im=>{
@@ -1114,6 +1157,7 @@ async function captureCard(){
   }finally{
     hideEls.forEach((el,i)=>{el.style.display=prevDisplay[i];});
     Object.keys(origStyle).forEach(k=>{card.style[k]=origStyle[k];});
+    if(freeEditWasOn&&imgCont)imgCont.classList.add('free-edit');
   }
 }
 
