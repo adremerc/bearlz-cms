@@ -500,33 +500,33 @@ function initDrag(){
    margin-top negativa). Permite ocupar espacos do card que antes
    ficavam fixos pelo flex layout. */
 
-/* Maximizar imagem: estica a area da imagem ate o LIMITE DO POST (525px do
-   card no preview = 1350px no Instagram). Tambem puxa pra cima invadindo
-   o espaco do texto se possivel, pra eliminar gaps. */
+/* Maximizar imagem: puxa pra CIMA invadindo o espaco do texto (suave),
+   E estica pra BAIXO ate o LIMITE DO POST (linha vermelha em 525px).
+   Resultado: imagem ocupa o maximo possivel do card. */
 function maximizarImg(){
   const s=slides[cur];
   if(!s)return;
   const card=document.getElementById('theCard')||document.querySelector('.card');
   const sec=document.querySelector('.img-section');
-  const cont=document.getElementById('imgContainer');
   if(!card||!sec)return;
-  // 1. Encosta no texto: imgMarginTop negativa pequena (-12px elimina padding)
-  s.imgMarginTop=-12;
-  // 2. Calcula altura max ate o limite do post (525px do card preview)
-  // Pega top do imgSection relativo ao card e subtrai de 525.
+  // 1. Pra cima: invade o espaco do texto com margin negativa de 60px
+  // (suave mas visivel, nao destroi a leitura do texto totalmente)
+  s.imgMarginTop=-60;
+  // 2. Pra baixo: calcula altura ate a linha vermelha (525px do card)
   const cardRect=card.getBoundingClientRect();
-  const secRect=sec.getBoundingClientRect();
+  const secRect =sec.getBoundingClientRect();
   const topDoSec=secRect.top-cardRect.top;
   const limite=525;
-  const alturaDisp=Math.max(120,limite-topDoSec+12); // +12 pra compensar margin-top
+  // Altura disponivel = limite - top original + os 60px que ganhou pra cima
+  const alturaDisp=Math.max(150,limite-topDoSec+60);
   s.imgH=Math.round(alturaDisp);
   _applyImgFraming(s);
   applyBgSize(s);
   updateImgCtrlUI(s);
   autoSave();
   if(typeof checkOverflow==='function')checkOverflow();
-  if(typeof setStatus==='function')setStatus(`Imagem maximizada (${s.imgH}px)`);
-  setTimeout(()=>{if(typeof setStatus==='function')setStatus('');},2500);
+  if(typeof setStatus==='function')setStatus(`Imagem expandida (${s.imgH}px, sobe 60px)`);
+  setTimeout(()=>{if(typeof setStatus==='function')setStatus('');},2800);
 }
 window.maximizarImg=maximizarImg;
 
@@ -770,7 +770,18 @@ function onImgFile(input){
   };
   r.readAsDataURL(f);input.value='';
 }
-function clearImage(){slides[cur].image=null;slides[cur].zoom=1;slides[cur].ox=50;slides[cur].oy=50;slides[cur].imgH=null;slides[cur].fit=null;slides[cur].imgNW=null;slides[cur].imgNH=null;document.getElementById('imgCtrlPanel').style.display='none';render();autoSave();}
+function clearImage(){
+  const s=slides[cur];
+  s.image=null;s.zoom=1;s.ox=50;s.oy=50;
+  s.imgH=null;s.fit=null;s.imgNW=null;s.imgNH=null;
+  s.freeX=null;s.freeY=null;s.imgMarginTop=null;
+  // Reseta margin-top do .img-section pro proximo render nao ficar quebrado
+  const sec=document.querySelector('.img-section');
+  if(sec)sec.style.marginTop='';
+  const panel=document.getElementById('imgCtrlPanel');
+  if(panel)panel.style.display='none';
+  render();autoSave();
+}
 function toggleImgCtrl(){const panel=document.getElementById('imgCtrlPanel');const showing=panel.style.display!=='none';panel.style.display=showing?'none':'block';}
 // applyBgSize: nome historico, hoje aplica posicao+tamanho no <img> real
 // dentro de #imgContainer. Tres modos: cover (constrained crop), contain

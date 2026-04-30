@@ -124,7 +124,26 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
 .img-resize-handle:hover{background:rgba(29,155,240,.2)!important}
 .img-resize-handle:hover::before{background:#1d9bf0;width:80px}
 
-.img-overlay-btn{position:absolute;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;border:none;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2}
+/* Botao X (apagar imagem) — agora SEMPRE visivel e acima dos handles */
+.img-overlay-btn{
+  position:absolute;
+  width:30px;height:30px;
+  border-radius:50%;
+  background:rgba(0,0,0,.65);
+  color:#fff;border:2px solid rgba(255,255,255,.9);
+  font-size:16px;font-weight:700;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  z-index:6; /* acima dos handles (z-index:4) */
+  box-shadow:0 2px 8px rgba(0,0,0,.3);
+  transition:all .15s;
+  line-height:1;
+  padding:0;
+}
+.img-overlay-btn:hover{
+  background:#dc2626;
+  transform:scale(1.1);
+}
 .img-ctrl-panel{margin-top:8px;padding:10px 14px;background:#f8f8f8;border-radius:10px;display:flex;flex-direction:column;gap:8px}
 .ctrl-row-inner{display:flex;align-items:center;gap:10px}
 .ctrl-label{font-size:10px;font-weight:700;color:#888;min-width:36px}
