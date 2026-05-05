@@ -352,17 +352,17 @@ function renderImgSection(){
     const hStyle=s.imgH?`height:${s.imgH}px;flex:none`:'';
     const bgColor=fit==='contain'?'#f8f8f8':'transparent';
     const freeClass=fit==='free'?' free-edit':'';
-    // Botao X agora fica DENTRO de .img-section (irmao de .img-container)
-    // pra nao ser afetado pelo overflow:hidden do container nem coberto
-    // por nada da imagem em si.
     sec.innerHTML=`<div class="img-section" style="position:relative">
       <div class="img-container${freeClass}" id="imgContainer" style="${hStyle};background:${bgColor}">
         <img id="imgReal" class="img-real" src="${s.image}" alt="" draggable="false" style="visibility:hidden">
         <div class="img-resize-handle img-resize-handle-top" id="imgResizeHandleTop" title="Arraste pra cima pra esticar / pra baixo pra encolher"></div>
         <div class="img-resize-handle img-resize-handle-bottom" id="imgResizeHandle" title="Arraste pra baixo pra esticar / pra cima pra encolher"></div>
       </div>
-      <button class="img-overlay-btn" type="button" onclick="event.stopPropagation();clearImage()" aria-label="Apagar imagem">×</button>
     </div>`;
+    // Botao X vive ANCORADO NO .card (nao dentro de img-section/img-container).
+    // Imune a overflow:hidden e a qualquer posicionamento que a imagem faca.
+    _ensureCardDeleteBtn();
+    _showCardDeleteBtn(true);
     requestAnimationFrame(()=>{
       _applyImgFraming(s); // aplica margin-top + altura customizadas
       applyBgSize(s);
@@ -394,6 +394,8 @@ function renderImgSection(){
     </div>`;
     document.getElementById('btnAjustar').style.display='none';
     panel.style.display='none';
+    // Sem imagem -> esconde o botao X global do card
+    _showCardDeleteBtn(false);
   }
 }
 
@@ -560,6 +562,57 @@ function _applyImgFraming(s){
     cont.style.height='';
     cont.style.flex='';
   }
+}
+
+/* Injeta um botao X de "apagar imagem" diretamente no .card (nao dentro
+   do imgSection). Fica ancorado ao topo-right do card, position:absolute,
+   z-index astronomico. Imune a qualquer overflow:hidden ou margem
+   negativa que afete o imgSection. */
+function _ensureCardDeleteBtn(){
+  if(document.getElementById('cardDeleteImgBtn'))return;
+  const card=document.getElementById('theCard')||document.querySelector('.card');
+  if(!card)return;
+  // Garante que o card eh containing block pro absolute do botao
+  const cs=getComputedStyle(card);
+  if(cs.position==='static')card.style.position='relative';
+  const btn=document.createElement('button');
+  btn.id='cardDeleteImgBtn';
+  btn.type='button';
+  btn.innerHTML='×';
+  btn.title='Apagar imagem deste slide';
+  btn.setAttribute('aria-label','Apagar imagem');
+  btn.onclick=(e)=>{e.preventDefault();e.stopPropagation();if(typeof clearImage==='function')clearImage();};
+  // Estilos inline com !important via cssText pra ninguem sobrescrever
+  btn.style.cssText=
+    'position:absolute!important;'+
+    'top:12px!important;'+
+    'right:12px!important;'+
+    'width:38px!important;'+
+    'height:38px!important;'+
+    'border-radius:50%!important;'+
+    'background:#dc2626!important;'+
+    'color:#fff!important;'+
+    'border:3px solid #fff!important;'+
+    'font-size:22px!important;'+
+    'font-weight:900!important;'+
+    'cursor:pointer!important;'+
+    'display:flex!important;'+
+    'align-items:center!important;'+
+    'justify-content:center!important;'+
+    'z-index:99999!important;'+
+    'box-shadow:0 4px 14px rgba(0,0,0,.5)!important;'+
+    'line-height:1!important;'+
+    'padding:0!important;'+
+    'visibility:visible!important;'+
+    'opacity:1!important;'+
+    'pointer-events:auto!important;'+
+    'font-family:inherit!important;';
+  card.appendChild(btn);
+}
+function _showCardDeleteBtn(show){
+  const btn=document.getElementById('cardDeleteImgBtn');
+  if(!btn)return;
+  btn.style.setProperty('display',show?'flex':'none','important');
 }
 
 /* Injeta o .gap-handle no DOM se nao existir (posts antigos foram
