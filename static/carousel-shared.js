@@ -559,10 +559,27 @@ function _applyImgFraming(s){
   }
 }
 
+/* Injeta o .gap-handle no DOM se nao existir (posts antigos foram
+   gerados antes do template ter esse handle). Roda no boot. */
+function _ensureGapHandle(){
+  if(document.getElementById('gapHandle'))return true;
+  const textArea=document.getElementById('textArea')||document.querySelector('.text-area');
+  const imgSection=document.getElementById('imgSection');
+  if(!textArea||!imgSection||!textArea.parentNode)return false;
+  const handle=document.createElement('div');
+  handle.id='gapHandle';
+  handle.className='gap-handle';
+  handle.title='Arraste pra ajustar o espaço entre texto e imagem';
+  // Insere ANTES do imgSection (entre text-area e img-section)
+  textArea.parentNode.insertBefore(handle,imgSection);
+  return true;
+}
+
 /* Drag no handle entre texto e imagem — ajusta s.gapTextImg em px.
    Drag pra cima diminui gap (pode ficar negativo: imagem encosta no
    texto OU invade); drag pra baixo aumenta gap. */
 function initGapHandle(){
+  if(!_ensureGapHandle())return;
   const handle=document.getElementById('gapHandle');
   if(!handle||handle._bound)return;
   handle._bound=true;
@@ -1496,5 +1513,12 @@ initHydrate();
 // Adiciona botão Hooks no footer apos o DOM estar pronto. Tenta varias vezes
 // caso o footer ainda nao tenha sido renderizado pelo initHydrate.
 setTimeout(()=>_retryHookButton(20),100);
-// Bind do handle de gap entre texto e imagem
-setTimeout(initGapHandle,150);
+// Bind do handle de gap entre texto e imagem (com retry caso DOM nao
+// esteja pronto, ou template antigo precise injetar o handle)
+function _retryGapHandle(tries){
+  initGapHandle();
+  if(document.getElementById('gapHandle'))return;
+  if(tries<=0)return;
+  setTimeout(()=>_retryGapHandle(tries-1),200);
+}
+setTimeout(()=>_retryGapHandle(20),150);

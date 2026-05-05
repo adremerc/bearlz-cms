@@ -368,6 +368,33 @@ STATUS_LABELS = {
 def _admin_check_key():
     return request.headers.get("X-Admin-Key", "") == CMS_API_KEY
 
+@app.route("/api/_admin/bump-asset-version", methods=["POST"])
+def api_admin_bump_assets():
+    """Faz patch em todos os HTMLs em data/generated/ trocando
+    ?v=N pra ?v=N+1 nos links de carousel-shared.css/js. Forca os
+    browsers a baixarem a versao nova. Requer X-Admin-Key."""
+    if not _admin_check_key():
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json() or {}
+    new_v = str(data.get("version", "2"))
+    fixados = 0
+    if GENERATED_DIR.exists():
+        for html in GENERATED_DIR.glob("carrossel-*.html"):
+            try:
+                content = html.read_text(encoding="utf-8")
+                novo = re.sub(
+                    r'(carousel-shared\.(?:css|js))\?v=\d+',
+                    rf'\1?v={new_v}',
+                    content
+                )
+                if novo != content:
+                    html.write_text(novo, encoding="utf-8")
+                    fixados += 1
+            except Exception:
+                pass
+    return jsonify({"ok": True, "fixados": fixados, "version": new_v})
+
+
 @app.route("/api/_admin/state-history/<slug>", methods=["GET"])
 def api_admin_state_history(slug):
     """Lista versoes de data/edits/<slug>.json no branch data-generated.
