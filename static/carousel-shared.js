@@ -119,6 +119,8 @@ async function loadFromServer(){
         if('freeY' in saved)slides[i].freeY=saved.freeY;
         // imgMarginTop: deixa imagem invadir espaco acima (margin negativa)
         if('imgMarginTop' in saved)slides[i].imgMarginTop=saved.imgMarginTop;
+        // gapTextImg: usuario ajusta gap entre texto e imagem manualmente
+        if('gapTextImg' in saved)slides[i].gapTextImg=saved.gapTextImg;
         if('fit' in saved)slides[i].fit=saved.fit;
         if('image' in saved){
           if(saved.image===null){
@@ -229,6 +231,8 @@ function autoLoad(){
         if('freeY' in saved)slides[i].freeY=saved.freeY;
         // imgMarginTop: deixa imagem invadir espaco acima (margin negativa)
         if('imgMarginTop' in saved)slides[i].imgMarginTop=saved.imgMarginTop;
+        // gapTextImg: usuario ajusta gap entre texto e imagem manualmente
+        if('gapTextImg' in saved)slides[i].gapTextImg=saved.gapTextImg;
         if('fit' in saved)slides[i].fit=saved.fit;
         if('image' in saved){
           if(saved.image===null){
@@ -533,9 +537,19 @@ window.maximizarImg=maximizarImg;
 function _applyImgFraming(s){
   const sec=document.querySelector('.img-section');
   const cont=document.getElementById('imgContainer');
+  const gap=document.getElementById('gapHandle');
   if(!cont)return;
+  // imgMarginTop: usuario invade espaco do texto via handle TOP
   const mt=s.imgMarginTop||0;
   if(sec)sec.style.marginTop=mt+'px';
+  // gapTextImg: usuario ajusta gap text<->imagem via gapHandle.
+  // Default 0; valor positivo afasta, negativo aproxima.
+  const g=s.gapTextImg||0;
+  if(gap)gap.style.height=Math.max(0,8+g)+'px'; // visual feedback do gap
+  // Aplica como padding-top NO CONTAINER (afeta posicao do <img>)
+  if(cont){
+    cont.style.paddingTop = (g>0?g:0)+'px';
+  }
   if(s.imgH){
     cont.style.height=s.imgH+'px';
     cont.style.flex='none';
@@ -544,6 +558,48 @@ function _applyImgFraming(s){
     cont.style.flex='';
   }
 }
+
+/* Drag no handle entre texto e imagem — ajusta s.gapTextImg em px.
+   Drag pra cima diminui gap (pode ficar negativo: imagem encosta no
+   texto OU invade); drag pra baixo aumenta gap. */
+function initGapHandle(){
+  const handle=document.getElementById('gapHandle');
+  if(!handle||handle._bound)return;
+  handle._bound=true;
+  let dragging=false,startY=0,startGap=0;
+  const onDown=(e)=>{
+    e.preventDefault();e.stopPropagation();
+    dragging=true;
+    const pt=e.touches?e.touches[0]:e;
+    startY=pt.clientY;
+    startGap=slides[cur].gapTextImg||0;
+    document.body.style.cursor='ns-resize';
+    window.addEventListener('mousemove',onMove);window.addEventListener('mouseup',onUp);
+    window.addEventListener('touchmove',onMove,{passive:false});window.addEventListener('touchend',onUp);
+  };
+  const onMove=(e)=>{
+    if(!dragging)return;
+    e.preventDefault();
+    const pt=e.touches?e.touches[0]:e;
+    const delta=pt.clientY-startY;
+    // Range -60 (imagem invade texto) a +120 (afasta bastante)
+    slides[cur].gapTextImg=Math.round(Math.max(-60,Math.min(120,startGap+delta)));
+    _applyImgFraming(slides[cur]);
+    applyBgSize(slides[cur]);
+  };
+  const onUp=()=>{
+    if(!dragging)return;
+    dragging=false;
+    document.body.style.cursor='';
+    window.removeEventListener('mousemove',onMove);window.removeEventListener('mouseup',onUp);
+    window.removeEventListener('touchmove',onMove);window.removeEventListener('touchend',onUp);
+    autoSave();
+    if(typeof checkOverflow==='function')checkOverflow();
+  };
+  handle.addEventListener('mousedown',onDown);
+  handle.addEventListener('touchstart',onDown,{passive:false});
+}
+window.initGapHandle=initGapHandle;
 
 function _bindResizeHandle(handle, role){
   // role: 'bottom' (mexe imgH) | 'top' (mexe imgMarginTop, deixa imagem subir)
@@ -775,10 +831,12 @@ function clearImage(){
   const s=slides[cur];
   s.image=null;s.zoom=1;s.ox=50;s.oy=50;
   s.imgH=null;s.fit=null;s.imgNW=null;s.imgNH=null;
-  s.freeX=null;s.freeY=null;s.imgMarginTop=null;
-  // Reseta margin-top do .img-section pro proximo render nao ficar quebrado
+  s.freeX=null;s.freeY=null;s.imgMarginTop=null;s.gapTextImg=null;
+  // Reseta margin-top do .img-section + gap handle pro proximo render limpo
   const sec=document.querySelector('.img-section');
   if(sec)sec.style.marginTop='';
+  const gap=document.getElementById('gapHandle');
+  if(gap)gap.style.height='';
   const panel=document.getElementById('imgCtrlPanel');
   if(panel)panel.style.display='none';
   render();autoSave();
@@ -1163,7 +1221,8 @@ async function captureCard(){
   // (quando o slide nao tem imagem, area fica branca em vez de tracejado).
   const hideEls=Array.from(document.querySelectorAll(
     '.card-dots-row,.card-footer,#imgCtrlPanel,.img-overlay-btn,'+
-    '.profile-edit-panel,.img-resize-handle,.img-placeholder'
+    '.profile-edit-panel,.img-resize-handle,.img-placeholder,'+
+    '.gap-handle'
   ));
   const prevDisplay=hideEls.map(el=>el.style.display);
   hideEls.forEach(el=>{el.style.display='none';});
@@ -1437,3 +1496,5 @@ initHydrate();
 // Adiciona botão Hooks no footer apos o DOM estar pronto. Tenta varias vezes
 // caso o footer ainda nao tenha sido renderizado pelo initHydrate.
 setTimeout(()=>_retryHookButton(20),100);
+// Bind do handle de gap entre texto e imagem
+setTimeout(initGapHandle,150);
