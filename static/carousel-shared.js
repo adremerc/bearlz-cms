@@ -352,13 +352,16 @@ function renderImgSection(){
     const hStyle=s.imgH?`height:${s.imgH}px;flex:none`:'';
     const bgColor=fit==='contain'?'#f8f8f8':'transparent';
     const freeClass=fit==='free'?' free-edit':'';
-    sec.innerHTML=`<div class="img-section">
+    // Botao X agora fica DENTRO de .img-section (irmao de .img-container)
+    // pra nao ser afetado pelo overflow:hidden do container nem coberto
+    // por nada da imagem em si.
+    sec.innerHTML=`<div class="img-section" style="position:relative">
       <div class="img-container${freeClass}" id="imgContainer" style="${hStyle};background:${bgColor}">
         <img id="imgReal" class="img-real" src="${s.image}" alt="" draggable="false" style="visibility:hidden">
-        <button class="img-overlay-btn" style="top:8px;right:8px" onclick="event.stopPropagation();clearImage()">×</button>
         <div class="img-resize-handle img-resize-handle-top" id="imgResizeHandleTop" title="Arraste pra cima pra esticar / pra baixo pra encolher"></div>
         <div class="img-resize-handle img-resize-handle-bottom" id="imgResizeHandle" title="Arraste pra baixo pra esticar / pra cima pra encolher"></div>
       </div>
+      <button class="img-overlay-btn" type="button" onclick="event.stopPropagation();clearImage()" aria-label="Apagar imagem">×</button>
     </div>`;
     requestAnimationFrame(()=>{
       _applyImgFraming(s); // aplica margin-top + altura customizadas
