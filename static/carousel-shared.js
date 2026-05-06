@@ -548,10 +548,15 @@ function _applyImgFraming(s){
   const mt=s.imgMarginTop||0;
   if(sec)sec.style.marginTop=mt+'px';
   // gapTextImg: usuario ajusta gap text<->imagem via gapHandle.
-  // Default 0; valor positivo afasta, negativo aproxima.
+  // Default 0; valor positivo afasta, negativo aproxima/encosta.
   const g=s.gapTextImg||0;
-  if(gap)gap.style.height=Math.max(0,8+g)+'px'; // visual feedback do gap
-  // Aplica como padding-top NO CONTAINER (afeta posicao do <img>)
+  if(gap){
+    // Quando negativo: handle fica com 4px (sutil mas visivel pra clicar)
+    // Quando positivo: cresce conforme o valor (visual gap)
+    gap.style.height=(g<0?4:Math.max(4,8+g))+'px';
+    gap.style.marginTop=(g<0?g:0)+'px'; // negativo: encolhe o espaco real
+  }
+  // Padding-top do container apenas pra positivos (afasta)
   if(cont){
     cont.style.paddingTop = (g>0?g:0)+'px';
   }
@@ -655,8 +660,8 @@ function initGapHandle(){
     e.preventDefault();
     const pt=e.touches?e.touches[0]:e;
     const delta=pt.clientY-startY;
-    // Range -60 (imagem invade texto) a +120 (afasta bastante)
-    slides[cur].gapTextImg=Math.round(Math.max(-60,Math.min(120,startGap+delta)));
+    // Range expandido: -150 (imagem invade bastante o texto) a +200
+    slides[cur].gapTextImg=Math.round(Math.max(-150,Math.min(200,startGap+delta)));
     _applyImgFraming(slides[cur]);
     applyBgSize(slides[cur]);
   };
