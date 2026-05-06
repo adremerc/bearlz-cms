@@ -471,25 +471,30 @@ function initDrag(){
     window.addEventListener('mousemove',onMove);window.addEventListener('mouseup',onUp);
     window.addEventListener('touchmove',onMove,{passive:false});window.addEventListener('touchend',onUp);
   };
+  let rafPending=false;
   const onMove=(e)=>{
     if(!dragging)return;
     if(e.touches&&e.touches.length>=2){onUp();return;}
     e.preventDefault();
     const pt=e.touches?e.touches[0]:e;
-    const s=slides[cur];
-    if(modeFree){
-      // Pixels absolutos — sem clamp, imagem pode sair do container
-      const dx=pt.clientX-startX, dy=pt.clientY-startY;
-      s.freeX=Math.round(startFx+dx);
-      s.freeY=Math.round(startFy+dy);
-    }else{
-      const r=cont.getBoundingClientRect();
-      const dx=((pt.clientX-startX)/r.width)*100;
-      const dy=((pt.clientY-startY)/r.height)*100;
-      s.ox=Math.max(0,Math.min(100,Math.round(startOx-dx)));
-      s.oy=Math.max(0,Math.min(100,Math.round(startOy-dy)));
-    }
-    applyBgSize(s);
+    const cx=pt.clientX, cy=pt.clientY;
+    if(rafPending)return; // throttle: 1 update por frame
+    rafPending=true;
+    requestAnimationFrame(()=>{
+      rafPending=false;
+      const s=slides[cur];
+      if(modeFree){
+        s.freeX=Math.round(startFx+(cx-startX));
+        s.freeY=Math.round(startFy+(cy-startY));
+      }else{
+        const r=cont.getBoundingClientRect();
+        const dx=((cx-startX)/r.width)*100;
+        const dy=((cy-startY)/r.height)*100;
+        s.ox=Math.max(0,Math.min(100,Math.round(startOx-dx)));
+        s.oy=Math.max(0,Math.min(100,Math.round(startOy-dy)));
+      }
+      applyBgSize(s);
+    });
   };
   const onUp=()=>{
     if(!dragging)return;
@@ -544,28 +549,29 @@ function _applyImgFraming(s){
   const cont=document.getElementById('imgContainer');
   const gap=document.getElementById('gapHandle');
   if(!cont)return;
-  // imgMarginTop: usuario invade espaco do texto via handle TOP
+  // RESET DEFENSIVO: zera todos os estilos inline antes de aplicar.
+  // Evita estado residual entre slides (slide A com imgMarginTop=-50 troca
+  // pro slide B sem custom — antes herdava o -50).
+  if(sec){sec.style.marginTop='';}
+  if(gap){gap.style.height='';gap.style.marginTop='';}
+  cont.style.paddingTop='';
+  cont.style.height='';
+  cont.style.flex='';
+
+  // Aplica os custom de cada slide (se houver)
   const mt=s.imgMarginTop||0;
-  if(sec)sec.style.marginTop=mt+'px';
-  // gapTextImg: usuario ajusta gap text<->imagem via gapHandle.
-  // Default 0; valor positivo afasta, negativo aproxima/encosta.
+  if(sec&&mt!==0)sec.style.marginTop=mt+'px';
+
   const g=s.gapTextImg||0;
   if(gap){
-    // Quando negativo: handle fica com 4px (sutil mas visivel pra clicar)
-    // Quando positivo: cresce conforme o valor (visual gap)
     gap.style.height=(g<0?4:Math.max(4,8+g))+'px';
-    gap.style.marginTop=(g<0?g:0)+'px'; // negativo: encolhe o espaco real
+    if(g<0)gap.style.marginTop=g+'px';
   }
-  // Padding-top do container apenas pra positivos (afasta)
-  if(cont){
-    cont.style.paddingTop = (g>0?g:0)+'px';
-  }
+  if(cont&&g>0)cont.style.paddingTop=g+'px';
+
   if(s.imgH){
     cont.style.height=s.imgH+'px';
     cont.style.flex='none';
-  }else{
-    cont.style.height='';
-    cont.style.flex='';
   }
 }
 
@@ -644,7 +650,7 @@ function initGapHandle(){
   const handle=document.getElementById('gapHandle');
   if(!handle||handle._bound)return;
   handle._bound=true;
-  let dragging=false,startY=0,startGap=0;
+  let dragging=false,startY=0,startGap=0,rafPending=false;
   const onDown=(e)=>{
     e.preventDefault();e.stopPropagation();
     dragging=true;
@@ -659,11 +665,16 @@ function initGapHandle(){
     if(!dragging)return;
     e.preventDefault();
     const pt=e.touches?e.touches[0]:e;
-    const delta=pt.clientY-startY;
-    // Range expandido: -150 (imagem invade bastante o texto) a +200
-    slides[cur].gapTextImg=Math.round(Math.max(-150,Math.min(200,startGap+delta)));
-    _applyImgFraming(slides[cur]);
-    applyBgSize(slides[cur]);
+    const cy=pt.clientY;
+    if(rafPending)return;
+    rafPending=true;
+    requestAnimationFrame(()=>{
+      rafPending=false;
+      const delta=cy-startY;
+      slides[cur].gapTextImg=Math.round(Math.max(-150,Math.min(200,startGap+delta)));
+      _applyImgFraming(slides[cur]);
+      applyBgSize(slides[cur]);
+    });
   };
   const onUp=()=>{
     if(!dragging)return;
@@ -684,7 +695,7 @@ function _bindResizeHandle(handle, role){
   const cont=document.getElementById('imgContainer');
   if(!handle||!cont||handle._bound)return;
   handle._bound=true;
-  let resizing=false,startY=0,startH=0,startMt=0;
+  let resizing=false,startY=0,startH=0,startMt=0,rafPending=false;
   const onDown=(e)=>{
     e.preventDefault();e.stopPropagation();
     resizing=true;
@@ -700,23 +711,24 @@ function _bindResizeHandle(handle, role){
     if(!resizing)return;
     e.preventDefault();
     const pt=e.touches?e.touches[0]:e;
-    const delta=pt.clientY-startY;
-    const s=slides[cur];
-    if(role==='bottom'){
-      // Drag pra baixo (delta>0) = estica; pra cima = encolhe
-      s.imgH=Math.round(Math.max(80,Math.min(900,startH+delta)));
-    }else{
-      // role==='top': drag pra cima invade espaco do texto via margin
-      // negativa. Limite -100 (suave) pra nao cobrir profile/avatar.
-      // text-area tem z-index:3 entao texto nunca eh coberto, mas a
-      // limitacao mantem a UX intuitiva.
-      const newMt=Math.round(Math.max(-100,Math.min(40,startMt+delta)));
-      const dMt=newMt-startMt;
-      s.imgMarginTop=newMt;
-      s.imgH=Math.round(Math.max(80,Math.min(900,startH-dMt)));
-    }
-    _applyImgFraming(s);
-    applyBgSize(s);
+    const cy=pt.clientY;
+    if(rafPending)return;
+    rafPending=true;
+    requestAnimationFrame(()=>{
+      rafPending=false;
+      const delta=cy-startY;
+      const s=slides[cur];
+      if(role==='bottom'){
+        s.imgH=Math.round(Math.max(80,Math.min(900,startH+delta)));
+      }else{
+        const newMt=Math.round(Math.max(-100,Math.min(40,startMt+delta)));
+        const dMt=newMt-startMt;
+        s.imgMarginTop=newMt;
+        s.imgH=Math.round(Math.max(80,Math.min(900,startH-dMt)));
+      }
+      _applyImgFraming(s);
+      applyBgSize(s);
+    });
   };
   const onUp=()=>{
     if(!resizing)return;
