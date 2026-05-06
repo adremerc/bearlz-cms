@@ -327,6 +327,34 @@ def load_anthropic_key():
         pass
 
 
+# ── Wrapper com retry pra chamadas Claude ────────────────────────────────────
+# Anthropic eventualmente retorna 529 'overloaded_error'. Backoff exponencial
+# resolve a maioria dos casos sem o usuario perceber.
+def claude_call_with_retry(client, max_retries=4, **params):
+    import time as _time
+    last_err = None
+    for attempt in range(max_retries):
+        try:
+            return client.messages.create(**params)
+        except Exception as e:
+            msg = str(e)
+            # Retry pra overloaded (529), rate limit (429) ou erros transitorios
+            transient = (
+                "overloaded" in msg.lower() or
+                "529" in msg or
+                "rate_limit" in msg.lower() or
+                "429" in msg or
+                "timeout" in msg.lower() or
+                "connection" in msg.lower()
+            )
+            last_err = e
+            if not transient or attempt >= max_retries - 1:
+                raise
+            # Backoff exponencial: 1s, 2s, 4s, 8s
+            _time.sleep(2 ** attempt)
+    raise last_err
+
+
 # Inicializa DB e escaneia pasta na startup
 init_db()
 # Hidrata a partir do branch data-generated ANTES do scan, pra que os
@@ -1023,7 +1051,7 @@ def api_revisar(slug):
 
     try:
         client = _anthropic_lib.Anthropic(api_key=ANTHROPIC_API_KEY)
-        resp   = client.messages.create(
+        resp   = claude_call_with_retry(client,
             model="claude-sonnet-4-5", max_tokens=5000,
             system=SYSTEM_REVISAO,
             messages=[{"role": "user", "content": prompt}]
@@ -1243,7 +1271,7 @@ def api_revisar_preview(slug):
 
     try:
         client = _anthropic_lib.Anthropic(api_key=ANTHROPIC_API_KEY)
-        resp = client.messages.create(
+        resp = claude_call_with_retry(client,
             model="claude-sonnet-4-5", max_tokens=5000,
             system=SYSTEM_REVISAO_PREVIEW,
             messages=[{"role": "user", "content": prompt}]
@@ -1801,7 +1829,7 @@ def api_gerar():
 
     try:
         client = _anthropic_lib.Anthropic(api_key=ANTHROPIC_API_KEY)
-        resp   = client.messages.create(
+        resp   = claude_call_with_retry(client,
             model="claude-sonnet-4-5", max_tokens=6000,
             system=SYSTEM,
             messages=[{"role": "user", "content": prompt}]
@@ -2116,7 +2144,7 @@ def api_hooks(slug):
 
     try:
         client = _anthropic_lib.Anthropic(api_key=ANTHROPIC_API_KEY)
-        resp = client.messages.create(
+        resp = claude_call_with_retry(client,
             model="claude-sonnet-4-5", max_tokens=2500,
             system=SYSTEM,
             messages=[{"role": "user", "content": prompt}],
@@ -2133,6 +2161,11 @@ def api_hooks(slug):
     except json.JSONDecodeError as e:
         return jsonify({"error": f"Resposta inválida do Claude: {e}"}), 500
     except Exception as e:
+        msg = str(e)
+        if "overloaded" in msg.lower() or "529" in msg:
+            return jsonify({"error": "A API do Claude está sobrecarregada agora (529). Tente em 1-2 min."}), 503
+        if "rate_limit" in msg.lower() or "429" in msg:
+            return jsonify({"error": "Limite de requests atingido. Aguarde um minuto."}), 429
         return jsonify({"error": str(e)}), 500
 
 
