@@ -1300,10 +1300,15 @@ async function captureCard(){
   const hideEls=Array.from(document.querySelectorAll(
     '.card-dots-row,.card-footer,#imgCtrlPanel,.img-overlay-btn,'+
     '.profile-edit-panel,.img-resize-handle,.img-placeholder,'+
-    '.gap-handle'
+    '.gap-handle,#cardDeleteImgBtn'
   ));
-  const prevDisplay=hideEls.map(el=>el.style.display);
-  hideEls.forEach(el=>{el.style.display='none';});
+  // Salva display anterior + priority (botao X usa !important via cssText)
+  const prevDisplay=hideEls.map(el=>({
+    val: el.style.getPropertyValue('display'),
+    pri: el.style.getPropertyPriority('display')
+  }));
+  // Usa setProperty com 'important' pra sobrescrever cssText !important
+  hideEls.forEach(el=>{el.style.setProperty('display','none','important');});
   const origStyle={};
   ['borderRadius','boxShadow','border','width','maxWidth','height','minHeight','maxHeight','marginBottom'].forEach(k=>{origStyle[k]=card.style[k];});
   card.style.borderRadius='0';card.style.boxShadow='none';card.style.border='none';
@@ -1334,7 +1339,11 @@ async function captureCard(){
     });
     return canvas;
   }finally{
-    hideEls.forEach((el,i)=>{el.style.display=prevDisplay[i];});
+    hideEls.forEach((el,i)=>{
+      const p=prevDisplay[i];
+      if(p.val){el.style.setProperty('display',p.val,p.pri||'');}
+      else{el.style.removeProperty('display');}
+    });
     Object.keys(origStyle).forEach(k=>{card.style[k]=origStyle[k];});
     if(freeEditWasOn&&imgCont)imgCont.classList.add('free-edit');
   }
