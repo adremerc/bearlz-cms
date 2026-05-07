@@ -1305,28 +1305,39 @@ async function captureCard(){
   // Card: 420x525 px (preview). Export em 2160x2700 (5.14x), que eh a
   // resolucao 2x do tamanho 1080x1350 do Instagram. Boa qualidade pra zoom.
   const CARD_W=420,CARD_H=525,SCALE=2160/CARD_W;
-  // Esconde TUDO que eh UI de edicao no export final.
-  // Inclui: dots, footer, controles de imagem, botao X, profile edit,
-  // handles de resize (cima/baixo) e placeholder "Adicionar imagem"
-  // (quando o slide nao tem imagem, area fica branca em vez de tracejado).
-  const hideEls=Array.from(document.querySelectorAll(
+
+  // ── Elementos pra esconder (display:none — fora do fluxo) ──
+  // Sao itens absolute ou que nao afetam o layout dos vizinhos.
+  const displayNoneEls=Array.from(document.querySelectorAll(
     '.card-dots-row,.card-footer,#imgCtrlPanel,.img-overlay-btn,'+
     '.profile-edit-panel,.img-resize-handle,.img-placeholder,'+
-    '.gap-handle,#cardDeleteImgBtn'
+    '#cardDeleteImgBtn'
   ));
-  // Salva display anterior + priority (botao X usa !important via cssText)
-  const prevDisplay=hideEls.map(el=>({
+
+  // ── Elementos pra esconder PRESERVANDO LAYOUT (visibility:hidden) ──
+  // .gap-handle pode ter margin-top negativa (do drag) que afeta o
+  // posicionamento da imagem. display:none faria essa margin sumir e
+  // distorcer o export.
+  const visHiddenEls=Array.from(document.querySelectorAll('.gap-handle'));
+
+  const prevDisplay=displayNoneEls.map(el=>({
     val: el.style.getPropertyValue('display'),
     pri: el.style.getPropertyPriority('display')
   }));
-  // Usa setProperty com 'important' pra sobrescrever cssText !important
-  hideEls.forEach(el=>{el.style.setProperty('display','none','important');});
+  displayNoneEls.forEach(el=>{el.style.setProperty('display','none','important');});
+
+  const prevVis=visHiddenEls.map(el=>el.style.visibility);
+  visHiddenEls.forEach(el=>{el.style.visibility='hidden';});
+
   const origStyle={};
-  ['borderRadius','boxShadow','border','width','maxWidth','height','minHeight','maxHeight','marginBottom'].forEach(k=>{origStyle[k]=card.style[k];});
+  ['borderRadius','boxShadow','border','width','maxWidth','height','minHeight','maxHeight','marginBottom','overflow'].forEach(k=>{origStyle[k]=card.style[k];});
   card.style.borderRadius='0';card.style.boxShadow='none';card.style.border='none';
   card.style.width=CARD_W+'px';card.style.maxWidth=CARD_W+'px';
   card.style.height=CARD_H+'px';card.style.minHeight=CARD_H+'px';card.style.maxHeight=CARD_H+'px';
   card.style.marginBottom='0';
+  // Forca overflow:hidden pra clipar elementos com imgMarginTop muito
+  // negativo ou imgH grande que extrapolam (sao o que aparece distorcido)
+  card.style.overflow='hidden';
   // Remove temporariamente classe free-edit (grade 3x3 + tooltip) durante o export
   const imgCont=document.getElementById('imgContainer');
   const freeEditWasOn=imgCont&&imgCont.classList.contains('free-edit');
@@ -1351,11 +1362,12 @@ async function captureCard(){
     });
     return canvas;
   }finally{
-    hideEls.forEach((el,i)=>{
+    displayNoneEls.forEach((el,i)=>{
       const p=prevDisplay[i];
       if(p.val){el.style.setProperty('display',p.val,p.pri||'');}
       else{el.style.removeProperty('display');}
     });
+    visHiddenEls.forEach((el,i)=>{el.style.visibility=prevVis[i]||'';});
     Object.keys(origStyle).forEach(k=>{card.style[k]=origStyle[k];});
     if(freeEditWasOn&&imgCont)imgCont.classList.add('free-edit');
   }
