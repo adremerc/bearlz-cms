@@ -448,7 +448,7 @@
     toast(`Hook "${v.tipo}" aplicado no slide 1`);
   }
 
-  // ── Galeria: modal renderizado no parent ──
+  // ── Galeria: modal renderizado no parent (com busca Pexels) ──
   function openParentGallery(images){
     let m = document.getElementById('parentGalleryModal');
     if (!m) {
@@ -460,39 +460,71 @@
         <div style="background:#fff;border-radius:14px;max-width:920px;width:100%;margin:0 auto;padding:18px 22px;display:flex;flex-direction:column;gap:14px;font-family:'Open Sans',sans-serif">
           <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f0f0f0;padding-bottom:8px">
             <div>
-              <strong style="font-size:15px;color:#111">Imagens extraídas dos links</strong>
-              <p style="font-size:11px;color:#6b7280;margin:2px 0 0">Clique numa imagem pra aplicar no slide atual</p>
+              <strong style="font-size:15px;color:#111">Galeria de imagens</strong>
+              <p style="font-size:11px;color:#6b7280;margin:2px 0 0">Imagens dos links + busca Pexels. Clique numa pra aplicar.</p>
             </div>
             <button onclick="document.getElementById('parentGalleryModal').style.display='none'" style="background:none;border:none;font-size:24px;cursor:pointer;color:#999;line-height:1;padding:0 6px">×</button>
           </div>
-          <div id="parentGalleryGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;max-height:70vh;overflow-y:auto"></div>
+          <div style="display:flex;gap:8px">
+            <input id="pexelsSearchInput" type="text" placeholder="Buscar no Pexels (ex: bitcoin, brazilian flag, stock market)..." style="flex:1;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;outline:none">
+            <button id="pexelsSearchBtn" style="padding:8px 16px;background:#1d9bf0;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px">Buscar</button>
+          </div>
+          <div id="parentGalleryGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;max-height:60vh;overflow-y:auto;min-height:200px"></div>
         </div>`;
       document.body.appendChild(m);
-    }
-    const grid = document.getElementById('parentGalleryGrid');
-    if (!images || images.length === 0) {
-      grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;padding:40px;color:#888;font-size:13px">Nenhuma imagem extraída dos links.</p>';
-    } else {
-      grid.innerHTML = images.map((im, i) => `
-        <div data-url="${im.url_imagem.replace(/"/g, '&quot;')}" style="cursor:pointer;border:2px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#f9fafb;transition:border-color .15s,transform .1s">
-          <img src="${im.url_imagem}" loading="lazy" style="width:100%;height:140px;object-fit:cover;display:block">
-        </div>
-      `).join('');
-      grid.querySelectorAll('[data-url]').forEach(d => {
-        d.onmouseenter = () => { d.style.borderColor = '#1d9bf0'; d.style.transform = 'scale(1.02)'; };
-        d.onmouseleave = () => { d.style.borderColor = '#e5e7eb'; d.style.transform = ''; };
-        d.onclick = () => {
-          const url = d.dataset.url;
-          const iframe = document.getElementById('carrossel-frame');
-          if (iframe && iframe.contentWindow) {
-            iframe.contentWindow.postMessage({type: 'bearlz-gallery-apply', url: url}, '*');
+      // Wire up busca Pexels
+      const inp = document.getElementById('pexelsSearchInput');
+      const btn = document.getElementById('pexelsSearchBtn');
+      const doSearch = async () => {
+        const q = inp.value.trim();
+        if (!q) return;
+        const grid = document.getElementById('parentGalleryGrid');
+        grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;padding:40px;color:#888;font-size:13px">Buscando no Pexels...</p>';
+        try {
+          const r = await fetch('/api/pexels/search?q=' + encodeURIComponent(q));
+          const d = await r.json();
+          if (d.ok && d.fotos && d.fotos.length) {
+            _renderGalleryGrid(d.fotos.map(f => ({url_imagem: f.url})));
+          } else {
+            grid.innerHTML = `<p style="grid-column:1/-1;text-align:center;padding:40px;color:#888;font-size:13px">Nenhum resultado: ${d.error||q}</p>`;
           }
-          m.style.display = 'none';
-          toast('Imagem aplicada no slide');
-        };
-      });
+        } catch(e) {
+          grid.innerHTML = `<p style="grid-column:1/-1;text-align:center;padding:40px;color:#c33;font-size:13px">Erro: ${e.message}</p>`;
+        }
+      };
+      btn.onclick = doSearch;
+      inp.onkeydown = (e) => { if (e.key === 'Enter') doSearch(); };
     }
+    _renderGalleryGrid(images || []);
     m.style.display = 'block';
+    setTimeout(() => { const i = document.getElementById('pexelsSearchInput'); if (i) i.focus(); }, 100);
+  }
+
+  function _renderGalleryGrid(images){
+    const grid = document.getElementById('parentGalleryGrid');
+    if (!grid) return;
+    if (!images || images.length === 0) {
+      grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;padding:40px;color:#888;font-size:13px">Nenhuma imagem dos links. Use a busca acima pra procurar no Pexels.</p>';
+      return;
+    }
+    grid.innerHTML = images.map((im, i) => `
+      <div data-url="${im.url_imagem.replace(/"/g, '&quot;')}" style="cursor:pointer;border:2px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#f9fafb;transition:border-color .15s,transform .1s">
+        <img src="${im.url_imagem}" loading="lazy" style="width:100%;height:140px;object-fit:cover;display:block">
+      </div>
+    `).join('');
+    grid.querySelectorAll('[data-url]').forEach(d => {
+      d.onmouseenter = () => { d.style.borderColor = '#1d9bf0'; d.style.transform = 'scale(1.02)'; };
+      d.onmouseleave = () => { d.style.borderColor = '#e5e7eb'; d.style.transform = ''; };
+      d.onclick = () => {
+        const url = d.dataset.url;
+        const iframe = document.getElementById('carrossel-frame');
+        if (iframe && iframe.contentWindow) {
+          iframe.contentWindow.postMessage({type: 'bearlz-gallery-apply', url: url}, '*');
+        }
+        document.getElementById('parentGalleryModal').style.display = 'none';
+        toast('Imagem aplicada no slide');
+      };
+    });
   }
 
   // Listener pras mensagens do iframe

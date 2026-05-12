@@ -958,7 +958,7 @@ NEGRITOS — use de 2 a 4 por slide:
 - Pode incluir dados numéricos em negrito: **9%**, **R$ 1,2 trilhão**, **maior alta em 10 anos**
 - NUNCA negrite frases longas, períodos inteiros ou parágrafos completos
 
-TAMANHO: 200-280 chars ideal, 310 MAX. Slides maiores caem fora do limite do Instagram. Divida em 2 se exceder. Corte adjetivos e redundancia pra ficar abaixo de 310.
+TAMANHO: 180-420 chars por slide. Varie pra criar ritmo (uns curtos 220-260, outros maiores 320-400). NUNCA acima de 420 (cai fora do limite Instagram).
 
 RETORNE SOMENTE JSON VÁLIDO:
 {"slides": ["texto do slide 1", "texto do slide 2", ...]}
@@ -1222,7 +1222,7 @@ VOZ E REGRAS:
 - NUNCA use enchimento: "vale destacar", "é importante ressaltar", "cabe destacar"
 - Sem emoji, sem hashtag
 - 2 a 4 negritos por slide (**palavra**) com numeros/expressoes de impacto
-- TAMANHO: 200-280 chars ideal, 310 MAX por slide (slides maiores extrapolam o limite do Instagram 1080x1350)
+- TAMANHO: 180-420 chars. Varie entre curtos (220-260) e maiores (320-400) pra criar ritmo. 420 eh limite absoluto.
 - Se exigir mais espaco, NAO comprima — divida em 2 slides
 
 FORMATO DA RESPOSTA — REGRA CRITICA:
@@ -1399,14 +1399,17 @@ SYSTEM_GERAR_DEFAULT = (
     "- Pode incluir dados numéricos em negrito: **9%**, **R$ 1,2 trilhão**, **maior alta em 10 anos**\n"
     "- NUNCA negrite frases longas, períodos inteiros ou parágrafos completos\n\n"
 
-    "TAMANHO — REGRA OBRIGATÓRIA E RIGOROSA:\n"
-    "- IDEAL: 200 a 280 caracteres por slide (conta espaços e quebras)\n"
-    "- LIMITE MÁXIMO ABSOLUTO: 310 caracteres por slide\n"
-    "- Slides com 310+ chars caem fora do post no Instagram (1080x1350)\n"
-    "- Se um ponto exige mais espaço, DIVIDA em 2 slides separados\n"
-    "- NÃO concentre tudo num slide só, prefira sempre mais slides curtos\n"
-    "- Re-leia cada slide ANTES de finalizar e CORTE adjetivos, redundancia\n"
-    "  e conectores supérfluos pra ficar abaixo de 310 chars\n\n"
+    "TAMANHO — VARIAR PRA CRIAR RITMO:\n"
+    "- Range permitido: 180 a 420 caracteres por slide\n"
+    "- INTERCALE tamanhos pra criar ritmo de leitura natural:\n"
+    "  * Hook (slide 1): 200-280 chars (impacto, vai direto)\n"
+    "  * Desenvolvimento (slides do meio): MISTURAR — alguns 220-280\n"
+    "    curtos pra impacto, outros 320-400 pra desenvolver ideia\n"
+    "  * Slide final/CTA: 280-380 chars (fecha o raciocinio)\n"
+    "- NAO faca todos do mesmo tamanho — fica monotono\n"
+    "- LIMITE ABSOLUTO: 420 chars (acima cai fora do post 1080x1350)\n"
+    "- Slides com numero/dado especifico podem ser mais CURTOS (220-260)\n"
+    "- Slides com argumento/contexto podem ser mais LONGOS (320-400)\n\n"
 
     "QUEBRA DE PARÁGRAFOS — REGRA OBRIGATÓRIA:\n"
     "- Cada slide DEVE ter 2 ou 3 parágrafos separados por LINHA EM BRANCO\n"
@@ -1505,7 +1508,7 @@ def _ensure_paragraphs(text: str) -> str:
             paragraphs.append(" ".join(current))
     return "\n\n".join(paragraphs) if len(paragraphs) > 1 else text
 
-MAX_SLIDE_CHARS = 310
+MAX_SLIDE_CHARS = 420
 
 def _truncar_slide_se_grande(text: str, max_chars: int = MAX_SLIDE_CHARS) -> str:
     """Se passar do limite, trunca de forma inteligente: tenta cortar no
@@ -1857,6 +1860,40 @@ def _pexels_search(query: str, used_ids: set, orientation: str = "portrait", n: 
 def pagina_gerar():
     has_key = bool(ANTHROPIC_API_KEY and ANTHROPIC_API_KEY.startswith("sk-ant-api"))
     return render_template("gerar.html", has_key=has_key)
+
+
+@app.route("/api/pexels/search", methods=["GET"])
+def api_pexels_search():
+    """Busca fotos no Pexels pra galeria do viewer. Retorna 12 fotos."""
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return jsonify({"error": "query obrigatoria"}), 400
+    if not PEXELS_API_KEY:
+        return jsonify({"error": "PEXELS_API_KEY nao configurada"}), 400
+    try:
+        import requests as _req
+        r = _req.get(
+            "https://api.pexels.com/v1/search",
+            params={"query": q, "per_page": 12, "orientation": "portrait"},
+            headers={"Authorization": PEXELS_API_KEY},
+            timeout=10
+        )
+        if r.status_code != 200:
+            return jsonify({"error": f"Pexels {r.status_code}"}), r.status_code
+        data = r.json()
+        fotos = []
+        for p in data.get("photos", []):
+            src = p.get("src", {})
+            url = src.get("portrait") or src.get("large") or src.get("original")
+            if url:
+                fotos.append({
+                    "url": url,
+                    "thumb": src.get("medium") or url,
+                    "photographer": p.get("photographer", ""),
+                })
+        return jsonify({"ok": True, "fotos": fotos})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/gerar/system-prompt", methods=["GET"])
@@ -2220,7 +2257,7 @@ def api_hooks(slug):
         "   janela de entrada ainda está aberta.'\n\n"
 
         "REGRAS INEGOCIÁVEIS:\n"
-        "- 200-280 chars ideal por hook, 310 MAX (acima disso, cai fora do post no Instagram)\n"
+        "- TAMANHO: 220-380 chars por hook (slide 1 pode ser mais curto pra impacto). MAX 420.\n"
         "- 2 a 4 negritos (**palavra**) com palavras-chave, números ou expressões de impacto\n"
         "- NUNCA use travessão (—) em hipótese alguma\n"
         "- Sem frases picotadas estilo IA: 'Queda. Alta. Oportunidade.' é proibido\n"

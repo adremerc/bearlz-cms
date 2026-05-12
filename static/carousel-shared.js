@@ -1470,13 +1470,13 @@ function _ensureGalleryButton(){
   const footerActions=document.querySelector('.footer-actions');
   if(!footerActions)return false;
   const imgs=window.EXTRACTED_IMAGES||[];
-  if(imgs.length===0)return true; // nao mostra botao se nao tem imgs
   const btn=document.createElement('button');
   btn.id='btnGaleria';
   btn.className='footer-btn';
-  btn.textContent=`🖼 Galeria (${imgs.length})`;
-  btn.title='Imagens extraídas dos links do brief original — clique numa pra aplicar no slide atual';
-  btn.style.color='#059669'; // verde pra destacar
+  // Mostra sempre — se tem links, mostra contador; senao, soh "Galeria"
+  btn.textContent=imgs.length>0?`🖼 Galeria (${imgs.length})`:'🖼 Galeria';
+  btn.title='Imagens extraídas dos links + busca no Pexels';
+  btn.style.color='#059669';
   btn.addEventListener('click',function(e){
     e.preventDefault();e.stopPropagation();
     _abrirGaleriaModal();
