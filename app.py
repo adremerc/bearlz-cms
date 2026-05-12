@@ -958,7 +958,7 @@ NEGRITOS — use de 2 a 4 por slide:
 - Pode incluir dados numéricos em negrito: **9%**, **R$ 1,2 trilhão**, **maior alta em 10 anos**
 - NUNCA negrite frases longas, períodos inteiros ou parágrafos completos
 
-TAMANHO: 280 a 420 caracteres por slide. Se um ponto exige mais espaço, DIVIDA em 2 slides. NUNCA comprima — divida.
+TAMANHO: 200-280 chars ideal, 310 MAX. Slides maiores caem fora do limite do Instagram. Divida em 2 se exceder. Corte adjetivos e redundancia pra ficar abaixo de 310.
 
 RETORNE SOMENTE JSON VÁLIDO:
 {"slides": ["texto do slide 1", "texto do slide 2", ...]}
@@ -1222,7 +1222,7 @@ VOZ E REGRAS:
 - NUNCA use enchimento: "vale destacar", "é importante ressaltar", "cabe destacar"
 - Sem emoji, sem hashtag
 - 2 a 4 negritos por slide (**palavra**) com numeros/expressoes de impacto
-- 280 a 420 caracteres por slide
+- TAMANHO: 200-280 chars ideal, 310 MAX por slide (slides maiores extrapolam o limite do Instagram 1080x1350)
 - Se exigir mais espaco, NAO comprima — divida em 2 slides
 
 FORMATO DA RESPOSTA — REGRA CRITICA:
@@ -1399,8 +1399,14 @@ SYSTEM_GERAR_DEFAULT = (
     "- Pode incluir dados numéricos em negrito: **9%**, **R$ 1,2 trilhão**, **maior alta em 10 anos**\n"
     "- NUNCA negrite frases longas, períodos inteiros ou parágrafos completos\n\n"
 
-    "TAMANHO: 280 a 420 caracteres por slide. "
-    "Se um ponto exige mais espaço, DIVIDA em 2 slides. NUNCA comprima, divida.\n\n"
+    "TAMANHO — REGRA OBRIGATÓRIA E RIGOROSA:\n"
+    "- IDEAL: 200 a 280 caracteres por slide (conta espaços e quebras)\n"
+    "- LIMITE MÁXIMO ABSOLUTO: 310 caracteres por slide\n"
+    "- Slides com 310+ chars caem fora do post no Instagram (1080x1350)\n"
+    "- Se um ponto exige mais espaço, DIVIDA em 2 slides separados\n"
+    "- NÃO concentre tudo num slide só, prefira sempre mais slides curtos\n"
+    "- Re-leia cada slide ANTES de finalizar e CORTE adjetivos, redundancia\n"
+    "  e conectores supérfluos pra ficar abaixo de 310 chars\n\n"
 
     "QUEBRA DE PARÁGRAFOS — REGRA OBRIGATÓRIA:\n"
     "- Cada slide DEVE ter 2 ou 3 parágrafos separados por LINHA EM BRANCO\n"
@@ -1418,9 +1424,18 @@ SYSTEM_GERAR_DEFAULT = (
     "- 'chart': slides com dados numéricos comparáveis (inclua chart_data com labels, values, unit, highlight)\n"
     "  chart_type: 'bar' (comparação entre categorias), 'horizontal_bar' (rankings), 'line' (evolução temporal)\n"
     "  highlight: true no ponto mais importante do gráfico\n"
-    "- 'photo': slides de contexto, hook ou implicação (inclua photo_topic em inglês específico e visual)\n"
-    "  photo_topic deve ser descritivo: 'US dollar bills close-up' NÃO 'money'\n"
-    "  USE photo_topic ÚNICO POR SLIDE — nunca repita o mesmo tópico em 2 slides do mesmo carrossel\n\n"
+    "- 'photo': slides de contexto, hook ou implicação (inclua photo_topic em inglês específico)\n"
+    "  REGRAS pro photo_topic (busca Pexels):\n"
+    "  * 2-4 palavras CONCRETAS e VISUAIS, em inglês\n"
+    "  * Especifico ao DADO mencionado no slide, nao generico\n"
+    "  * BOM: 'Brazilian flag stock market trader', 'US dollar bills hand counting',\n"
+    "    'wind turbines green energy field', 'silicon chip semiconductor close-up',\n"
+    "    'oil refinery industrial sunset', 'Brazilian congress brasilia government'\n"
+    "  * RUIM: 'money', 'business', 'people working', 'economy', 'office'\n"
+    "  * Use o SUBSTANTIVO mais importante do slide + 1 modificador visual\n"
+    "  * UNICO por slide (nao repete tema entre slides)\n"
+    "  - photo_topic_alt: 2-3 palavras alternativas se a primeira nao retornar\n"
+    "    (Pexels pode nao ter exatamente o que voce pediu)\n\n"
 
     "IMAGENS DOS LINKS — IMPORTANTE:\n"
     "- Se o brief tiver bloco [IMAGENS DISPONÍVEIS DOS LINKS], significa que os artigos\n"
@@ -1437,7 +1452,7 @@ SYSTEM_GERAR_DEFAULT = (
     '{"titulo":"...","slides":[{"texto":"...","tema":"bitcoin|economia|mercado|geopolitica|ia|tecnologia",'
     '"image_type":"chart|photo","chart_title":"...","chart_type":"bar|horizontal_bar|line",'
     '"chart_data":[{"label":"...","value":0,"unit":"%","highlight":false}],'
-    '"photo_topic":"...",'
+    '"photo_topic":"...","photo_topic_alt":"...",'
     '"image_from_link":null}]}'
 )
 
@@ -1590,10 +1605,15 @@ def _jina_fetch(url: str, max_chars: int = 4000):
         imgs_clean, seen = [], set()
         for u in imgs:
             if u in seen: continue
-            if any(skip in u.lower() for skip in
-                   ["logo","avatar","icon","pixel","tracking","blank.","1x1","spacer"]):
+            low = u.lower()
+            if any(skip in low for skip in [
+                "logo","avatar","icon","pixel","tracking","blank.","1x1","spacer",
+                "/profile/","/ad/","/ads/","advert","banner","/social/","/share/",
+                "facebook","twitter","linkedin","instagram","/emoji/","/sprite/","/ui/",
+                "_small.","_thumb.","thumbnail-small"
+            ]):
                 continue
-            if u.lower().endswith((".gif",".svg")):
+            if low.endswith((".gif",".svg",".ico")):
                 continue
             seen.add(u); imgs_clean.append(u)
         # Markdown -> texto puro
@@ -1604,7 +1624,7 @@ def _jina_fetch(url: str, max_chars: int = 4000):
         text = re.sub(r'\n{3,}', '\n\n', text).strip()
         if len(text) < 80:
             return None
-        return {"text": text[:max_chars], "images": imgs_clean[:6]}
+        return {"text": text[:max_chars], "images": imgs_clean[:4]}
     except Exception:
         return None
 
@@ -1662,27 +1682,48 @@ def _fetch_url_text(url: str, max_chars: int = 4000):
             tw_url = urljoin(url, tw["content"])
             if tw_url not in candidate_images:
                 candidate_images.append(tw_url)
-        # 3. <img> dentro de article/main
+        # 3. <img> dentro de article/main — com filtros rigorosos
         article_root = soup.find("article") or soup.find("main") or soup.body
         if article_root:
-            for img in article_root.find_all("img", limit=20):
+            for img in article_root.find_all("img", limit=30):
                 src = img.get("src") or img.get("data-src") or img.get("data-original")
                 if not src:
                     continue
                 full = urljoin(url, src)
-                # Filtra ruidos comuns: logos, avatars, icones, pixels de tracking, gifs animados
-                if any(skip in full.lower() for skip in [
-                    "logo", "avatar", "icon", "pixel", "tracking",
-                    "blank.", "1x1", "spacer", "/ad/", "/ads/", "advert",
-                    "thumbnail-small", "_small.", "_thumb."
+                low = full.lower()
+                # Filtro 1: palavras-chave de ruido na URL
+                if any(skip in low for skip in [
+                    "logo", "avatar", "icon", "pixel", "tracking", "/profile/",
+                    "blank.", "1x1", "spacer", "/ad/", "/ads/", "advert", "banner",
+                    "thumbnail-small", "_small.", "_thumb.", "/social/", "/share/",
+                    "facebook", "twitter", "linkedin", "instagram",
+                    "/emoji/", "/sprite/", "/ui/",
                 ]):
                     continue
-                if full.lower().endswith((".gif", ".svg")):
+                # Filtro 2: formato ruim
+                if low.endswith((".gif", ".svg", ".ico")):
+                    continue
+                # Filtro 3: dimensoes pequenas (width/height attrs ou class)
+                w = img.get("width") or "0"
+                h = img.get("height") or "0"
+                try:
+                    w_n = int(str(w).replace("px","").split(".")[0])
+                    h_n = int(str(h).replace("px","").split(".")[0])
+                    if w_n and w_n < 200: continue  # pequena demais
+                    if h_n and h_n < 200: continue
+                except (ValueError, TypeError):
+                    pass
+                # Filtro 4: classes/alt suspeitos
+                cls = " ".join(img.get("class", [])).lower()
+                alt = (img.get("alt") or "").lower()
+                if any(s in cls for s in ["avatar", "logo", "icon", "thumb", "thumbnail"]):
+                    continue
+                if any(s in alt for s in ["avatar", "logo do", "ícone", "compartilhar"]):
                     continue
                 if full not in candidate_images:
                     candidate_images.append(full)
-        # max 6 imagens por URL (evita estourar contexto do prompt)
-        candidate_images = candidate_images[:6]
+        # max 4 imagens por URL (era 6) — menos ruido, mais foco no que importa
+        candidate_images = candidate_images[:4]
 
         # ── Texto principal ─────────────────────────────────────────────────
         for tag in soup(["script", "style", "nav", "footer", "aside",
@@ -1923,12 +1964,16 @@ def api_gerar():
                         + "&width=1080&height=520&backgroundColor=white&version=2"
                     )
             # ── PRIORIDADE 2: Pexels API por photo_topic (foto unica por slide) ──
+            # Tenta principal, depois alt, depois variacao com 1 palavra-chave do tema
             if not img:
                 photo_topic = (s.get("photo_topic") or "").strip()
-                if photo_topic:
-                    pexels_url = _pexels_search(photo_topic, used_pexels_ids)
+                photo_topic_alt = (s.get("photo_topic_alt") or "").strip()
+                for query in [photo_topic, photo_topic_alt]:
+                    if not query: continue
+                    pexels_url = _pexels_search(query, used_pexels_ids)
                     if pexels_url:
                         img = pexels_url
+                        break
             # ── PRIORIDADE 3: Pexels API por tema (fallback se topic vazio/falhou) ──
             if not img and PEXELS_API_KEY:
                 tema_query = {
@@ -2139,7 +2184,7 @@ def api_hooks(slug):
         "   janela de entrada ainda está aberta.'\n\n"
 
         "REGRAS INEGOCIÁVEIS:\n"
-        "- 280 a 420 caracteres por hook\n"
+        "- 200-280 chars ideal por hook, 310 MAX (acima disso, cai fora do post no Instagram)\n"
         "- 2 a 4 negritos (**palavra**) com palavras-chave, números ou expressões de impacto\n"
         "- NUNCA use travessão (—) em hipótese alguma\n"
         "- Sem frases picotadas estilo IA: 'Queda. Alta. Oportunidade.' é proibido\n"
