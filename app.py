@@ -1505,10 +1505,41 @@ def _ensure_paragraphs(text: str) -> str:
             paragraphs.append(" ".join(current))
     return "\n\n".join(paragraphs) if len(paragraphs) > 1 else text
 
+MAX_SLIDE_CHARS = 310
+
+def _truncar_slide_se_grande(text: str, max_chars: int = MAX_SLIDE_CHARS) -> str:
+    """Se passar do limite, trunca de forma inteligente: tenta cortar no
+    final do ultimo paragrafo completo. Se nao der, corta no final da
+    ultima frase. Ultimo recurso: corta no caractere."""
+    if not text or len(text) <= max_chars:
+        return text
+    # 1. Tenta cortar no fim do ultimo paragrafo (\n\n) que cabe
+    paras = text.split("\n\n")
+    acumulado = ""
+    for p in paras:
+        candidato = (acumulado + "\n\n" + p).strip() if acumulado else p
+        if len(candidato) > max_chars:
+            break
+        acumulado = candidato
+    if acumulado and len(acumulado) >= max_chars // 2:
+        return acumulado.strip()
+    # 2. Corta no fim da ultima frase completa (. ! ?) que cabe
+    sub = text[:max_chars]
+    for sep in (". ", "! ", "? ", ".", "!", "?"):
+        idx = sub.rfind(sep)
+        if idx > max_chars // 2:
+            return sub[:idx+1].strip()
+    # 3. Ultimo recurso: corta na ultima palavra completa
+    sub = text[:max_chars].rsplit(" ", 1)[0]
+    return sub.strip()
+
 def _sanitizar_slide(text: str) -> str:
-    """Pipeline completo: tira travessao + garante quebras de paragrafo."""
+    """Pipeline completo: tira travessao, garante paragrafos, trunca se >310.
+    Ordem importa: truncar POR ULTIMO pra que adicao de \\n\\n nao estoure
+    o limite depois do corte."""
     text = _strip_em_dash(text or "")
     text = _ensure_paragraphs(text)
+    text = _truncar_slide_se_grande(text)
     return text
 
 
@@ -1789,30 +1820,35 @@ def _processar_brief_com_urls(brief: str):
 # Usa o photo_topic gerado pelo Claude pra cada slide pra buscar foto unica
 # em vez de rotacionar 3 IDs hardcoded por tema.
 
-def _pexels_search(query: str, used_ids: set, orientation: str = "portrait", n: int = 15):
-    """Busca foto no Pexels matching `query`, retorna URL da primeira foto
-    cujo ID nao esteja em `used_ids`. None se falhar ou nao tiver chave."""
+def _pexels_search(query: str, used_ids: set, orientation: str = "portrait", n: int = 30):
+    """Busca foto no Pexels matching `query`, ESCOLHE ALEATORIAMENTE entre as
+    fotos disponiveis pra evitar que multiplos posts sobre o mesmo tema peguem
+    sempre a foto top 1. n maior = mais variedade."""
     if not PEXELS_API_KEY:
         return None
     try:
         import requests as _req
+        import random as _rand
+        # Pagina aleatoria (1-3) tambem ajuda a diversificar entre posts
+        page = _rand.randint(1, 3)
         r = _req.get(
             "https://api.pexels.com/v1/search",
-            params={"query": query, "per_page": n, "orientation": orientation},
+            params={"query": query, "per_page": n, "page": page, "orientation": orientation},
             headers={"Authorization": PEXELS_API_KEY},
             timeout=8
         )
         if r.status_code != 200:
             return None
         data = r.json()
-        for photo in data.get("photos", []):
-            pid = photo.get("id")
-            if pid and pid not in used_ids:
-                used_ids.add(pid)
-                # Prioriza 'portrait' (1080x1620) que casa com proporcao do slide
-                src = photo.get("src", {})
-                return src.get("portrait") or src.get("large") or src.get("original")
-        return None
+        photos = [p for p in data.get("photos", []) if p.get("id") and p["id"] not in used_ids]
+        if not photos:
+            return None
+        # Pega aleatoriamente entre as 15 primeiras disponiveis (qualidade ~ topo
+        # mas com variedade pra evitar todos os posts pegarem a mesma foto)
+        candidate = _rand.choice(photos[:15])
+        used_ids.add(candidate["id"])
+        src = candidate.get("src", {})
+        return src.get("portrait") or src.get("large") or src.get("original")
     except Exception:
         return None
 
