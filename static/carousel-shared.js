@@ -1462,6 +1462,100 @@ function _retryHookButton(tries){
   setTimeout(()=>_retryHookButton(tries-1),200);
 }
 
+/* ── Galeria das imagens extraidas dos links ──
+   Permite usuario acessar manualmente as fotos que o sistema extraiu
+   dos artigos colados no brief, mesmo que Claude nao tenha usado. */
+function _ensureGalleryButton(){
+  if(document.getElementById('btnGaleria'))return true;
+  const footerActions=document.querySelector('.footer-actions');
+  if(!footerActions)return false;
+  const imgs=window.EXTRACTED_IMAGES||[];
+  if(imgs.length===0)return true; // nao mostra botao se nao tem imgs
+  const btn=document.createElement('button');
+  btn.id='btnGaleria';
+  btn.className='footer-btn';
+  btn.textContent=`🖼 Galeria (${imgs.length})`;
+  btn.title='Imagens extraídas dos links do brief original — clique numa pra aplicar no slide atual';
+  btn.style.color='#059669'; // verde pra destacar
+  btn.addEventListener('click',function(e){
+    e.preventDefault();e.stopPropagation();
+    _abrirGaleriaModal();
+  });
+  footerActions.appendChild(btn);
+  return true;
+}
+function _retryGalleryButton(tries){
+  if(_ensureGalleryButton())return;
+  if(tries<=0)return;
+  setTimeout(()=>_retryGalleryButton(tries-1),200);
+}
+
+function _abrirGaleriaModal(){
+  // Reusa o mesmo padrao do hooks: posta pro parent (que tem mais viewport)
+  // ou renderiza local se standalone
+  const imgs=window.EXTRACTED_IMAGES||[];
+  if(window.parent && window.parent !== window){
+    try{
+      window.parent.postMessage({type:'bearlz-gallery-open',images:imgs},'*');
+      return;
+    }catch(e){console.warn('[Galeria] postMessage falhou',e);}
+  }
+  _galeriaModalLocal(imgs);
+}
+function _galeriaModalLocal(imgs){
+  let m=document.getElementById('galeriaModal');
+  if(!m){
+    m=document.createElement('div');
+    m.id='galeriaModal';
+    m.className='hooks-modal'; // reusa estilo do hooks
+    m.innerHTML=`
+      <div class="hooks-inner" style="max-width:720px">
+        <div class="hooks-head">
+          <strong>Imagens dos links</strong>
+          <button class="hooks-x" onclick="document.getElementById('galeriaModal').classList.remove('active')">×</button>
+        </div>
+        <div id="galeriaBody" class="hooks-body" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"></div>
+      </div>`;
+    document.body.appendChild(m);
+  }
+  const body=document.getElementById('galeriaBody');
+  body.innerHTML=imgs.map((im,i)=>`
+    <div style="cursor:pointer;border:2px solid #e5e7eb;border-radius:8px;overflow:hidden;transition:border-color .15s" data-idx="${i}">
+      <img src="${im.url_imagem}" loading="lazy" style="width:100%;height:120px;object-fit:cover;display:block">
+    </div>
+  `).join('');
+  body.querySelectorAll('[data-idx]').forEach(d=>{
+    d.addEventListener('mouseenter',()=>d.style.borderColor='#1d9bf0');
+    d.addEventListener('mouseleave',()=>d.style.borderColor='#e5e7eb');
+    d.addEventListener('click',()=>{
+      const im=imgs[parseInt(d.dataset.idx,10)];
+      _aplicarImagemDaGaleria(im.url_imagem);
+      m.classList.remove('active');
+    });
+  });
+  m.classList.add('active');
+}
+
+function _aplicarImagemDaGaleria(url){
+  if(!url||!slides[cur])return;
+  const s=slides[cur];
+  s.image=url;
+  s.zoom=1;s.ox=50;s.oy=50;
+  s.imgH=null;s.fit='cover';s.imgNW=null;s.imgNH=null;
+  s.freeX=null;s.freeY=null;
+  if(typeof render==='function')render();
+  if(typeof autoSave==='function')autoSave();
+  if(typeof setStatus==='function')setStatus('✓ Imagem aplicada no slide '+(cur+1));
+  setTimeout(()=>{if(typeof setStatus==='function')setStatus('');},2500);
+}
+// Listener pra receber imagem escolhida do parent (quando renderiza la fora)
+window.addEventListener('message',function(e){
+  if(!e.data||typeof e.data!=='object')return;
+  if(e.data.type==='bearlz-gallery-apply' && e.data.url){
+    _aplicarImagemDaGaleria(e.data.url);
+  }
+});
+
 function _ensureHooksModal(){
   if(document.getElementById('hooksModal'))return;
   const modal=document.createElement('div');
@@ -1607,6 +1701,7 @@ initHydrate();
 // Adiciona botão Hooks no footer apos o DOM estar pronto. Tenta varias vezes
 // caso o footer ainda nao tenha sido renderizado pelo initHydrate.
 setTimeout(()=>_retryHookButton(20),100);
+setTimeout(()=>_retryGalleryButton(20),150);
 // Bind do handle de gap entre texto e imagem (com retry caso DOM nao
 // esteja pronto, ou template antigo precise injetar o handle)
 function _retryGapHandle(tries){

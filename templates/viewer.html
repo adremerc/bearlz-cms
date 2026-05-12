@@ -448,16 +448,66 @@
     toast(`Hook "${v.tipo}" aplicado no slide 1`);
   }
 
+  // ── Galeria: modal renderizado no parent ──
+  function openParentGallery(images){
+    let m = document.getElementById('parentGalleryModal');
+    if (!m) {
+      m = document.createElement('div');
+      m.id = 'parentGalleryModal';
+      m.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99999;padding:24px 16px;overflow-y:auto';
+      m.onclick = (e) => { if (e.target === m) m.style.display = 'none'; };
+      m.innerHTML = `
+        <div style="background:#fff;border-radius:14px;max-width:920px;width:100%;margin:0 auto;padding:18px 22px;display:flex;flex-direction:column;gap:14px;font-family:'Open Sans',sans-serif">
+          <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f0f0f0;padding-bottom:8px">
+            <div>
+              <strong style="font-size:15px;color:#111">Imagens extraídas dos links</strong>
+              <p style="font-size:11px;color:#6b7280;margin:2px 0 0">Clique numa imagem pra aplicar no slide atual</p>
+            </div>
+            <button onclick="document.getElementById('parentGalleryModal').style.display='none'" style="background:none;border:none;font-size:24px;cursor:pointer;color:#999;line-height:1;padding:0 6px">×</button>
+          </div>
+          <div id="parentGalleryGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;max-height:70vh;overflow-y:auto"></div>
+        </div>`;
+      document.body.appendChild(m);
+    }
+    const grid = document.getElementById('parentGalleryGrid');
+    if (!images || images.length === 0) {
+      grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;padding:40px;color:#888;font-size:13px">Nenhuma imagem extraída dos links.</p>';
+    } else {
+      grid.innerHTML = images.map((im, i) => `
+        <div data-url="${im.url_imagem.replace(/"/g, '&quot;')}" style="cursor:pointer;border:2px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#f9fafb;transition:border-color .15s,transform .1s">
+          <img src="${im.url_imagem}" loading="lazy" style="width:100%;height:140px;object-fit:cover;display:block">
+        </div>
+      `).join('');
+      grid.querySelectorAll('[data-url]').forEach(d => {
+        d.onmouseenter = () => { d.style.borderColor = '#1d9bf0'; d.style.transform = 'scale(1.02)'; };
+        d.onmouseleave = () => { d.style.borderColor = '#e5e7eb'; d.style.transform = ''; };
+        d.onclick = () => {
+          const url = d.dataset.url;
+          const iframe = document.getElementById('carrossel-frame');
+          if (iframe && iframe.contentWindow) {
+            iframe.contentWindow.postMessage({type: 'bearlz-gallery-apply', url: url}, '*');
+          }
+          m.style.display = 'none';
+          toast('Imagem aplicada no slide');
+        };
+      });
+    }
+    m.style.display = 'block';
+  }
+
   // Listener pras mensagens do iframe
   window.addEventListener('message', (e) => {
     if (!e.data || typeof e.data !== 'object') return;
     if (e.data.type === 'bearlz-hooks-open') {
       openParentHooks();
+    } else if (e.data.type === 'bearlz-gallery-open') {
+      openParentGallery(e.data.images || []);
     }
   });
   window.openParentHooks    = openParentHooks;
   window.closeParentHooks   = closeParentHooks;
   window.aplicarParentHook  = aplicarParentHook;
+  window.openParentGallery  = openParentGallery;
 
   // ── Timer ─────────────────────────────────────────────────────────────────
 

@@ -1982,6 +1982,20 @@ def api_gerar():
             html = re.sub(r"(?<!window\.CAROUSEL_)LS_KEY='[^']*'",
                           f"LS_KEY='bearlz_{ls_key_slug}_v1'", html)
 
+            # Injeta as imagens extraidas dos links do brief pra usuario poder
+            # acessar via galeria no viewer, mesmo que Claude nao tenha usado.
+            imgs_json = json.dumps(all_images, ensure_ascii=False)
+            inject_imgs = f"window.EXTRACTED_IMAGES={imgs_json};"
+            if "window.EXTRACTED_IMAGES=" in html:
+                html = re.sub(r"window\.EXTRACTED_IMAGES=[^;]*;", inject_imgs, html)
+            else:
+                # Adiciona logo apos CAROUSEL_LS_KEY pra ficar no mesmo bloco
+                html = html.replace(
+                    f"window.CAROUSEL_LS_KEY='bearlz_{ls_key_slug}_v1'",
+                    f"window.CAROUSEL_LS_KEY='bearlz_{ls_key_slug}_v1';\n{inject_imgs}",
+                    1
+                )
+
             # Garante que a foto do Gabriel está embutida (template refatorado ja tem base64,
             # mas se um template antigo ainda tiver avatarDataUrl=null, embutimos aqui)
             avatar_path = BASE_DIR / "static" / "gabriel.png"
