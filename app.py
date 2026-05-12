@@ -1061,8 +1061,12 @@ def api_revisar(slug):
             texto = re.sub(r"^```[a-z]*\n?", "", texto)
             texto = re.sub(r"\n?```$", "", texto).strip()
 
-        alteracoes = json.loads(texto)  # {"1": "novo texto", "2": "igual", ...}
-
+        alteracoes = _parse_claude_json(texto)  # robusto a aspas mal escapadas
+        if alteracoes is None:
+            return jsonify({
+                "error": "Resposta do Claude veio malformada. Tente reformular as instruções.",
+                "raw": texto[:500]
+            }), 500
         if not alteracoes:
             return jsonify({"error": "Claude não retornou alterações"}), 500
 
@@ -1839,7 +1843,12 @@ def api_gerar():
             texto = re.sub(r"^```[a-z]*\n?", "", texto)
             texto = re.sub(r"\n?```$", "", texto).strip()
 
-        dados        = json.loads(texto)
+        dados = _parse_claude_json(texto)  # robusto a JSON malformado
+        if dados is None:
+            return jsonify({
+                "error": "Resposta do Claude veio malformada. Tente novamente.",
+                "raw": texto[:500]
+            }), 500
         slides_raw   = dados.get("slides", [])
         titulo_gerado = dados.get("titulo", topico[:40])
 
@@ -2153,7 +2162,12 @@ def api_hooks(slug):
         if texto.startswith("```"):
             texto = re.sub(r"^```[a-z]*\n?", "", texto)
             texto = re.sub(r"\n?```$", "", texto).strip()
-        dados = json.loads(texto)
+        dados = _parse_claude_json(texto)  # robusto a JSON malformado
+        if dados is None:
+            return jsonify({
+                "error": "Resposta do Claude veio malformada. Tente novamente.",
+                "raw": texto[:500]
+            }), 500
         variantes = dados.get("variantes", [])
         if not isinstance(variantes, list) or len(variantes) != 3:
             return jsonify({"error": "Claude não retornou 3 variantes"}), 500
