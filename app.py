@@ -1716,15 +1716,28 @@ def _jina_fetch(url: str, max_chars: int = 4000):
         # Extrai imagens do markdown: ![alt](url)
         imgs = re.findall(r'!\[[^\]]*\]\(([^)]+)\)', md)
         imgs_clean, seen = [], set()
+        BANNER = [
+            "logo","avatar","icon","pixel","tracking","blank.","1x1","spacer",
+            "/profile/","/ad/","/ads/","advert","banner","/social/","/share/",
+            "facebook","twitter","linkedin","instagram","youtube","/emoji/",
+            "/sprite/","/ui/","_small.","_thumb.","thumbnail-small",
+            # Produtos/cursos/promo
+            "ebook","e-book","curso","course","simulador","simulator",
+            "viver-de-renda","carteira-recomendada","guia-","manual-",
+            "/cta/","/produto/","/promo/","/promotional/","/promocional/",
+            "newsletter-","lead-","lead_","captura","acquisition","acquisiti",
+            "patrocinad","sponsored","publicidade","publi",
+            "lead-magnet","leadmagnet","popup","inline-ad",
+            # Assets do tema do site
+            "/themes/","/wp-content/themes/","/v2/assets/","/assets/img/",
+            "/static/img/","/dist/img/","/build/img/",
+            "badge","selo","stamp","ribbon","/mascot/","mascote",
+            "/author/","/colunista/","/by/","/autor/",
+        ]
         for u in imgs:
             if u in seen: continue
             low = u.lower()
-            if any(skip in low for skip in [
-                "logo","avatar","icon","pixel","tracking","blank.","1x1","spacer",
-                "/profile/","/ad/","/ads/","advert","banner","/social/","/share/",
-                "facebook","twitter","linkedin","instagram","/emoji/","/sprite/","/ui/",
-                "_small.","_thumb.","thumbnail-small"
-            ]):
+            if any(skip in low for skip in BANNER):
                 continue
             if low.endswith((".gif",".svg",".ico")):
                 continue
@@ -1737,7 +1750,7 @@ def _jina_fetch(url: str, max_chars: int = 4000):
         text = re.sub(r'\n{3,}', '\n\n', text).strip()
         if len(text) < 80:
             return None
-        return {"text": text[:max_chars], "images": imgs_clean[:4]}
+        return {"text": text[:max_chars], "images": imgs_clean[:3]}
     except Exception:
         return None
 
@@ -1782,61 +1795,134 @@ def _fetch_url_text(url: str, max_chars: int = 4000):
         from urllib.parse import urljoin
         soup = BeautifulSoup(html_text, "html.parser")
 
-        # ── Extrai imagens candidatas ANTES de remover scripts/header ───────
-        # (precisa de meta tags do head)
+        # ── Extrai imagens candidatas com PRIORIZACAO editorial ───────────
+        # Estrategia: pega apenas conteudo curado, descarta banners/ebooks/promo
         candidate_images = []
-        # 1. og:image (geralmente a melhor)
+
+        # Palavras-chave de RUIDO COMERCIAL/PROMOCIONAL (expandida)
+        BANNER_KEYWORDS = [
+            # Anuncios/banners genericos
+            "logo", "avatar", "icon", "pixel", "tracking", "/profile/",
+            "blank.", "1x1", "spacer", "/ad/", "/ads/", "advert", "banner",
+            "thumbnail-small", "_small.", "_thumb.", "/social/", "/share/",
+            "facebook", "twitter", "linkedin", "instagram", "youtube",
+            "/emoji/", "/sprite/", "/ui/",
+            # Produtos/cursos (capas de ebook, simuladores, etc)
+            "ebook", "e-book", "curso", "course", "simulador", "simulator",
+            "viver-de-renda", "carteira-recomendada", "guia-", "manual-",
+            "/cta/", "/produto/", "/promo/", "/promotional/", "/promocional/",
+            "newsletter-", "lead-", "lead_", "captura", "acquisition", "acquisiti",
+            "patrocinad", "sponsored", "publicidade", "publi",
+            "lead-magnet", "leadmagnet", "popup", "inline-ad",
+            # Assets do tema do site (quase sempre promo/UI, nao conteudo)
+            "/themes/", "/wp-content/themes/", "/v2/assets/", "/assets/img/",
+            "/static/img/", "/dist/img/", "/build/img/",
+            # Selos/badges
+            "badge", "selo", "stamp", "ribbon", "tag-",
+            # Mascots/mascotes que sites usam (XP, BTG, etc geralmente tem mascote)
+            "/mascot/", "mascote",
+            # Author thumbnails (geralmente <60px)
+            "/author/", "/colunista/", "/by/", "/autor/",
+        ]
+
+        # Helper pra filtrar uma URL/elemento
+        def _img_is_garbage(url_low, alt, cls, parent_ctx):
+            if any(s in url_low for s in BANNER_KEYWORDS): return True
+            if url_low.endswith((".gif", ".svg", ".ico", ".webp.gif")): return True
+            # Classe/alt promocional
+            promo_terms = ["avatar", "logo", "icon", "thumb", "thumbnail",
+                           "ad-", "ads-", "advert", "banner", "promo",
+                           "lead", "newsletter", "cta", "sponsor",
+                           "ebook", "course", "curso", "simulador"]
+            if any(s in cls for s in promo_terms): return True
+            if any(s in alt for s in ["avatar", "logo do", "ícone", "compartilhar",
+                                       "ebook", "e-book", "curso", "simulador",
+                                       "patrocin", "publicidade", "anúncio"]):
+                return True
+            # Context: dentro de aside/sidebar/related/promo containers
+            if parent_ctx and any(s in parent_ctx for s in [
+                "sidebar", "aside", "related", "newsletter", "promo",
+                "advertisement", "footer", "header-promo", "lead-form",
+                "recommended", "cta-", "popup"
+            ]):
+                return True
+            return False
+
+        def _check_dimensions(img):
+            """Retorna True se imagem tem dimensoes razoaveis pra ser editorial.
+            Min 400x300, max aspect 3:1 (banners ultra-wide sao ruido)."""
+            w = img.get("width") or "0"
+            h = img.get("height") or "0"
+            try:
+                w_n = int(str(w).replace("px","").split(".")[0])
+                h_n = int(str(h).replace("px","").split(".")[0])
+                if w_n and w_n < 400: return False
+                if h_n and h_n < 300: return False
+                if w_n and h_n and (w_n/h_n > 3 or h_n/w_n > 3): return False
+            except (ValueError, TypeError):
+                pass
+            return True
+
+        # 1. og:image (curada pelo editor, geralmente a hero foto)
         og = soup.find("meta", property="og:image")
         if og and og.get("content"):
-            candidate_images.append(urljoin(url, og["content"]))
-        # 2. twitter:image (fallback se og nao existe)
-        tw = soup.find("meta", attrs={"name": "twitter:image"})
-        if tw and tw.get("content"):
-            tw_url = urljoin(url, tw["content"])
-            if tw_url not in candidate_images:
-                candidate_images.append(tw_url)
-        # 3. <img> dentro de article/main — com filtros rigorosos
+            og_url = urljoin(url, og["content"])
+            if not any(s in og_url.lower() for s in BANNER_KEYWORDS):
+                candidate_images.append(og_url)
+
+        # 2. PRIORIDADE: <figure> com <img> + <figcaption> — sao conteudo
+        #    editorial real, geralmente fotos/graficos/screenshots do artigo
         article_root = soup.find("article") or soup.find("main") or soup.body
         if article_root:
-            for img in article_root.find_all("img", limit=30):
+            for fig in article_root.find_all("figure", limit=10):
+                img = fig.find("img")
+                if not img: continue
+                # figure dentro de aside/sidebar/promo? pula
+                parent_ctx = ""
+                p = fig.parent
+                for _ in range(3):
+                    if p is None: break
+                    parent_ctx += " " + " ".join(p.get("class", [])).lower()
+                    parent_ctx += " " + (p.get("id", "") or "").lower()
+                    p = p.parent
                 src = img.get("src") or img.get("data-src") or img.get("data-original")
-                if not src:
-                    continue
+                if not src: continue
                 full = urljoin(url, src)
                 low = full.lower()
-                # Filtro 1: palavras-chave de ruido na URL
-                if any(skip in low for skip in [
-                    "logo", "avatar", "icon", "pixel", "tracking", "/profile/",
-                    "blank.", "1x1", "spacer", "/ad/", "/ads/", "advert", "banner",
-                    "thumbnail-small", "_small.", "_thumb.", "/social/", "/share/",
-                    "facebook", "twitter", "linkedin", "instagram",
-                    "/emoji/", "/sprite/", "/ui/",
-                ]):
-                    continue
-                # Filtro 2: formato ruim
-                if low.endswith((".gif", ".svg", ".ico")):
-                    continue
-                # Filtro 3: dimensoes pequenas (width/height attrs ou class)
-                w = img.get("width") or "0"
-                h = img.get("height") or "0"
-                try:
-                    w_n = int(str(w).replace("px","").split(".")[0])
-                    h_n = int(str(h).replace("px","").split(".")[0])
-                    if w_n and w_n < 200: continue  # pequena demais
-                    if h_n and h_n < 200: continue
-                except (ValueError, TypeError):
-                    pass
-                # Filtro 4: classes/alt suspeitos
                 cls = " ".join(img.get("class", [])).lower()
                 alt = (img.get("alt") or "").lower()
-                if any(s in cls for s in ["avatar", "logo", "icon", "thumb", "thumbnail"]):
-                    continue
-                if any(s in alt for s in ["avatar", "logo do", "ícone", "compartilhar"]):
-                    continue
+                if _img_is_garbage(low, alt, cls, parent_ctx): continue
+                if not _check_dimensions(img): continue
                 if full not in candidate_images:
                     candidate_images.append(full)
-        # max 4 imagens por URL (era 6) — menos ruido, mais foco no que importa
-        candidate_images = candidate_images[:4]
+
+        # 3. <img> normais dentro do article (sem figure) — so se tiver poucos
+        if article_root and len(candidate_images) < 3:
+            for img in article_root.find_all("img", limit=20):
+                if len(candidate_images) >= 3: break
+                # Pula se ja tem figure pai (ja processado)
+                if img.find_parent("figure"): continue
+                src = img.get("src") or img.get("data-src") or img.get("data-original")
+                if not src: continue
+                full = urljoin(url, src)
+                low = full.lower()
+                cls = " ".join(img.get("class", [])).lower()
+                alt = (img.get("alt") or "").lower()
+                # Pega contexto dos ancestrais
+                parent_ctx = ""
+                p = img.parent
+                for _ in range(3):
+                    if p is None: break
+                    parent_ctx += " " + " ".join(p.get("class", [])).lower()
+                    parent_ctx += " " + (p.get("id", "") or "").lower()
+                    p = p.parent
+                if _img_is_garbage(low, alt, cls, parent_ctx): continue
+                if not _check_dimensions(img): continue
+                if full not in candidate_images:
+                    candidate_images.append(full)
+
+        # Max 3 imagens por URL — qualidade > quantidade
+        candidate_images = candidate_images[:3]
 
         # ── Texto principal ─────────────────────────────────────────────────
         for tag in soup(["script", "style", "nav", "footer", "aside",
