@@ -1473,17 +1473,27 @@ SYSTEM_GERAR_DEFAULT = (
     "Tipos de image_type:\n"
     "- 'chart': dados numéricos comparáveis. Inclua chart_data com labels, values, unit, highlight\n"
     "  chart_type: 'bar' | 'horizontal_bar' | 'line'\n"
-    "- 'photo': contexto visual com FUNÇÃO. Use photo_topic CINEMATOGRÁFICO em inglês:\n"
-    "  REGRAS:\n"
-    "  * 3-6 palavras descritivas + 1 modificador VISUAL/EMOCIONAL\n"
-    "  * Modificadores poderosos: 'dramatic', 'dark', 'intense', 'golden hour',\n"
-    "    'close-up', 'cinematic', 'aerial', 'macro', 'silhouette', 'neon'\n"
-    "  * EXCELENTE: 'dramatic Brazilian flag wind cinematic', 'dark Federal Reserve building Washington',\n"
-    "    'intense stock trader screens panic', 'golden hour Sao Paulo skyline aerial',\n"
-    "    'close-up Brazilian real currency notes', 'silhouette politician brasilia night'\n"
-    "  * RUIM: 'money', 'business', 'office'\n"
+    "- 'photo': contexto visual com FUNÇÃO. Use photo_topic ESPECÍFICO:\n"
+    "  PRIORIDADE 1 — NOMES PRÓPRIOS (busca Wikimedia, fotos REAIS):\n"
+    "  * Quando slide cita pessoa, empresa, prédio ou lugar específico,\n"
+    "    use o NOME PRÓPRIO em inglês/português no photo_topic\n"
+    "  * EXEMPLOS BONS: 'Lula Brasília 2024', 'Petrobras headquarters Rio',\n"
+    "    'Federal Reserve building Washington', 'Powell speech',\n"
+    "    'Banco Central Brasil', 'Faria Lima São Paulo', 'JP Morgan logo',\n"
+    "    'Roberto Campos Neto', 'Bovespa B3 trading floor'\n"
+    "  * Esses retornam fotos REAIS da Wikimedia, não stock genérico\n\n"
+    "  PRIORIDADE 2 — CINEMATOGRÁFICO (busca Pexels, stock visual):\n"
+    "  * Quando o slide é contexto abstrato (mercado caindo, otimismo, crise),\n"
+    "    use 3-6 palavras descritivas + modificador visual em inglês\n"
+    "  * Modificadores: 'dramatic', 'dark', 'intense', 'golden hour',\n"
+    "    'close-up', 'cinematic', 'aerial', 'silhouette'\n"
+    "  * EXEMPLOS: 'dramatic Brazilian flag wind cinematic',\n"
+    "    'intense stock trader screens panic',\n"
+    "    'golden hour Sao Paulo skyline aerial'\n\n"
+    "  REGRAS GERAIS:\n"
+    "  * RUIM (sempre): 'money', 'business', 'office'\n"
     "  * NUNCA reutilize photo_topic entre slides\n"
-    "  - photo_topic_alt: 2-3 palavras alternativas (fallback se a 1ª não retornar)\n\n"
+    "  - photo_topic_alt: 2-3 palavras alternativas (fallback)\n\n"
 
     "IMAGENS DOS LINKS:\n"
     "- Se brief tem [IMAGENS DISPONÍVEIS DOS LINKS], pode usar image_from_link com índice 1-based\n"
@@ -1931,6 +1941,106 @@ def pagina_gerar():
     return render_template("gerar.html", has_key=has_key)
 
 
+def _wikimedia_search(query: str, n: int = 12):
+    """Busca imagens no Wikimedia Commons. Otimo pra fotos REAIS de
+    politicos, edificios, eventos, logos — diferente do stock generico
+    do Pexels. Sem key necessaria.
+    Retorna lista de {url, thumb, title}."""
+    try:
+        import requests as _req
+        # API do Commons: gera lista de imagens via search
+        r = _req.get("https://commons.wikimedia.org/w/api.php", params={
+            "action": "query",
+            "format": "json",
+            "generator": "search",
+            "gsrnamespace": 6,           # File namespace
+            "gsrsearch": query,
+            "gsrlimit": n,
+            "prop": "imageinfo",
+            "iiprop": "url|size|mime",
+            "iiurlwidth": 800,           # thumbnail 800px
+        }, headers={"User-Agent": "BearlzCMS/1.0"}, timeout=10)
+        if r.status_code != 200:
+            return []
+        pages = (r.json().get("query") or {}).get("pages") or {}
+        out = []
+        for pid, page in pages.items():
+            ii = (page.get("imageinfo") or [{}])[0]
+            mime = ii.get("mime", "")
+            if not mime.startswith("image/"):
+                continue
+            if mime in ("image/svg+xml",):
+                continue  # SVG vetorial pode quebrar canvas
+            # Filtra imagens muito pequenas
+            w = ii.get("width", 0)
+            h = ii.get("height", 0)
+            if w < 400 or h < 400:
+                continue
+            # Aceitar fotos com aspect razoavel (nao banners ultra-wide)
+            ratio = (w / h) if h else 1
+            if ratio > 2.5 or ratio < 0.4:
+                continue
+            url = ii.get("url")
+            thumb = ii.get("thumburl") or url
+            if url:
+                out.append({
+                    "url": url,
+                    "thumb": thumb,
+                    "title": page.get("title", "").replace("File:", "").rsplit(".", 1)[0],
+                    "source": "wikimedia",
+                })
+        return out
+    except Exception:
+        return []
+
+
+@app.route("/api/img/search", methods=["GET"])
+def api_img_search():
+    """Busca imagens combinando Wikimedia Commons + Pexels.
+    Wikimedia eh otimo pra fotos REAIS de politicos, predios, marcas;
+    Pexels pra contexto visual generico. Retorna mix priorizando
+    Wikimedia (mais relevante pra conteudo jornalistico)."""
+    q = (request.args.get("q") or "").strip()
+    if not q:
+        return jsonify({"error": "query obrigatoria"}), 400
+    fotos = []
+    # 1. Wikimedia primeiro (relevancia editorial)
+    wiki = _wikimedia_search(q, n=8)
+    for w in wiki:
+        fotos.append({
+            "url": w["url"],
+            "thumb": w["thumb"],
+            "source": "wikimedia",
+            "credit": w.get("title", ""),
+        })
+    # 2. Pexels (preenche o resto)
+    if PEXELS_API_KEY:
+        try:
+            import requests as _req
+            r = _req.get(
+                "https://api.pexels.com/v1/search",
+                params={"query": q, "per_page": 12, "orientation": "portrait"},
+                headers={"Authorization": PEXELS_API_KEY},
+                timeout=8
+            )
+            if r.status_code == 200:
+                data = r.json()
+                for p in data.get("photos", []):
+                    src = p.get("src", {})
+                    url = src.get("portrait") or src.get("large") or src.get("original")
+                    thumb = src.get("medium") or url
+                    if url:
+                        fotos.append({
+                            "url": url,
+                            "thumb": thumb,
+                            "source": "pexels",
+                            "credit": p.get("photographer", ""),
+                        })
+        except Exception:
+            pass
+    return jsonify({"ok": True, "fotos": fotos})
+
+
 @app.route("/api/img-proxy", methods=["GET"])
 def api_img_proxy():
     """Proxy de imagem: baixa a URL externa e devolve com CORS aberto.
@@ -2135,17 +2245,30 @@ def api_gerar():
                         + urllib.parse.quote(json.dumps(cfg, separators=(",", ":")))
                         + "&width=1080&height=520&backgroundColor=white&version=2"
                     )
-            # ── PRIORIDADE 2: Pexels API por photo_topic (foto unica por slide) ──
-            # Tenta principal, depois alt, depois variacao com 1 palavra-chave do tema
+            # ── PRIORIDADE 2: Wikimedia primeiro (fotos reais), Pexels fallback ──
             if not img:
                 photo_topic = (s.get("photo_topic") or "").strip()
                 photo_topic_alt = (s.get("photo_topic_alt") or "").strip()
-                for query in [photo_topic, photo_topic_alt]:
-                    if not query: continue
-                    pexels_url = _pexels_search(query, used_pexels_ids)
-                    if pexels_url:
-                        img = pexels_url
-                        break
+                queries = [q for q in [photo_topic, photo_topic_alt] if q]
+                # Tenta Wikimedia primeiro pra cada query — retorna fotos REAIS
+                # de pessoas/predios/marcas se a query for um nome proprio
+                for q in queries:
+                    wiki_results = _wikimedia_search(q, n=5)
+                    if wiki_results:
+                        # Pega a primeira que ainda nao foi usada
+                        for w in wiki_results:
+                            if w["url"] not in used_pexels_ids:
+                                img = w["url"]
+                                used_pexels_ids.add(w["url"])
+                                break
+                        if img: break
+                # Fallback Pexels se Wikimedia nao retornou nada
+                if not img:
+                    for q in queries:
+                        pexels_url = _pexels_search(q, used_pexels_ids)
+                        if pexels_url:
+                            img = pexels_url
+                            break
             # ── PRIORIDADE 3: Pexels API por tema (fallback se topic vazio/falhou) ──
             if not img and PEXELS_API_KEY:
                 tema_query = {

@@ -479,12 +479,19 @@
         const q = inp.value.trim();
         if (!q) return;
         const grid = document.getElementById('parentGalleryGrid');
-        grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;padding:40px;color:#888;font-size:13px">Buscando no Pexels...</p>';
+        grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;padding:40px;color:#888;font-size:13px">Buscando em Wikimedia + Pexels...</p>';
         try {
-          const r = await fetch('/api/pexels/search?q=' + encodeURIComponent(q));
+          // Endpoint novo /api/img/search retorna mix de Wikimedia Commons
+          // (fotos reais de pessoas/predios/marcas) + Pexels (stock visual)
+          const r = await fetch('/api/img/search?q=' + encodeURIComponent(q));
           const d = await r.json();
           if (d.ok && d.fotos && d.fotos.length) {
-            _renderGalleryGrid(d.fotos.map(f => ({url_imagem: f.url})));
+            _renderGalleryGrid(d.fotos.map(f => ({
+              url_imagem: f.url,
+              thumb: f.thumb || f.url,
+              source: f.source || 'pexels',
+              credit: f.credit || ''
+            })));
           } else {
             grid.innerHTML = `<p style="grid-column:1/-1;text-align:center;padding:40px;color:#888;font-size:13px">Nenhum resultado: ${d.error||q}</p>`;
           }
@@ -504,14 +511,22 @@
     const grid = document.getElementById('parentGalleryGrid');
     if (!grid) return;
     if (!images || images.length === 0) {
-      grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;padding:40px;color:#888;font-size:13px">Nenhuma imagem dos links. Use a busca acima pra procurar no Pexels.</p>';
+      grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;padding:40px;color:#888;font-size:13px">Nenhuma imagem dos links. Use a busca acima — tenta nome próprio (políticos, empresas), termos em PT ou EN.</p>';
       return;
     }
-    grid.innerHTML = images.map((im, i) => `
-      <div data-url="${im.url_imagem.replace(/"/g, '&quot;')}" style="cursor:pointer;border:2px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#f9fafb;transition:border-color .15s,transform .1s">
-        <img src="${im.url_imagem}" loading="lazy" style="width:100%;height:140px;object-fit:cover;display:block">
-      </div>
-    `).join('');
+    grid.innerHTML = images.map((im, i) => {
+      const src = im.thumb || im.url_imagem;
+      const source = im.source || '';
+      const badge = source === 'wikimedia'
+        ? '<span style="position:absolute;top:6px;left:6px;background:#7c3aed;color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">REAL</span>'
+        : (source === 'pexels'
+            ? '<span style="position:absolute;top:6px;left:6px;background:#059669;color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">STOCK</span>'
+            : '');
+      return `<div data-url="${im.url_imagem.replace(/"/g, '&quot;')}" style="cursor:pointer;border:2px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#f9fafb;transition:border-color .15s,transform .1s;position:relative">
+        <img src="${src}" loading="lazy" style="width:100%;height:140px;object-fit:cover;display:block">
+        ${badge}
+      </div>`;
+    }).join('');
     grid.querySelectorAll('[data-url]').forEach(d => {
       d.onmouseenter = () => { d.style.borderColor = '#1d9bf0'; d.style.transform = 'scale(1.02)'; };
       d.onmouseleave = () => { d.style.borderColor = '#e5e7eb'; d.style.transform = ''; };
