@@ -352,9 +352,14 @@ function renderImgSection(){
     const hStyle=s.imgH?`height:${s.imgH}px;flex:none`:'';
     const bgColor=fit==='contain'?'#f8f8f8':'transparent';
     const freeClass=fit==='free'?' free-edit':'';
+    // Adiciona crossorigin pra URLs externas (Pexels, etc) pra que html2canvas
+    // nao "taint" o canvas e o export inclua a imagem. Imagens data: nao
+    // precisam (nao tem CORS).
+    const isExternal = s.image && !s.image.startsWith('data:');
+    const crossAttr = isExternal ? ' crossorigin="anonymous"' : '';
     sec.innerHTML=`<div class="img-section" style="position:relative">
       <div class="img-container${freeClass}" id="imgContainer" style="${hStyle};background:${bgColor}">
-        <img id="imgReal" class="img-real" src="${s.image}" alt="" draggable="false" style="visibility:hidden">
+        <img id="imgReal" class="img-real"${crossAttr} src="${s.image}" alt="" draggable="false" style="visibility:hidden">
         <div class="img-resize-handle img-resize-handle-top" id="imgResizeHandleTop" title="Arraste pra cima pra esticar / pra baixo pra encolher"></div>
         <div class="img-resize-handle img-resize-handle-bottom" id="imgResizeHandle" title="Arraste pra baixo pra esticar / pra cima pra encolher"></div>
       </div>
@@ -1536,13 +1541,50 @@ function _galeriaModalLocal(imgs){
   m.classList.add('active');
 }
 
-function _aplicarImagemDaGaleria(url){
+// Converte URL externa em data: base64 via canvas (evita problema de CORS
+// no export). Retorna data URL ou null se falhar.
+async function _urlParaBase64(url){
+  return new Promise((res)=>{
+    const im=new Image();
+    im.crossOrigin='anonymous';
+    im.onload=()=>{
+      try{
+        const c=document.createElement('canvas');
+        c.width=im.naturalWidth;c.height=im.naturalHeight;
+        c.getContext('2d').drawImage(im,0,0);
+        res(c.toDataURL('image/jpeg',0.92));
+      }catch(e){res(null);}
+    };
+    im.onerror=()=>res(null);
+    im.src=url;
+  });
+}
+
+async function _aplicarImagemDaGaleria(url){
   if(!url||!slides[cur])return;
   const s=slides[cur];
-  s.image=url;
   s.zoom=1;s.ox=50;s.oy=50;
   s.imgH=null;s.fit='cover';s.imgNW=null;s.imgNH=null;
   s.freeX=null;s.freeY=null;
+  if(typeof setStatus==='function')setStatus('Carregando imagem...');
+  // Pra URLs externas (Pexels, sites), converte em data: base64 ANTES de aplicar.
+  // Isso garante que o export PNG inclua a foto mesmo se o servidor original
+  // nao mandar CORS direito.
+  let finalUrl=url;
+  if(!url.startsWith('data:')){
+    // Tenta direto. Se falhar (canvas tainted), tenta via proxy do servidor.
+    let dataUrl=await _urlParaBase64(url);
+    if(!dataUrl){
+      dataUrl=await _urlParaBase64('/api/img-proxy?url='+encodeURIComponent(url));
+    }
+    if(dataUrl){
+      finalUrl=dataUrl;
+    }else{
+      if(typeof setStatus==='function')setStatus('⚠ Imagem aplicada mas pode falhar no export');
+      setTimeout(()=>{if(typeof setStatus==='function')setStatus('');},3500);
+    }
+  }
+  s.image=finalUrl;
   if(typeof render==='function')render();
   if(typeof autoSave==='function')autoSave();
   if(typeof setStatus==='function')setStatus('✓ Imagem aplicada no slide '+(cur+1));

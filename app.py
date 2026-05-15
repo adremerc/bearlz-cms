@@ -1931,6 +1931,36 @@ def pagina_gerar():
     return render_template("gerar.html", has_key=has_key)
 
 
+@app.route("/api/img-proxy", methods=["GET"])
+def api_img_proxy():
+    """Proxy de imagem: baixa a URL externa e devolve com CORS aberto.
+    Util pra imagens cujo servidor nao manda Access-Control-Allow-Origin,
+    o que faz html2canvas tainted e o export pular a imagem.
+    Uso: <img crossorigin="anonymous" src="/api/img-proxy?url=https://...">
+    """
+    url = (request.args.get("url") or "").strip()
+    if not url or not (url.startswith("http://") or url.startswith("https://")):
+        return jsonify({"error": "url invalida"}), 400
+    try:
+        import requests as _req
+        r = _req.get(url, timeout=15, stream=False,
+                     headers={"User-Agent": _BROWSER_HEADERS["User-Agent"]})
+        if r.status_code != 200:
+            return jsonify({"error": f"upstream {r.status_code}"}), 502
+        # Detecta content-type
+        ct = r.headers.get("Content-Type", "image/jpeg")
+        if not ct.startswith("image/"):
+            return jsonify({"error": "nao eh imagem"}), 400
+        # Resposta com CORS aberto pra html2canvas conseguir usar
+        from flask import Response
+        resp = Response(r.content, mimetype=ct)
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Cache-Control"] = "public, max-age=86400"
+        return resp
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/pexels/search", methods=["GET"])
 def api_pexels_search():
     """Busca fotos no Pexels pra galeria do viewer. Retorna 12 fotos."""
