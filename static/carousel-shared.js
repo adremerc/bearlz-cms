@@ -313,15 +313,20 @@ function render(){
   }else{
     document.getElementById('avatarDisp').innerHTML=`<span id="avatarLetter">G</span>`;
   }
+  // Modo edit: ativa class no text-area pra ele sobrepor a imagem com
+  // z-index alto. Botao Salvar fica fixed no canto da tela.
+  const textAreaEl=document.getElementById('textArea');
   if(editingText){
     document.getElementById('textDisplay').style.display='none';
     document.getElementById('textEditArea').style.display='block';
     document.getElementById('editTA').value=s.text;
+    if(textAreaEl)textAreaEl.classList.add('editing-mode');
   }else{
     document.getElementById('textDisplay').style.display='block';
     document.getElementById('textEditArea').style.display='none';
     const paras=s.text.split(/\n\n+/).map(p=>`<span style="display:block;margin-bottom:16px">${toHTML(p)}</span>`).join('');
     document.getElementById('textDisplay').innerHTML=paras;
+    if(textAreaEl)textAreaEl.classList.remove('editing-mode');
   }
   renderImgSection();
   const cd=document.getElementById('cardDots');
@@ -1235,6 +1240,18 @@ document.addEventListener('keydown',function(e){
     if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='b'){
       e.preventDefault();
       wrapBoldSelection();
+    }
+    // Ctrl+S OU Ctrl+Enter salva a edicao
+    else if(((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s')||
+            ((e.ctrlKey||e.metaKey)&&e.key==='Enter')){
+      e.preventDefault();
+      saveEdit();
+    }
+    // Esc cancela edicao
+    else if(e.key==='Escape'){
+      e.preventDefault();
+      editingText=false;
+      render();
     }
   }
 });

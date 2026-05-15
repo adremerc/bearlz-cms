@@ -30,8 +30,31 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
 .text-display{font-size:18px;line-height:1.4;color:#0f1419;white-space:pre-line;cursor:text;min-height:60px;padding:2px 0}
 .text-display strong{font-weight:700}
 .edit-textarea{width:100%;min-height:180px;border:1.5px solid #1d9bf0;border-radius:10px;padding:12px 14px;font-size:16px;font-family:inherit;line-height:1.6;resize:vertical;outline:none;color:#0f1419;background:#fafcff;box-sizing:border-box}
-.edit-actions{display:flex;gap:6px;margin-top:8px;align-items:center}
-.btn-save{padding:7px 16px;font-size:11px;font-weight:700;background:#1d9bf0;color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:inherit}
+.edit-actions{display:flex;gap:6px;margin-top:8px;align-items:center;position:sticky;bottom:0;background:#fff;padding:6px 0 2px;z-index:50}
+.btn-save{padding:9px 18px;font-size:13px;font-weight:700;background:#1d9bf0;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(29,155,240,.35)}
+.btn-save:hover{background:#1781cc}
+
+/* Modo edicao: text-area SOBE acima de tudo (imagem, handles) e nao corta */
+.text-area.editing-mode{
+  position:relative !important;
+  z-index:1000 !important;
+  overflow:visible !important;
+  background:#fff !important;
+  padding-bottom:14px !important;
+  box-shadow:0 8px 20px rgba(0,0,0,.08);
+  border-radius:0 0 12px 12px;
+}
+/* Botao Salvar FLUTUANTE quando em modo edit — z-index gigante,
+   sempre visivel mesmo se algo cobrir o texto-area */
+.text-area.editing-mode .btn-save{
+  position:fixed !important;
+  bottom:24px !important;
+  right:24px !important;
+  z-index:99999 !important;
+  padding:12px 24px !important;
+  font-size:14px !important;
+  box-shadow:0 6px 20px rgba(29,155,240,.5) !important;
+}
 .edit-hint{font-size:10px;color:#aaa}
 #imgSection{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 /* padding vertical padrao 10px = enquadramento visualmente agradavel (espaco
