@@ -313,20 +313,31 @@ function render(){
   }else{
     document.getElementById('avatarDisp').innerHTML=`<span id="avatarLetter">G</span>`;
   }
-  // Modo edit: ativa class no text-area pra ele sobrepor a imagem com
-  // z-index alto. Botao Salvar fica fixed no canto da tela.
+  // Modo edit: text-area ganha 'editing-mode' (z-index + bg) e card ganha
+  // 'editing-text' (esconde imagem+footer pra liberar espaco visivel).
+  // Resultado: textarea + botao Salvar sempre 100% visiveis.
   const textAreaEl=document.getElementById('textArea');
+  const cardEl=document.getElementById('theCard')||document.querySelector('.card');
   if(editingText){
     document.getElementById('textDisplay').style.display='none';
     document.getElementById('textEditArea').style.display='block';
     document.getElementById('editTA').value=s.text;
     if(textAreaEl)textAreaEl.classList.add('editing-mode');
+    if(cardEl)cardEl.classList.add('editing-text');
+    // Auto-scroll pro textarea ficar visivel no iframe
+    setTimeout(()=>{
+      const ta=document.getElementById('editTA');
+      if(ta){
+        ta.scrollIntoView({behavior:'smooth',block:'center'});
+      }
+    },80);
   }else{
     document.getElementById('textDisplay').style.display='block';
     document.getElementById('textEditArea').style.display='none';
     const paras=s.text.split(/\n\n+/).map(p=>`<span style="display:block;margin-bottom:16px">${toHTML(p)}</span>`).join('');
     document.getElementById('textDisplay').innerHTML=paras;
     if(textAreaEl)textAreaEl.classList.remove('editing-mode');
+    if(cardEl)cardEl.classList.remove('editing-text');
   }
   renderImgSection();
   const cd=document.getElementById('cardDots');

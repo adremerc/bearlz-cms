@@ -34,26 +34,33 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
 .btn-save{padding:9px 18px;font-size:13px;font-weight:700;background:#1d9bf0;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(29,155,240,.35)}
 .btn-save:hover{background:#1781cc}
 
-/* Modo edicao: text-area SOBE acima de tudo (imagem, handles) e nao corta */
+/* Modo edicao: text-area SOBE acima da imagem e nao corta. O .card todo
+   ganha class 'editing' pra ESCONDER a imagem temporariamente — assim
+   o textarea + Salvar sempre tem espaco e o botao nunca eh coberto. */
 .text-area.editing-mode{
   position:relative !important;
   z-index:1000 !important;
   overflow:visible !important;
   background:#fff !important;
   padding-bottom:14px !important;
-  box-shadow:0 8px 20px rgba(0,0,0,.08);
-  border-radius:0 0 12px 12px;
 }
-/* Botao Salvar FLUTUANTE quando em modo edit — z-index gigante,
-   sempre visivel mesmo se algo cobrir o texto-area */
+/* Esconde a area da imagem + handles quando editando texto. Volta na
+   hora que salva. Garante que TEXTAREA + BOTAO SALVAR tem 100% de
+   visibilidade dentro do iframe sem position:fixed (que confunde). */
+.card.editing-text #imgSection,
+.card.editing-text .gap-handle,
+.card.editing-text .card-dots-row,
+.card.editing-text .card-footer{
+  display:none !important;
+}
+/* Botao Salvar dentro do edit-mode — grande, em destaque, sticky no
+   final do textarea, z-index alto pra nao ser coberto por nada. */
 .text-area.editing-mode .btn-save{
-  position:fixed !important;
-  bottom:24px !important;
-  right:24px !important;
-  z-index:99999 !important;
-  padding:12px 24px !important;
+  padding:12px 28px !important;
   font-size:14px !important;
+  font-weight:800 !important;
   box-shadow:0 6px 20px rgba(29,155,240,.5) !important;
+  width:100% !important;
 }
 .edit-hint{font-size:10px;color:#aaa}
 #imgSection{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
