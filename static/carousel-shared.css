@@ -76,6 +76,15 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
   transition:all .15s;
 }
 .btn-revisar-pt:hover{background:#fcd34d;color:#78350f;transform:translateY(-1px)}
+.btn-polir{
+  padding:7px 14px;font-size:12px;font-weight:700;
+  background:linear-gradient(135deg,#a78bfa,#8b5cf6);color:#fff;
+  border:none;border-radius:7px;
+  cursor:pointer;font-family:inherit;
+  transition:all .15s;
+  box-shadow:0 2px 6px rgba(139,92,246,.3);
+}
+.btn-polir:hover{background:linear-gradient(135deg,#8b5cf6,#7c3aed);transform:translateY(-1px);box-shadow:0 3px 10px rgba(139,92,246,.5)}
 
 /* Modo edicao: text-area SOBE acima da imagem e nao corta. O .card todo
    ganha class 'editing' pra ESCONDER a imagem temporariamente — assim

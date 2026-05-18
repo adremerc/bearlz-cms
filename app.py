@@ -2244,6 +2244,87 @@ def _detect_vicios_ia(texto: str):
     return matches
 
 
+SYSTEM_POLIR = """Você é editor sênior de copy do @gabriel.bearlz no Instagram.
+Você recebe UM SLIDE de carrossel e reescreve removendo vícios de IA + tornando a linguagem mais simples e humanizada, MANTENDO o sentido e os dados.
+
+REGRAS DO REWRITE:
+
+VOZ HUMANIZADA — eliminar TODOS os clichês de IA:
+- "Na prática," → remova (vá direto ao ponto)
+- "O que acontece é que," → remova
+- "Vale destacar", "é importante ressaltar", "cabe destacar" → remova
+- "Dessa forma," "Nesse sentido," "Em suma," → use transições mais naturais
+- "Com isso," — use no MÁXIMO 1× no slide. Se aparecer 2+ vezes, varie
+- NUNCA travessão (—) — use vírgula ou parênteses
+- Sem frases picotadas estilo IA ("Queda. Alta. Recuperação.")
+
+LINGUAGEM ACESSÍVEL:
+- Troque termos complicados por palavras simples
+- "Concomitantemente" → "ao mesmo tempo"
+- "Outrossim" → "além disso"
+- "Por conseguinte" → "por isso"
+- "Mediante" → "via" / "através de"
+- Jargão técnico desnecessário → explique em palavra simples
+- Frases longas com 2+ subordinações → quebre em 2
+
+MANTER OBRIGATORIAMENTE:
+- O sentido original e todos os dados/números
+- O tamanho aproximado (180-420 chars)
+- Negritos em FRASES inteiras (4-12 palavras com sentido). Se o texto
+  tinha **palavra isolada** (ex: **9%**), reescreva pra envolver
+  numa frase: **a queda de 9% no trimestre**
+- Aspas duplas " (nunca simples ')
+- Parágrafos separados por \\n\\n (mantém estrutura)
+- Números arredondados (R$ 14 bi, não R$ 14,247 bi)
+
+RESPOSTA: SOMENTE JSON, sem markdown:
+{"texto_novo": "texto reescrito completo", "mudancas_principais": ["lista breve dos principais ajustes feitos"]}"""
+
+
+@app.route("/api/polir-slide", methods=["POST"])
+def api_polir_slide():
+    """Recebe texto de UM slide e devolve versao polida (sem vicios IA,
+    linguagem mais simples). Frontend mostra antes/depois lado a lado."""
+    if not ANTHROPIC_AVAILABLE:
+        return jsonify({"error": "Biblioteca anthropic não instalada"}), 400
+    if not ANTHROPIC_API_KEY or not ANTHROPIC_API_KEY.startswith("sk-ant-api"):
+        return jsonify({"error": "ANTHROPIC_API_KEY não configurada"}), 400
+    data = request.get_json() or {}
+    texto = (data.get("text") or "").strip()
+    if not texto:
+        return jsonify({"error": "texto vazio"}), 400
+    if len(texto) > 2000:
+        return jsonify({"error": "texto muito grande (max 2000 chars)"}), 400
+
+    try:
+        client = _anthropic_lib.Anthropic(api_key=ANTHROPIC_API_KEY)
+        resp = claude_call_with_retry(client,
+            model="claude-sonnet-4-5", max_tokens=1500,
+            system=SYSTEM_POLIR,
+            messages=[{"role": "user", "content": f"SLIDE ATUAL:\n{texto}\n\nReescreva removendo vícios e simplificando."}]
+        )
+        out = resp.content[0].text.strip()
+        if out.startswith("```"):
+            out = re.sub(r"^```[a-z]*\n?", "", out)
+            out = re.sub(r"\n?```$", "", out).strip()
+        dados = _parse_claude_json(out)
+        if not dados or "texto_novo" not in dados:
+            return jsonify({"error": "Resposta inválida do Claude", "raw": out[:300]}), 500
+        # Sanitiza o resultado pelos mesmos filtros que o gerador
+        texto_novo = _sanitizar_slide(dados.get("texto_novo", ""))
+        return jsonify({
+            "ok": True,
+            "texto_original": texto,
+            "texto_novo": texto_novo,
+            "mudancas": dados.get("mudancas_principais", []),
+        })
+    except Exception as e:
+        msg = str(e)
+        if "overloaded" in msg.lower() or "529" in msg:
+            return jsonify({"error": "Claude sobrecarregado. Tente em 1-2 min."}), 503
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/check-pt", methods=["POST"])
 def api_check_pt():
     """Verifica erros ortograficos/gramaticais via LanguageTool (free API).

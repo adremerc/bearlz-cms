@@ -638,6 +638,65 @@
     m.style.display = 'block';
   }
 
+  // ── Polir slide: modal antes/depois lado a lado ──
+  function openParentPolir(data, original) {
+    let m = document.getElementById('parentPolirModal');
+    if (!m) {
+      m = document.createElement('div');
+      m.id = 'parentPolirModal';
+      m.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99999;padding:24px;overflow-y:auto';
+      m.onclick = (e) => { if (e.target === m) m.style.display = 'none'; };
+      document.body.appendChild(m);
+    }
+    const err = data && data.error;
+    let body;
+    if (err) {
+      body = `<div style="padding:16px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;color:#991b1b">${err}</div>`;
+    } else if (!data || !data.texto_novo) {
+      body = `<div style="padding:16px;color:#888">Sem mudanças sugeridas.</div>`;
+    } else {
+      const mudancas = (data.mudancas || []).map(m => `<li>${m.replace(/</g,'&lt;')}</li>`).join('');
+      const orig = (data.texto_original || original || '').replace(/</g,'&lt;').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+      const novo = (data.texto_novo || '').replace(/</g,'&lt;').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+      body = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+          <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:14px">
+            <div style="font-size:10px;font-weight:700;color:#991b1b;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">ANTES (${(data.texto_original||original||'').length} chars)</div>
+            <div style="font-size:13px;line-height:1.6;color:#374151">${orig}</div>
+          </div>
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px">
+            <div style="font-size:10px;font-weight:700;color:#166534;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">DEPOIS (${data.texto_novo.length} chars)</div>
+            <div style="font-size:13px;line-height:1.6;color:#14532d">${novo}</div>
+          </div>
+        </div>
+        ${mudancas ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;font-size:12px;color:#1e3a8a;margin-bottom:12px"><strong>Mudanças principais:</strong><ul style="margin:4px 0 0;padding-left:20px">${mudancas}</ul></div>` : ''}
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button onclick="document.getElementById('parentPolirModal').style.display='none'" style="padding:9px 18px;background:#f3f4f6;color:#374151;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-family:inherit">Cancelar</button>
+          <button id="parentPolirApplyBtn" style="padding:9px 22px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(139,92,246,.4)">✨ Aplicar versão polida</button>
+        </div>
+      `;
+    }
+    m.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:880px;width:100%;margin:0 auto;padding:18px 22px;font-family:'Open Sans',sans-serif">
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f0f0f0;padding-bottom:8px;margin-bottom:14px">
+        <strong style="font-size:15px">✨ Polir slide — Antes / Depois</strong>
+        <button onclick="document.getElementById('parentPolirModal').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#999">×</button>
+      </div>
+      ${body}
+    </div>`;
+    const applyBtn = document.getElementById('parentPolirApplyBtn');
+    if (applyBtn && data && data.texto_novo) {
+      applyBtn.onclick = () => {
+        const iframe = document.getElementById('carrossel-frame');
+        if (iframe && iframe.contentWindow) {
+          iframe.contentWindow.postMessage({type:'bearlz-polir-apply', text: data.texto_novo}, '*');
+        }
+        m.style.display = 'none';
+        toast('✨ Versão polida aplicada');
+      };
+    }
+    m.style.display = 'block';
+  }
+
   // Listener pras mensagens do iframe
   window.addEventListener('message', (e) => {
     if (!e.data || typeof e.data !== 'object') return;
@@ -645,6 +704,22 @@
       openParentHooks();
     } else if (e.data.type === 'bearlz-gallery-open') {
       openParentGallery(e.data.images || []);
+    } else if (e.data.type === 'bearlz-polir-start') {
+      let m = document.getElementById('parentPolirModal');
+      if (!m) {
+        m = document.createElement('div');
+        m.id = 'parentPolirModal';
+        m.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99999;padding:24px;overflow-y:auto';
+        m.onclick = (ev) => { if (ev.target === m) m.style.display = 'none'; };
+        document.body.appendChild(m);
+      }
+      m.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:520px;margin:0 auto;padding:30px;text-align:center;font-family:'Open Sans',sans-serif">
+        <div style="font-size:14px;color:#7c3aed">✨ Claude está polindo o slide...</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:4px">Remove vícios de IA e simplifica linguagem · 5-15s</div>
+      </div>`;
+      m.style.display = 'block';
+    } else if (e.data.type === 'bearlz-polir-result') {
+      openParentPolir(e.data.data, e.data.original);
     } else if (e.data.type === 'bearlz-revisar-pt-start') {
       // Mostra loading enquanto o iframe consulta
       let m = document.getElementById('parentRevisarPtModal');

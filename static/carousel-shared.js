@@ -1022,10 +1022,21 @@ function _ensureEditButtons(){
     btn.textContent='📝 Revisar PT';
     btn.title='Verifica ortografia e gramática via LanguageTool';
     btn.onclick=function(){revisarPortugues();};
-    // Insere depois do btn-save
     const save=actions.querySelector('.btn-save');
     if(save&&save.nextSibling)actions.insertBefore(btn,save.nextSibling);
     else if(save)save.parentNode.appendChild(btn);
+    else actions.appendChild(btn);
+  }
+  // Botao Polir — usa Claude pra reescrever sem vicios + simplificar
+  if(!actions.querySelector('.btn-polir')){
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.className='btn-polir';
+    btn.textContent='✨ Polir';
+    btn.title='Reescreve o slide com Claude removendo vícios de IA e simplificando linguagem';
+    btn.onclick=function(){polirSlide();};
+    const revisar=actions.querySelector('.btn-revisar-pt');
+    if(revisar&&revisar.nextSibling)actions.insertBefore(btn,revisar.nextSibling);
     else actions.appendChild(btn);
   }
   // Contador de chars — injeta se nao existir
@@ -1048,6 +1059,59 @@ function _ensureEditButtons(){
     });
   }
 }
+
+/* ── Polir slide com Claude (remove vicios + simplifica linguagem) ── */
+async function polirSlide(){
+  const ta=document.getElementById('editTA');
+  if(!ta)return;
+  const text=ta.value.trim();
+  if(!text)return;
+  const sendToParent = window.parent && window.parent !== window;
+  if(sendToParent){
+    try{window.parent.postMessage({type:'bearlz-polir-start',text:text},'*');}catch(e){}
+  }
+  try{
+    const r=await fetch('/api/polir-slide',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({text:text})
+    });
+    const d=await r.json();
+    if(sendToParent){
+      try{window.parent.postMessage({type:'bearlz-polir-result',data:d,original:text},'*');}catch(e){}
+    } else {
+      if(d.ok && d.texto_novo){
+        if(confirm('Aplicar versao polida?\n\nANTES:\n'+text+'\n\nDEPOIS:\n'+d.texto_novo)){
+          ta.value=d.texto_novo;
+          _updateCharCount(ta.value);
+          if(typeof liveUpdate==='function')liveUpdate(ta.value);
+          if(typeof autoSave==='function')autoSave();
+        }
+      } else {
+        alert('Erro: '+(d.error||'desconhecido'));
+      }
+    }
+  }catch(e){
+    if(sendToParent){
+      try{window.parent.postMessage({type:'bearlz-polir-result',data:{error:e.message}},'*');}catch(_){}
+    }
+  }
+}
+window.polirSlide=polirSlide;
+
+// Listener: parent posta texto polido aprovado
+window.addEventListener('message',function(e){
+  if(!e.data||typeof e.data!=='object')return;
+  if(e.data.type==='bearlz-polir-apply' && typeof e.data.text==='string'){
+    const ta=document.getElementById('editTA');
+    if(ta){
+      ta.value=e.data.text;
+      _updateCharCount(ta.value);
+      if(typeof liveUpdate==='function')liveUpdate(ta.value);
+      if(typeof autoSave==='function')autoSave();
+    }
+  }
+});
 
 /* ── Revisor de portugues (LanguageTool) ──
    Verifica erros ortograficos e gramaticais no texto do textarea. */
