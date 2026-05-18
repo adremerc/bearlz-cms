@@ -2127,6 +2127,123 @@ def api_img_search():
     return jsonify({"ok": True, "fotos": fotos})
 
 
+def _detect_vicios_ia(texto: str):
+    """Detecta padroes tipicos de escrita de IA — NAO sao erros gramaticais,
+    mas sao clichês que tornam o texto artificial e que o usuario quer evitar."""
+    matches = []
+    if not texto:
+        return matches
+
+    # 1. Cliches/mulet
+    cliches = [
+        (r"\bNa pr[áa]tica,?", "'Na prática' é clichê de IA. Va direto ao ponto."),
+        (r"\bO que acontece [eé] que,?", "'O que acontece é que' é clichê de IA."),
+        (r"\bVale destacar(?:\s+que)?,?", "'Vale destacar' soa burocrático. Apenas destaque o ponto."),
+        (r"\bÉ importante ressaltar(?:\s+que)?,?", "'É importante ressaltar' soa burocrático."),
+        (r"\bCabe destacar(?:\s+que)?,?", "'Cabe destacar' soa burocrático."),
+        (r"\bÉ fundamental(?:\s+que)?", "'É fundamental' soa formal. Use 'precisa', 'tem que'."),
+        (r"\bDessa forma,?", "'Dessa forma' é clichê. Use transição mais natural."),
+        (r"\bNesse sentido,?", "'Nesse sentido' é clichê. Use algo mais direto."),
+        (r"\bEm suma,?", "'Em suma' soa formal demais. Reescreva o fechamento."),
+        (r"\bPor outro lado,?", "'Por outro lado' é muleta. Use 'mas', 'só que'."),
+    ]
+    for pattern, msg in cliches:
+        for m in re.finditer(pattern, texto, re.IGNORECASE):
+            matches.append({
+                "offset": m.start(),
+                "length": m.end() - m.start(),
+                "message": msg,
+                "short": "Clichê de IA",
+                "suggestions": [],
+                "category": "Vício de IA",
+                "type": "AI_CLICHE",
+                "context": texto[max(0,m.start()-20):min(len(texto), m.end()+20)]
+            })
+
+    # 2. Travessão (—) é proibido absoluto
+    for m in re.finditer(r"—", texto):
+        matches.append({
+            "offset": m.start(),
+            "length": 1,
+            "message": "Travessão (—) é proibido. Substitua por vírgula ou parênteses.",
+            "short": "Travessão",
+            "suggestions": [",", " ("],
+            "category": "Vício de IA",
+            "type": "AI_DASH",
+            "context": texto[max(0,m.start()-20):min(len(texto), m.end()+20)]
+        })
+
+    # 3. "Com isso," — só permitido 1x. Marca a partir da 2a aparição
+    com_isso = list(re.finditer(r"\bCom isso,?", texto, re.IGNORECASE))
+    if len(com_isso) > 1:
+        for m in com_isso[1:]:
+            matches.append({
+                "offset": m.start(),
+                "length": m.end() - m.start(),
+                "message": f"'Com isso' já foi usado antes. Varie: 'Aliás,', 'Tudo isso', 'O resultado'.",
+                "short": "Repetição de muleta",
+                "suggestions": ["Aliás,", "Tudo isso", "O resultado"],
+                "category": "Vício de IA",
+                "type": "AI_REPEAT",
+                "context": texto[max(0,m.start()-20):min(len(texto), m.end()+20)]
+            })
+
+    # 4. Frases picotadas: 3+ frases curtas em sequência tipo "Queda. Alta. Recuperação."
+    picotada = re.compile(
+        r"\b([A-ZÁÊÍÔÚÃÕÇÀÉ][a-záêíôúãõçàé]{2,15})\.\s+"
+        r"([A-ZÁÊÍÔÚÃÕÇÀÉ][a-záêíôúãõçàé]{2,15})\.\s+"
+        r"([A-ZÁÊÍÔÚÃÕÇÀÉ][a-záêíôúãõçàé]{2,15})\."
+    )
+    for m in picotada.finditer(texto):
+        # As 3 palavras juntas são curtas (picotada típica)
+        total = sum(len(g) for g in m.groups())
+        if total < 50:
+            matches.append({
+                "offset": m.start(),
+                "length": m.end() - m.start(),
+                "message": "Frases picotadas estilo IA. Reescreva como uma frase fluida.",
+                "short": "Frase picotada",
+                "suggestions": [],
+                "category": "Vício de IA",
+                "type": "AI_CHOPPY",
+                "context": texto[max(0,m.start()-10):min(len(texto), m.end()+10)]
+            })
+
+    # 5. Negrito em palavra isolada (**X** com 1-2 palavras curtas)
+    # Regra do prompt: negritos devem ser FRASES inteiras (4-12 palavras)
+    for m in re.finditer(r"\*\*([^*\n]{1,40})\*\*", texto):
+        content = m.group(1).strip()
+        word_count = len(content.split())
+        # 1-3 palavras = palavra isolada (mau uso)
+        if word_count <= 3 and len(content) < 25:
+            matches.append({
+                "offset": m.start(),
+                "length": m.end() - m.start(),
+                "message": f"Negrito em '{content}' é palavra isolada. Negrite FRASES inteiras (4-12 palavras).",
+                "short": "Negrito mal usado",
+                "suggestions": [],
+                "category": "Vício de IA",
+                "type": "AI_BOLD",
+                "context": texto[max(0,m.start()-15):min(len(texto), m.end()+15)]
+            })
+
+    # 6. Aspas simples (regra: usar sempre duplas)
+    # Detecta padrão 'palavra' ou 'frase' (não apóstrofo natural d'agua)
+    for m in re.finditer(r"(?<!\w)'([^'\n]{2,80})'(?!\w)", texto):
+        matches.append({
+            "offset": m.start(),
+            "length": m.end() - m.start(),
+            "message": "Use aspas duplas (\") em vez de simples (').",
+            "short": "Aspas erradas",
+            "suggestions": [f'"{m.group(1)}"'],
+            "category": "Vício de IA",
+            "type": "AI_QUOTES",
+            "context": texto[max(0,m.start()-15):min(len(texto), m.end()+15)]
+        })
+
+    return matches
+
+
 @app.route("/api/check-pt", methods=["POST"])
 def api_check_pt():
     """Verifica erros ortograficos/gramaticais via LanguageTool (free API).
@@ -2136,8 +2253,13 @@ def api_check_pt():
     texto = (data.get("text") or "").strip()
     if not texto:
         return jsonify({"error": "texto vazio"}), 400
-    # Remove markdown bold pra nao confundir o checker
+    # Remove markdown bold pra nao confundir o checker (mas mantemos os offsets
+    # corretos no texto original tirando ** mas mantendo o texto interno).
+    # Pro check de vicios usamos o texto original (com ** intacto).
     texto_limpo = re.sub(r"\*\*([^*]+)\*\*", r"\1", texto)
+    matches = []
+
+    # ── PARTE 1: LanguageTool (ortografia/gramatica/pontuacao) ──
     try:
         import requests as _req
         r = _req.post(
@@ -2150,25 +2272,30 @@ def api_check_pt():
             timeout=20,
             headers={"User-Agent": "BearlzCMS/1.0"}
         )
-        if r.status_code != 200:
-            return jsonify({"error": f"LanguageTool {r.status_code}"}), 502
-        data_lt = r.json()
-        matches = []
-        for m in data_lt.get("matches", []):
-            sug = [r.get("value", "") for r in m.get("replacements", [])][:5]
-            matches.append({
-                "offset": m.get("offset", 0),
-                "length": m.get("length", 0),
-                "message": m.get("message", ""),
-                "short": m.get("shortMessage", ""),
-                "suggestions": sug,
-                "category": (m.get("rule", {}) or {}).get("category", {}).get("name", ""),
-                "type": (m.get("rule", {}) or {}).get("issueType", ""),
-                "context": (m.get("context", {}) or {}).get("text", ""),
-            })
-        return jsonify({"ok": True, "matches": matches, "total": len(matches)})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        if r.status_code == 200:
+            data_lt = r.json()
+            for m in data_lt.get("matches", []):
+                sug = [r.get("value", "") for r in m.get("replacements", [])][:5]
+                matches.append({
+                    "offset": m.get("offset", 0),
+                    "length": m.get("length", 0),
+                    "message": m.get("message", ""),
+                    "short": m.get("shortMessage", ""),
+                    "suggestions": sug,
+                    "category": (m.get("rule", {}) or {}).get("category", {}).get("name", ""),
+                    "type": (m.get("rule", {}) or {}).get("issueType", ""),
+                    "context": (m.get("context", {}) or {}).get("text", ""),
+                })
+    except Exception:
+        pass  # Falha no LT nao bloqueia os vicios IA
+
+    # ── PARTE 2: Vicios de IA (cliches, travessao, negrito, etc) ──
+    # Roda no texto ORIGINAL (com **) pra pegar negritos mal usados
+    matches += _detect_vicios_ia(texto)
+
+    # Ordena por offset pra UI mostrar em ordem
+    matches.sort(key=lambda m: m.get("offset", 0))
+    return jsonify({"ok": True, "matches": matches, "total": len(matches)})
 
 
 @app.route("/api/img-proxy", methods=["GET"])

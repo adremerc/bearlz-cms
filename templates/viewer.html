@@ -566,18 +566,38 @@
         <div style="margin-top:6px;color:#6b7280;font-size:12px">Texto sem erros ortográficos ou gramaticais.</div>
       </div>`;
     } else {
-      body = matches.map((em, i) => {
+      // Separa em 2 grupos: vícios de IA (laranja) vs erros gramaticais (vermelho)
+      const isVicioIA = (em) => em.category === 'Vício de IA' || (em.type||'').startsWith('AI_');
+      const vicios = matches.filter(isVicioIA);
+      const erros = matches.filter(em => !isVicioIA(em));
+
+      const renderItem = (em, i, scheme) => {
+        // scheme: 'red' (erro) ou 'orange' (vicio IA)
+        const colors = scheme === 'orange'
+          ? {border:'#fed7aa', bg:'#fff7ed', titleColor:'#9a3412', badgeColor:'#7c2d12', badgeBg:'#fed7aa'}
+          : {border:'#fee2e2', bg:'#fef2f2', titleColor:'#991b1b', badgeColor:'#7f1d1d', badgeBg:'#fecaca'};
         const sug = (em.suggestions || []).map((s, j) =>
           `<button data-i="${i}" data-j="${j}" class="revisar-sug-btn" style="background:#dbeafe;color:#1e3a8a;padding:4px 10px;border-radius:6px;margin:0 4px 4px 0;border:none;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit">${s.replace(/</g,'&lt;')}</button>`
         ).join('');
-        const cat = em.category ? `<span style="font-size:10px;background:#e5e7eb;color:#4b5563;padding:2px 6px;border-radius:4px;margin-left:6px">${em.category}</span>` : '';
+        const cat = em.category ? `<span style="font-size:10px;background:${colors.badgeBg};color:${colors.badgeColor};padding:2px 7px;border-radius:4px;margin-left:6px;font-weight:600">${em.category}</span>` : '';
         const ctx = em.context ? `<div style="font-size:11px;color:#6b7280;margin:6px 0;font-family:monospace;background:#f9fafb;padding:6px 8px;border-radius:4px">${em.context.replace(/</g,'&lt;')}</div>` : '';
-        return `<div style="border:1px solid #fee2e2;background:#fef2f2;border-radius:8px;padding:12px;margin-bottom:10px">
-          <div style="font-size:13px;color:#991b1b;font-weight:600;margin-bottom:4px">${em.message.replace(/</g,'&lt;')}${cat}</div>
+        return `<div style="border:1px solid ${colors.border};background:${colors.bg};border-radius:8px;padding:12px;margin-bottom:10px">
+          <div style="font-size:13px;color:${colors.titleColor};font-weight:600;margin-bottom:4px">${em.message.replace(/</g,'&lt;')}${cat}</div>
           ${ctx}
           ${sug ? `<div style="margin-top:6px;font-size:11px;color:#374151">Sugestões: ${sug}</div>` : ''}
         </div>`;
-      }).join('');
+      };
+      // Mapeia índice global no array `matches` pra usar nas sugestões
+      let html = '';
+      if (vicios.length > 0) {
+        html += `<div style="font-size:11px;font-weight:700;color:#9a3412;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px">⚠ Vícios de IA (${vicios.length})</div>`;
+        html += vicios.map(em => renderItem(em, matches.indexOf(em), 'orange')).join('');
+      }
+      if (erros.length > 0) {
+        html += `<div style="font-size:11px;font-weight:700;color:#991b1b;margin:${vicios.length?'12px':'0'} 0 8px;text-transform:uppercase;letter-spacing:.5px">✗ Erros gramaticais (${erros.length})</div>`;
+        html += erros.map(em => renderItem(em, matches.indexOf(em), 'red')).join('');
+      }
+      body = html;
     }
     m.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:680px;width:100%;margin:0 auto;padding:18px 22px;font-family:'Open Sans',sans-serif">
       <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f0f0f0;padding-bottom:8px;margin-bottom:12px">
