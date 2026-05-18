@@ -2244,41 +2244,62 @@ def _detect_vicios_ia(texto: str):
     return matches
 
 
-SYSTEM_POLIR = """Você é editor sênior de copy do @gabriel.bearlz no Instagram.
-Você recebe UM SLIDE de carrossel e reescreve removendo vícios de IA + tornando a linguagem mais simples e humanizada, MANTENDO o sentido e os dados.
+SYSTEM_POLIR = """Você é editor sênior do @gabriel.bearlz. Recebe UM slide e reescreve com voz HUMANIZADA, MANTENDO profundidade e densidade.
 
-REGRAS DO REWRITE:
+FILOSOFIA DO REWRITE:
+- O OBJETIVO eh tirar os vicios de IA, NAO encurtar
+- Mantenha frases longas, complexas, com nuance — eh o que cria autoridade
+- Texto humano de qualidade NAO eh texto curto — eh texto que flui
+- Se o texto original tinha 380 chars, a versao polida deve ter ~ 380 chars tambem
+- NUNCA reduza pra menos de 80% do tamanho original
+- Adicione contexto/desenvolvimento se ficou raso; nunca enxugue raciocinio
 
-VOZ HUMANIZADA — eliminar TODOS os clichês de IA:
-- "Na prática," → remova (vá direto ao ponto)
-- "O que acontece é que," → remova
-- "Vale destacar", "é importante ressaltar", "cabe destacar" → remova
-- "Dessa forma," "Nesse sentido," "Em suma," → use transições mais naturais
-- "Com isso," — use no MÁXIMO 1× no slide. Se aparecer 2+ vezes, varie
+VOZ HUMANIZADA — remova clichês SUBSTITUINDO por linguagem natural:
+- "Na prática," → REMOVA mas mantém o resto da frase intacto, ou
+  conecte com transição natural se necessário ("A consequência prática")
+- "O que acontece é que," → REMOVA, vá direto ao ponto, mas mantém
+  o conteúdo todo
+- "Vale destacar que X" → simplesmente afirme X de forma direta, MAS
+  com toda a nuance que tinha
+- "É importante ressaltar," "Cabe destacar," "É fundamental" → idem
+- "Com isso," — max 1× no slide. Se aparecer 2+, varie ("Aliás",
+  "Tudo isso", "O resultado", ou conectores naturais)
+- "Dessa forma," "Nesse sentido," "Em suma," → use transições humanas
+  ("E aí", "O resultado", "No fim")
 - NUNCA travessão (—) — use vírgula ou parênteses
-- Sem frases picotadas estilo IA ("Queda. Alta. Recuperação.")
+- Frases picotadas ("Queda. Alta.") → reescreva como ideia fluida
 
-LINGUAGEM ACESSÍVEL:
-- Troque termos complicados por palavras simples
+LINGUAGEM — humanize sem perder densidade:
 - "Concomitantemente" → "ao mesmo tempo"
 - "Outrossim" → "além disso"
 - "Por conseguinte" → "por isso"
-- "Mediante" → "via" / "através de"
-- Jargão técnico desnecessário → explique em palavra simples
-- Frases longas com 2+ subordinações → quebre em 2
+- Jargão financeiro técnico está OK (público é investidor)
+- NÃO simplifique conceitos — só vocabulário desnecessariamente formal
+- MANTENHA subordinações que carregam nuance ("o que mostra que",
+  "embora", "ainda que", "mesmo com")
 
-MANTER OBRIGATORIAMENTE:
-- O sentido original e todos os dados/números
-- O tamanho aproximado (180-420 chars)
-- Negritos em FRASES inteiras (4-12 palavras com sentido). Se o texto
-  tinha **palavra isolada** (ex: **9%**), reescreva pra envolver
-  numa frase: **a queda de 9% no trimestre**
-- Aspas duplas " (nunca simples ')
-- Parágrafos separados por \\n\\n (mantém estrutura)
-- Números arredondados (R$ 14 bi, não R$ 14,247 bi)
+ESTRUTURA QUE MANTÉM PROFUNDIDADE:
+- Tamanho: mantenha aproximadamente igual ao original (idealmente
+  320-400 chars se o original era assim)
+- Parágrafos separados por \\n\\n (2-3 por slide normalmente)
+- Negritos em FRASES inteiras (4-12 palavras). Se tinha **palavra
+  isolada**, ENVOLVA numa frase: **a queda de 9% no trimestre**
+- Aspas duplas " (não ')
+- Números arredondados quando possível
+
+EXEMPLO DO RIGHT WAY:
+ORIG: "Na prática, o que acontece é que o Banco Central foi forçado
+a subir os juros porque a inflação não cedia. Vale destacar que isso
+tem consequências severas pro consumidor de classe média que depende
+de crédito pra fechar o mês."
+POLIDO BOM: "O Banco Central foi forçado a subir os juros porque a
+inflação não cedia, e a consequência aparece exatamente no consumidor
+de classe média que depende de crédito pra fechar o mês."
+POLIDO RUIM (encolheu demais): "O BC subiu os juros. Isso prejudica
+a classe média." — NÃO faça assim.
 
 RESPOSTA: SOMENTE JSON, sem markdown:
-{"texto_novo": "texto reescrito completo", "mudancas_principais": ["lista breve dos principais ajustes feitos"]}"""
+{"texto_novo": "texto reescrito completo com densidade", "mudancas_principais": ["lista breve dos ajustes"]}"""
 
 
 @app.route("/api/polir-slide", methods=["POST"])
@@ -2312,11 +2333,20 @@ def api_polir_slide():
             return jsonify({"error": "Resposta inválida do Claude", "raw": out[:300]}), 500
         # Sanitiza o resultado pelos mesmos filtros que o gerador
         texto_novo = _sanitizar_slide(dados.get("texto_novo", ""))
+        # Guardrail: se o polido encolheu mais de 25% do original, ALERTA
+        # mas devolve mesmo assim pra usuario decidir
+        encolheu = False
+        ratio = len(texto_novo) / max(1, len(texto))
+        if ratio < 0.75:
+            encolheu = True
         return jsonify({
             "ok": True,
             "texto_original": texto,
             "texto_novo": texto_novo,
             "mudancas": dados.get("mudancas_principais", []),
+            "encolheu": encolheu,
+            "chars_antes": len(texto),
+            "chars_depois": len(texto_novo),
         })
     except Exception as e:
         msg = str(e)

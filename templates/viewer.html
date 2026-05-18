@@ -658,7 +658,10 @@
       const mudancas = (data.mudancas || []).map(m => `<li>${m.replace(/</g,'&lt;')}</li>`).join('');
       const orig = (data.texto_original || original || '').replace(/</g,'&lt;').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
       const novo = (data.texto_novo || '').replace(/</g,'&lt;').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
-      body = `
+      const alerta_encolheu = data.encolheu
+        ? `<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;font-size:12px;color:#92400e;margin-bottom:12px"><strong>⚠ Versão polida encolheu ${Math.round((1 - data.chars_depois/data.chars_antes) * 100)}%.</strong> Se ficou raso, cancele e tente de novo (Claude às vezes encurta demais).</div>`
+        : '';
+      body = alerta_encolheu + `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
           <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:14px">
             <div style="font-size:10px;font-weight:700;color:#991b1b;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">ANTES (${(data.texto_original||original||'').length} chars)</div>
