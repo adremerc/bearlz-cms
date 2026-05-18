@@ -7,10 +7,44 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
 .btn-add{padding:6px 12px;font-size:11px;font-weight:700;background:#111;color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:inherit}
 .btn-rem{padding:6px 10px;font-size:11px;font-weight:600;background:#fff;color:#c0392b;border:1px solid #e0e0e0;border-radius:7px;cursor:pointer;font-family:inherit}
 .btn-rem:disabled{color:#ccc;cursor:default}
-.top-dots{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap;justify-content:center}
-.top-dot{height:7px;border-radius:4px;border:none;cursor:grab;padding:0;transition:all .25s;background:#d0d0d0}
-.top-dot:active{cursor:grabbing}
-.top-dot.active{background:#1d9bf0;width:20px}
+.top-dots{display:flex;gap:5px;margin-bottom:14px;flex-wrap:wrap;justify-content:center}
+/* Chips numerados — elegantes e faceis de agarrar pro drag-and-drop.
+   Tamanho confortavel (24-26px largura), border-radius arredondado,
+   numero do slide visivel, transicao suave. */
+.top-dot{
+  height:24px;
+  min-width:24px;
+  padding:0 8px;
+  border-radius:7px;
+  border:none;
+  cursor:grab;
+  transition:all .2s ease;
+  background:#eef0f3;
+  color:#6b7280;
+  font-size:11px;
+  font-weight:600;
+  font-family:inherit;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  line-height:1;
+  box-shadow:0 1px 2px rgba(0,0,0,.04);
+  user-select:none;
+}
+.top-dot:hover{
+  background:#dbeafe;
+  color:#1d4ed8;
+  transform:translateY(-1px);
+  box-shadow:0 2px 6px rgba(29,78,216,.18);
+}
+.top-dot:active{cursor:grabbing;transform:scale(.95)}
+.top-dot.active{
+  background:linear-gradient(135deg,#1d9bf0,#1781cc);
+  color:#fff;
+  min-width:28px;
+  box-shadow:0 2px 8px rgba(29,155,240,.4);
+}
+.top-dot.active:hover{transform:translateY(-1px) scale(1.02)}
 .nav-wrap{display:flex;align-items:center;gap:10px;width:100%;max-width:490px;justify-content:center}
 .arrow-btn{width:34px;height:34px;border-radius:50%;background:#fff;border:1px solid #e0e0e0;color:#333;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit}
 .arrow-btn:disabled{background:#e8e8e8;color:#ccc;cursor:default}

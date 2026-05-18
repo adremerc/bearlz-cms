@@ -302,9 +302,9 @@ function render(){
   const total=slides.length;
   document.getElementById('subtitle').textContent=`${total} slides · Gabriel Bearlz`;
   const td=document.getElementById('topDots');
-  // Cada dot eh draggable pra permitir reorder estilo Canva.
-  // data-idx guarda o indice original, onclick navega normal.
-  td.innerHTML=slides.map((_,i)=>`<button class="top-dot${i===cur?' active':''}" style="width:${i===cur?20:7}px" data-idx="${i}" draggable="true" onclick="goTo(${i})" title="Slide ${i+1} — arraste pra reordenar"></button>`).join('');
+  // Chips numerados, draggable pra reordenar. Numero do slide visivel
+  // pra usuario saber qual eh qual. Mais facil de agarrar que dot 7px.
+  td.innerHTML=slides.map((_,i)=>`<button class="top-dot${i===cur?' active':''}" data-idx="${i}" draggable="true" onclick="goTo(${i})" title="Slide ${i+1} — clique pra navegar ou arraste pra reordenar">${i+1}</button>`).join('');
   _bindDotsDragAndDrop();
   document.getElementById('btnPrev').disabled=cur===0;
   document.getElementById('btnNext').disabled=cur===total-1;
