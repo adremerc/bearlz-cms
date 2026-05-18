@@ -2127,6 +2127,50 @@ def api_img_search():
     return jsonify({"ok": True, "fotos": fotos})
 
 
+@app.route("/api/check-pt", methods=["POST"])
+def api_check_pt():
+    """Verifica erros ortograficos/gramaticais via LanguageTool (free API).
+    Body: {text: "...", remove_md: bool}. Retorna matches do LanguageTool.
+    Free tier: ~20 req/min, sem key."""
+    data = request.get_json() or {}
+    texto = (data.get("text") or "").strip()
+    if not texto:
+        return jsonify({"error": "texto vazio"}), 400
+    # Remove markdown bold pra nao confundir o checker
+    texto_limpo = re.sub(r"\*\*([^*]+)\*\*", r"\1", texto)
+    try:
+        import requests as _req
+        r = _req.post(
+            "https://api.languagetool.org/v2/check",
+            data={
+                "text": texto_limpo,
+                "language": "pt-BR",
+                "enabledOnly": "false",
+            },
+            timeout=20,
+            headers={"User-Agent": "BearlzCMS/1.0"}
+        )
+        if r.status_code != 200:
+            return jsonify({"error": f"LanguageTool {r.status_code}"}), 502
+        data_lt = r.json()
+        matches = []
+        for m in data_lt.get("matches", []):
+            sug = [r.get("value", "") for r in m.get("replacements", [])][:5]
+            matches.append({
+                "offset": m.get("offset", 0),
+                "length": m.get("length", 0),
+                "message": m.get("message", ""),
+                "short": m.get("shortMessage", ""),
+                "suggestions": sug,
+                "category": (m.get("rule", {}) or {}).get("category", {}).get("name", ""),
+                "type": (m.get("rule", {}) or {}).get("issueType", ""),
+                "context": (m.get("context", {}) or {}).get("text", ""),
+            })
+        return jsonify({"ok": True, "matches": matches, "total": len(matches)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/img-proxy", methods=["GET"])
 def api_img_proxy():
     """Proxy de imagem: baixa a URL externa e devolve com CORS aberto.

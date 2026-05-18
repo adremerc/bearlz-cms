@@ -1001,6 +1001,83 @@ window._updateCharCount=_updateCharCount;
 function liveUpdate(val){slides[cur].text=val;const paras=val.split(/\n\n+/).map(p=>`<span style="display:block;margin-bottom:16px">${toHTML(p)}</span>`).join('');document.getElementById('textDisplay').innerHTML=paras;}
 function saveEdit(){slides[cur].text=document.getElementById('editTA').value;editingText=false;render();autoSave();}
 
+/* ── Revisor de portugues (LanguageTool) ──
+   Verifica erros ortograficos e gramaticais no texto do textarea. */
+async function revisarPortugues(){
+  const ta=document.getElementById('editTA');
+  if(!ta){return;}
+  const text=ta.value.trim();
+  if(!text){return;}
+  // Renderiza modal de loading no parent (iframe) pra ter espaco
+  const sendToParent = window.parent && window.parent !== window;
+  if(sendToParent){
+    try{
+      window.parent.postMessage({type:'bearlz-revisar-pt-start',text:text},'*');
+    }catch(e){}
+  }
+  // Chama backend
+  try{
+    const r=await fetch('/api/check-pt',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({text:text})
+    });
+    const d=await r.json();
+    if(sendToParent){
+      try{
+        window.parent.postMessage({type:'bearlz-revisar-pt-result',data:d,text:text},'*');
+      }catch(e){}
+    } else {
+      _showRevisarLocal(d,text);
+    }
+  }catch(e){
+    if(sendToParent){
+      try{ window.parent.postMessage({type:'bearlz-revisar-pt-result',data:{error:e.message},text:text},'*'); }catch(_){}
+    }
+  }
+}
+window.revisarPortugues=revisarPortugues;
+
+// Listener: parent posta correcao aplicada
+window.addEventListener('message',function(e){
+  if(!e.data||typeof e.data!=='object')return;
+  if(e.data.type==='bearlz-revisar-pt-apply' && typeof e.data.text==='string'){
+    const ta=document.getElementById('editTA');
+    if(ta){
+      ta.value=e.data.text;
+      _updateCharCount(ta.value);
+      if(typeof liveUpdate==='function')liveUpdate(ta.value);
+      if(typeof autoSave==='function')autoSave();
+    }
+  }
+});
+
+// Fallback local (sem iframe) — modal embutido simples
+function _showRevisarLocal(d,text){
+  let m=document.getElementById('revisarPtModal');
+  if(!m){
+    m=document.createElement('div');
+    m.id='revisarPtModal';
+    m.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99999;padding:24px;overflow-y:auto';
+    m.onclick=(e)=>{if(e.target===m)m.style.display='none';};
+    document.body.appendChild(m);
+  }
+  const matches=(d&&d.matches)||[];
+  m.innerHTML=`<div style="background:#fff;border-radius:12px;max-width:640px;width:100%;margin:0 auto;padding:18px;font-family:'Open Sans',sans-serif">
+    <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eee;padding-bottom:8px;margin-bottom:12px">
+      <strong>📝 Revisão PT — ${matches.length} ${matches.length===1?'erro':'erros'}</strong>
+      <button onclick="document.getElementById('revisarPtModal').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer">×</button>
+    </div>
+    ${matches.length===0?'<p style="color:#10b981;padding:20px;text-align:center">✓ Nenhum erro encontrado</p>':matches.map(em=>`
+      <div style="border:1px solid #fee2e2;background:#fef2f2;border-radius:8px;padding:10px;margin-bottom:8px">
+        <div style="font-size:12px;color:#991b1b;font-weight:600">${em.message}</div>
+        ${em.suggestions.length?`<div style="margin-top:4px;font-size:11px">Sugestões: ${em.suggestions.map(s=>`<code style="background:#dbeafe;color:#1e3a8a;padding:2px 6px;border-radius:4px;margin-right:4px">${s}</code>`).join('')}</div>`:''}
+      </div>
+    `).join('')}
+  </div>`;
+  m.style.display='block';
+}
+
 /* ── Image ── */
 function onImgFile(input){
   const f=input.files[0];if(!f)return;

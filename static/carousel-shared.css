@@ -68,6 +68,14 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
 .edit-actions{display:flex;gap:6px;margin-top:8px;align-items:center;position:sticky;bottom:0;background:#fff;padding:6px 0 2px;z-index:50}
 .btn-save{padding:9px 18px;font-size:13px;font-weight:700;background:#1d9bf0;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(29,155,240,.35)}
 .btn-save:hover{background:#1781cc}
+.btn-revisar-pt{
+  padding:7px 14px;font-size:12px;font-weight:600;
+  background:#fef3c7;color:#92400e;
+  border:1px solid #fde68a;border-radius:7px;
+  cursor:pointer;font-family:inherit;
+  transition:all .15s;
+}
+.btn-revisar-pt:hover{background:#fcd34d;color:#78350f;transform:translateY(-1px)}
 
 /* Modo edicao: text-area SOBE acima da imagem e nao corta. O .card todo
    ganha class 'editing' pra ESCONDER a imagem temporariamente — assim

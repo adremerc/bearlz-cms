@@ -542,6 +542,82 @@
     });
   }
 
+  // ── Revisar PT: modal renderizado no parent (mais espaço) ──
+  let _revisarTextOriginal = '';
+  function openParentRevisarPt(data, originalText) {
+    _revisarTextOriginal = originalText || '';
+    let m = document.getElementById('parentRevisarPtModal');
+    if (!m) {
+      m = document.createElement('div');
+      m.id = 'parentRevisarPtModal';
+      m.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99999;padding:24px;overflow-y:auto';
+      m.onclick = (e) => { if (e.target === m) m.style.display = 'none'; };
+      document.body.appendChild(m);
+    }
+    const matches = (data && data.matches) || [];
+    const err = data && data.error;
+    let body = '';
+    if (err) {
+      body = `<div style="padding:14px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;color:#991b1b">Erro: ${err}</div>`;
+    } else if (matches.length === 0) {
+      body = `<div style="padding:30px;text-align:center;color:#10b981;font-size:14px">
+        <div style="font-size:32px;margin-bottom:8px">✓</div>
+        <strong>Nenhum erro encontrado!</strong>
+        <div style="margin-top:6px;color:#6b7280;font-size:12px">Texto sem erros ortográficos ou gramaticais.</div>
+      </div>`;
+    } else {
+      body = matches.map((em, i) => {
+        const sug = (em.suggestions || []).map((s, j) =>
+          `<button data-i="${i}" data-j="${j}" class="revisar-sug-btn" style="background:#dbeafe;color:#1e3a8a;padding:4px 10px;border-radius:6px;margin:0 4px 4px 0;border:none;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit">${s.replace(/</g,'&lt;')}</button>`
+        ).join('');
+        const cat = em.category ? `<span style="font-size:10px;background:#e5e7eb;color:#4b5563;padding:2px 6px;border-radius:4px;margin-left:6px">${em.category}</span>` : '';
+        const ctx = em.context ? `<div style="font-size:11px;color:#6b7280;margin:6px 0;font-family:monospace;background:#f9fafb;padding:6px 8px;border-radius:4px">${em.context.replace(/</g,'&lt;')}</div>` : '';
+        return `<div style="border:1px solid #fee2e2;background:#fef2f2;border-radius:8px;padding:12px;margin-bottom:10px">
+          <div style="font-size:13px;color:#991b1b;font-weight:600;margin-bottom:4px">${em.message.replace(/</g,'&lt;')}${cat}</div>
+          ${ctx}
+          ${sug ? `<div style="margin-top:6px;font-size:11px;color:#374151">Sugestões: ${sug}</div>` : ''}
+        </div>`;
+      }).join('');
+    }
+    m.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:680px;width:100%;margin:0 auto;padding:18px 22px;font-family:'Open Sans',sans-serif">
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f0f0f0;padding-bottom:8px;margin-bottom:12px">
+        <div>
+          <strong style="font-size:15px">📝 Revisão Português</strong>
+          <span style="font-size:11px;color:#6b7280;margin-left:6px">${matches.length} ${matches.length === 1 ? 'erro encontrado' : 'erros encontrados'}</span>
+        </div>
+        <button onclick="document.getElementById('parentRevisarPtModal').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#999">×</button>
+      </div>
+      <div style="max-height:60vh;overflow-y:auto">${body}</div>
+    </div>`;
+    // Wire up sugestões clicáveis: aplica a correção no texto e re-envia pro iframe
+    m.querySelectorAll('.revisar-sug-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = parseInt(btn.dataset.i, 10);
+        const j = parseInt(btn.dataset.j, 10);
+        const match = matches[i];
+        const sugText = match.suggestions[j];
+        if (!match || sugText === undefined) return;
+        // Aplica a sugestão substituindo no texto original
+        const before = _revisarTextOriginal.slice(0, match.offset);
+        const after = _revisarTextOriginal.slice(match.offset + match.length);
+        const newText = before + sugText + after;
+        _revisarTextOriginal = newText;
+        // Envia o novo texto pro iframe
+        const iframe = document.getElementById('carrossel-frame');
+        if (iframe && iframe.contentWindow) {
+          iframe.contentWindow.postMessage({type: 'bearlz-revisar-pt-apply', text: newText}, '*');
+        }
+        // Re-checa: marca esse match como aplicado
+        btn.style.background = '#10b981';
+        btn.style.color = '#fff';
+        btn.textContent = '✓ ' + sugText;
+        btn.disabled = true;
+        toast('Correção aplicada — feche e revise o restante');
+      });
+    });
+    m.style.display = 'block';
+  }
+
   // Listener pras mensagens do iframe
   window.addEventListener('message', (e) => {
     if (!e.data || typeof e.data !== 'object') return;
@@ -549,6 +625,23 @@
       openParentHooks();
     } else if (e.data.type === 'bearlz-gallery-open') {
       openParentGallery(e.data.images || []);
+    } else if (e.data.type === 'bearlz-revisar-pt-start') {
+      // Mostra loading enquanto o iframe consulta
+      let m = document.getElementById('parentRevisarPtModal');
+      if (!m) {
+        m = document.createElement('div');
+        m.id = 'parentRevisarPtModal';
+        m.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99999;padding:24px;overflow-y:auto';
+        m.onclick = (ev) => { if (ev.target === m) m.style.display = 'none'; };
+        document.body.appendChild(m);
+      }
+      m.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:520px;margin:0 auto;padding:30px;text-align:center;font-family:'Open Sans',sans-serif">
+        <div style="font-size:14px;color:#1e3a8a">📝 Verificando ortografia e gramática...</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:4px">LanguageTool, 1-3 segundos</div>
+      </div>`;
+      m.style.display = 'block';
+    } else if (e.data.type === 'bearlz-revisar-pt-result') {
+      openParentRevisarPt(e.data.data, e.data.text);
     }
   });
   window.openParentHooks    = openParentHooks;
