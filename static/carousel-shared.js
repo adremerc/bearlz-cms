@@ -325,9 +325,12 @@ function render(){
     document.getElementById('textDisplay').style.display='none';
     document.getElementById('textEditArea').style.display='block';
     document.getElementById('editTA').value=s.text;
-    _ensureEditButtons(); // injeta Revisar PT + char-count em posts antigos
     if(textAreaEl)textAreaEl.classList.add('editing-mode');
     if(cardEl)cardEl.classList.add('editing-text');
+    // Injeta Revisar PT + Polir + char-count em posts antigos
+    // Roda DEPOIS do display:block pra garantir que o .edit-actions
+    // esteja visivel quando a injecao acontece.
+    setTimeout(_ensureEditButtons, 20);
     // Auto-scroll pro textarea ficar visivel no iframe
     setTimeout(()=>{
       const ta=document.getElementById('editTA');
