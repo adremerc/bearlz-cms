@@ -302,7 +302,10 @@ function render(){
   const total=slides.length;
   document.getElementById('subtitle').textContent=`${total} slides · Gabriel Bearlz`;
   const td=document.getElementById('topDots');
-  td.innerHTML=slides.map((_,i)=>`<button class="top-dot${i===cur?' active':''}" style="width:${i===cur?20:7}px" onclick="goTo(${i})"></button>`).join('');
+  // Cada dot eh draggable pra permitir reorder estilo Canva.
+  // data-idx guarda o indice original, onclick navega normal.
+  td.innerHTML=slides.map((_,i)=>`<button class="top-dot${i===cur?' active':''}" style="width:${i===cur?20:7}px" data-idx="${i}" draggable="true" onclick="goTo(${i})" title="Slide ${i+1} — arraste pra reordenar"></button>`).join('');
+  _bindDotsDragAndDrop();
   document.getElementById('btnPrev').disabled=cur===0;
   document.getElementById('btnNext').disabled=cur===total-1;
   document.getElementById('btnRem').disabled=total<=1;
@@ -898,6 +901,58 @@ function toggleFreeEdit(){
 }
 window.toggleFreeEdit=toggleFreeEdit;
 
+/* ── Reordenar slides via drag and drop nos top-dots (Canva-style) ──
+   Usuario arrasta um dot pra outra posicao e o array de slides eh
+   reordenado. Mantem o slide atual na posicao "que foi movida". */
+let _dragIdx = -1;
+function _bindDotsDragAndDrop(){
+  const td=document.getElementById('topDots');
+  if(!td)return;
+  td.querySelectorAll('.top-dot').forEach(dot=>{
+    dot.addEventListener('dragstart',(e)=>{
+      _dragIdx=parseInt(dot.dataset.idx,10);
+      dot.style.opacity='0.4';
+      try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',_dragIdx);}catch(err){}
+    });
+    dot.addEventListener('dragend',()=>{
+      dot.style.opacity='';
+      _dragIdx=-1;
+      td.querySelectorAll('.top-dot').forEach(d=>d.style.boxShadow='');
+    });
+    dot.addEventListener('dragover',(e)=>{
+      e.preventDefault();
+      try{e.dataTransfer.dropEffect='move';}catch(err){}
+      td.querySelectorAll('.top-dot').forEach(d=>d.style.boxShadow='');
+      dot.style.boxShadow='0 0 0 2px #1d9bf0';
+    });
+    dot.addEventListener('dragleave',()=>{
+      dot.style.boxShadow='';
+    });
+    dot.addEventListener('drop',(e)=>{
+      e.preventDefault();
+      const fromIdx=_dragIdx;
+      const toIdx=parseInt(dot.dataset.idx,10);
+      td.querySelectorAll('.top-dot').forEach(d=>d.style.boxShadow='');
+      if(fromIdx<0||toIdx<0||fromIdx===toIdx)return;
+      // Reordena: tira do fromIdx, insere no toIdx
+      const moved=slides.splice(fromIdx,1)[0];
+      slides.splice(toIdx,0,moved);
+      // Ajusta cur pra continuar mostrando o slide que estava ativo
+      if(cur===fromIdx){
+        cur=toIdx;
+      }else if(fromIdx<cur && toIdx>=cur){
+        cur=cur-1;
+      }else if(fromIdx>cur && toIdx<=cur){
+        cur=cur+1;
+      }
+      render();
+      autoSave();
+      if(typeof setStatus==='function')setStatus('✓ Slide movido: posição '+(fromIdx+1)+' → '+(toIdx+1));
+      setTimeout(()=>{if(typeof setStatus==='function')setStatus('');},2500);
+    });
+  });
+}
+
 /* ── Navigation ── */
 function goTo(i){cur=i;editingText=false;showImgCtrl=false;document.getElementById('imgCtrlPanel').style.display='none';render();}
 function navigate(d){goTo(Math.max(0,Math.min(slides.length-1,cur+d)));}
@@ -923,7 +978,26 @@ function onAvatarFile(input){
 }
 
 /* ── Text editing ── */
-function startEdit(){editingText=true;render();setTimeout(()=>document.getElementById('editTA').focus(),10);}
+function startEdit(){editingText=true;render();setTimeout(()=>{const ta=document.getElementById('editTA');if(ta){ta.focus();_updateCharCount(ta.value);}},10);}
+
+/* Contador de caracteres ao vivo com cores semaforicas:
+   - verde:  < 280 (ideal)
+   - laranja: 280-380 (limite confortavel)
+   - vermelho: > 380 (perto do max 420)
+   - vermelho forte: > 420 (vai estourar) */
+function _updateCharCount(value){
+  const el=document.getElementById('charCount');
+  if(!el)return;
+  const n=(value||'').length;
+  let color='#10b981'; // verde
+  let label=n+' / 420';
+  if(n>420){color='#dc2626';label=n+' / 420 ⚠ MAX';} // vermelho forte
+  else if(n>380){color='#ea580c';label=n+' / 420';}    // laranja
+  else if(n>280){color='#f59e0b';label=n+' / 420';}    // amarelo
+  el.textContent=label;
+  el.style.color=color;
+}
+window._updateCharCount=_updateCharCount;
 function liveUpdate(val){slides[cur].text=val;const paras=val.split(/\n\n+/).map(p=>`<span style="display:block;margin-bottom:16px">${toHTML(p)}</span>`).join('');document.getElementById('textDisplay').innerHTML=paras;}
 function saveEdit(){slides[cur].text=document.getElementById('editTA').value;editingText=false;render();autoSave();}
 

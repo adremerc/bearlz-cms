@@ -8,7 +8,8 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
 .btn-rem{padding:6px 10px;font-size:11px;font-weight:600;background:#fff;color:#c0392b;border:1px solid #e0e0e0;border-radius:7px;cursor:pointer;font-family:inherit}
 .btn-rem:disabled{color:#ccc;cursor:default}
 .top-dots{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap;justify-content:center}
-.top-dot{height:7px;border-radius:4px;border:none;cursor:pointer;padding:0;transition:all .25s;background:#d0d0d0}
+.top-dot{height:7px;border-radius:4px;border:none;cursor:grab;padding:0;transition:all .25s;background:#d0d0d0}
+.top-dot:active{cursor:grabbing}
 .top-dot.active{background:#1d9bf0;width:20px}
 .nav-wrap{display:flex;align-items:center;gap:10px;width:100%;max-width:490px;justify-content:center}
 .arrow-btn{width:34px;height:34px;border-radius:50%;background:#fff;border:1px solid #e0e0e0;color:#333;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit}
