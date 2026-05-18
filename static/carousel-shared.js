@@ -325,6 +325,7 @@ function render(){
     document.getElementById('textDisplay').style.display='none';
     document.getElementById('textEditArea').style.display='block';
     document.getElementById('editTA').value=s.text;
+    _ensureEditButtons(); // injeta Revisar PT + char-count em posts antigos
     if(textAreaEl)textAreaEl.classList.add('editing-mode');
     if(cardEl)cardEl.classList.add('editing-text');
     // Auto-scroll pro textarea ficar visivel no iframe
@@ -1000,6 +1001,53 @@ function _updateCharCount(value){
 window._updateCharCount=_updateCharCount;
 function liveUpdate(val){slides[cur].text=val;const paras=val.split(/\n\n+/).map(p=>`<span style="display:block;margin-bottom:16px">${toHTML(p)}</span>`).join('');document.getElementById('textDisplay').innerHTML=paras;}
 function saveEdit(){slides[cur].text=document.getElementById('editTA').value;editingText=false;render();autoSave();}
+
+/* ── Garante elementos do edit area em posts ANTIGOS ──
+   Posts gerados antes do template ter btn-revisar-pt + char-count + lang
+   nao tem esses elementos no HTML. Injeta dinamicamente. */
+function _ensureEditButtons(){
+  const ta=document.getElementById('editTA');
+  if(ta){
+    // Spellcheck nativo e lang pt-BR no textarea
+    if(ta.getAttribute('lang')!=='pt-BR')ta.setAttribute('lang','pt-BR');
+    if(ta.getAttribute('spellcheck')!=='true')ta.setAttribute('spellcheck','true');
+  }
+  const actions=document.querySelector('#textEditArea .edit-actions');
+  if(!actions)return;
+  // Botao Revisar PT — injeta se nao existir
+  if(!actions.querySelector('.btn-revisar-pt')){
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.className='btn-revisar-pt';
+    btn.textContent='📝 Revisar PT';
+    btn.title='Verifica ortografia e gramática via LanguageTool';
+    btn.onclick=function(){revisarPortugues();};
+    // Insere depois do btn-save
+    const save=actions.querySelector('.btn-save');
+    if(save&&save.nextSibling)actions.insertBefore(btn,save.nextSibling);
+    else if(save)save.parentNode.appendChild(btn);
+    else actions.appendChild(btn);
+  }
+  // Contador de chars — injeta se nao existir
+  if(!actions.querySelector('#charCount')){
+    const cc=document.createElement('span');
+    cc.id='charCount';
+    cc.className='char-count';
+    cc.style.cssText='margin-left:auto;font-size:11px;font-weight:700;color:#10b981';
+    cc.textContent='0 / 420';
+    actions.appendChild(cc);
+    if(ta)_updateCharCount(ta.value);
+  }
+  // Adiciona handler de input pra atualizar contador
+  if(ta && !ta._editHandlersBound){
+    ta._editHandlersBound=true;
+    ta.addEventListener('input',function(){
+      _updateCharCount(this.value);
+      if(typeof liveUpdate==='function')liveUpdate(this.value);
+      if(typeof autoSave==='function')autoSave();
+    });
+  }
+}
 
 /* ── Revisor de portugues (LanguageTool) ──
    Verifica erros ortograficos e gramaticais no texto do textarea. */
