@@ -2136,6 +2136,7 @@ def _detect_vicios_ia(texto: str):
 
     # 1. Cliches/mulet
     cliches = [
+        # Conectores burocráticos
         (r"\bNa pr[áa]tica,?", "'Na prática' é clichê de IA. Va direto ao ponto."),
         (r"\bO que acontece [eé] que,?", "'O que acontece é que' é clichê de IA."),
         (r"\bVale destacar(?:\s+que)?,?", "'Vale destacar' soa burocrático. Apenas destaque o ponto."),
@@ -2146,6 +2147,23 @@ def _detect_vicios_ia(texto: str):
         (r"\bNesse sentido,?", "'Nesse sentido' é clichê. Use algo mais direto."),
         (r"\bEm suma,?", "'Em suma' soa formal demais. Reescreva o fechamento."),
         (r"\bPor outro lado,?", "'Por outro lado' é muleta. Use 'mas', 'só que'."),
+        # Ganchos dramáticos tipicos de IA — pseudo-suspense pra "criar engajamento"
+        (r"\b(?:E\s+)?isso muda tudo\b\.?", "'Isso muda tudo' é fechamento dramático cara de IA. Reescreva mostrando O QUE muda concretamente."),
+        (r"\b(?:Só|So) que ningu[eé]m (?:est[aá]|ta) falando\b", "'Só que ninguém está falando' é gancho dramático de IA. Afirme o ponto direto."),
+        (r"\bningu[eé]m (?:te )?conta(?:\s+isso)?\b", "'Ninguém te conta' é gancho dramático de IA. Va direto pro fato."),
+        (r"\bo que ningu[eé]m (?:te\s+)?(?:fala|conta|diz)\b", "'O que ninguém te conta' é gancho dramático de IA."),
+        (r"\b(?:Mas\s+)?a verdade [eé] que,?", "'A verdade é que' é gancho de IA. Apenas afirme o fato."),
+        (r"\bA realidade [eé] que,?", "'A realidade é que' é gancho de IA. Apenas afirme o fato."),
+        (r"\bO que poucos sabem,?", "'O que poucos sabem' é gancho dramático de IA."),
+        (r"\bPouca gente sabe\b", "'Pouca gente sabe' é gancho dramático de IA."),
+        (r"\b(?:Eis|Aqui est[aá]) o (?:problema|ponto|detalhe|pulo do gato)\b", "Esse tipo de 'eis o problema' é gancho cara de IA."),
+        (r"\b(?:vira|virou) o jogo\b", "'Vira o jogo' é metáfora desgastada de IA."),
+        (r"\bjoga tudo (?:pelos ares|por terra)\b", "'Joga tudo pelos ares' é metáfora desgastada."),
+        (r"\bmuda o jogo\b", "'Muda o jogo' é metáfora desgastada de IA."),
+        (r"\b(?:E )?[eé] (?:isso|aqui) que muda tudo\b", "'É isso que muda tudo' é fechamento dramático de IA."),
+        (r"\bo (?:grande )?problema [eé] que,?", "'O problema é que' como abertura é gancho de IA. Apenas afirme."),
+        (r"\bisso (?:n[ãa]o [eé] coincid[êe]ncia|n[ãa]o [eé] [aà]\s*toa)\b", "'Não é coincidência/à toa' é dramatização cara de IA."),
+        (r"\b(?:e )?[eé] (?:exatamente )?(?:a[ií]|nesse momento) que\b", "'É aí que' como gancho repetido vira tique de IA."),
     ]
     for pattern, msg in cliches:
         for m in re.finditer(pattern, texto, re.IGNORECASE):
@@ -2268,6 +2286,24 @@ VOZ HUMANIZADA — remova clichês SUBSTITUINDO por linguagem natural:
   ("E aí", "O resultado", "No fim")
 - NUNCA travessão (—) — use vírgula ou parênteses
 - Frases picotadas ("Queda. Alta.") → reescreva como ideia fluida
+
+GANCHOS DRAMÁTICOS DE IA — REMOVA SEMPRE (são a cara da IA):
+- "Isso muda tudo" / "E isso muda tudo" / "é isso que muda tudo" /
+  "muda o jogo" / "vira o jogo" → REMOVA o fechamento dramático e
+  EXPLIQUE concretamente o que muda (ex.: "isso muda tudo pra renda
+  fixa" → "investidor de renda fixa vai sentir no rendimento mensal")
+- "Só que ninguém está falando" / "Ninguém te conta" / "O que poucos
+  sabem" / "Pouca gente sabe" → CORTA o gancho de suspense. Vá direto
+  pro fato. Não precisa anunciar que é informação rara.
+- "A verdade é que" / "A realidade é que" / "O problema é que" como
+  abertura → REMOVA. Apenas afirme o ponto sem o preâmbulo.
+- "Eis o problema" / "Aqui está o ponto" / "Esse é o pulo do gato" →
+  REMOVA. Esse tipo de anúncio é narrativa de IA.
+- "Isso não é coincidência" / "Isso não é à toa" → REMOVA. Se há
+  causa, mostre a causa em vez de anunciar que existe.
+
+Princípio: textos humanos AFIRMAM. Textos de IA ANUNCIAM. Corte os
+anúncios e mantenha as afirmações.
 
 LINGUAGEM — humanize sem perder densidade:
 - "Concomitantemente" → "ao mesmo tempo"

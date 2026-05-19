@@ -15,6 +15,44 @@ function toHTML(text){
 const LS_KEY=window.CAROUSEL_LS_KEY||'bearlz_carousel_v1';
 let _saveTimer,_serverSaveTimer,_lastServerUpdate=null,_myAutor='Anonimo';
 
+/* ── Status de revisao por slide ────────────────────────────────
+   Guardado em localStorage separado do estado do carrossel pra nao
+   poluir o sync com o servidor. Chave indexada por HASH do conteudo
+   do slide — se o texto mudar, o hash muda e o status some
+   automaticamente (forca nova revisao). */
+const REVIEW_LS_KEY=(window.CAROUSEL_LS_KEY||'bearlz_carousel_v1')+'_review';
+function _slideHash(text){
+  if(!text)return '';
+  let h=0;
+  const s=text.normalize?text.normalize('NFKC'):text;
+  for(let i=0;i<s.length;i++){h=((h<<5)-h+s.charCodeAt(i))|0;}
+  return h.toString(36)+'_'+s.length;
+}
+function _getReviewMap(){
+  try{const r=localStorage.getItem(REVIEW_LS_KEY);return r?JSON.parse(r):{};}
+  catch(e){return {};}
+}
+function _saveReviewMap(m){
+  try{localStorage.setItem(REVIEW_LS_KEY,JSON.stringify(m));}catch(e){}
+}
+function isSlideReviewed(idx){
+  const s=slides[idx];if(!s)return false;
+  const h=_slideHash(s.text||'');if(!h)return false;
+  const m=_getReviewMap();
+  return !!(m[h]&&m[h].reviewed);
+}
+function toggleSlideReviewed(){
+  const s=slides[cur];if(!s)return;
+  const h=_slideHash(s.text||'');if(!h)return;
+  const m=_getReviewMap();
+  if(m[h]&&m[h].reviewed)delete m[h];
+  else m[h]={reviewed:true,reviewedAt:Date.now()};
+  _saveReviewMap(m);
+  render();
+}
+window.toggleSlideReviewed=toggleSlideReviewed;
+window.isSlideReviewed=isSlideReviewed;
+
 function _getUserIdentity(){
   let u=localStorage.getItem('bearlz_user');
   if(!u){
@@ -304,7 +342,15 @@ function render(){
   const td=document.getElementById('topDots');
   // Chips numerados, draggable pra reordenar. Numero do slide visivel
   // pra usuario saber qual eh qual. Mais facil de agarrar que dot 7px.
-  td.innerHTML=slides.map((_,i)=>`<button class="top-dot${i===cur?' active':''}" data-idx="${i}" draggable="true" onclick="goTo(${i})" title="Slide ${i+1} — clique pra navegar ou arraste pra reordenar">${i+1}</button>`).join('');
+  // Cor do chip indica status de revisao:
+  //   .reviewed → verde (slide ja foi marcado como revisado)
+  //   .pending  → vermelho (ainda nao revisado ou texto mudou desde)
+  td.innerHTML=slides.map((_,i)=>{
+    const rev=isSlideReviewed(i);
+    const revCls=rev?' reviewed':' pending';
+    const revLbl=rev?' ✓ revisado':' • pendente';
+    return `<button class="top-dot${i===cur?' active':''}${revCls}" data-idx="${i}" draggable="true" onclick="goTo(${i})" title="Slide ${i+1}${revLbl} — clique pra navegar ou arraste pra reordenar">${i+1}</button>`;
+  }).join('');
   _bindDotsDragAndDrop();
   document.getElementById('btnPrev').disabled=cur===0;
   document.getElementById('btnNext').disabled=cur===total-1;
@@ -1042,6 +1088,18 @@ function _ensureEditButtons(){
     if(revisar&&revisar.nextSibling)actions.insertBefore(btn,revisar.nextSibling);
     else actions.appendChild(btn);
   }
+  // Botao Marcar revisao — toggle verde/vermelho do chip do slide atual
+  if(!actions.querySelector('.btn-mark-reviewed')){
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.className='btn-mark-reviewed';
+    btn.title='Marca esse slide como revisado. O chip fica verde no topo. Se editar o texto depois, o status reseta automaticamente.';
+    btn.onclick=function(){toggleSlideReviewed();};
+    const polir=actions.querySelector('.btn-polir');
+    if(polir&&polir.nextSibling)actions.insertBefore(btn,polir.nextSibling);
+    else actions.appendChild(btn);
+  }
+  _updateMarkReviewedBtn();
   // Contador de chars — injeta se nao existir
   if(!actions.querySelector('#charCount')){
     const cc=document.createElement('span');
@@ -1060,6 +1118,24 @@ function _ensureEditButtons(){
       if(typeof liveUpdate==='function')liveUpdate(this.value);
       if(typeof autoSave==='function')autoSave();
     });
+  }
+}
+
+/* Atualiza estado visual do botao Marcar como revisado.
+   Chamado pelo _ensureEditButtons (que roda apos cada entrada em
+   edit mode). Reflete o status atual do slide via hash. */
+function _updateMarkReviewedBtn(){
+  const btn=document.querySelector('#textEditArea .btn-mark-reviewed');
+  if(!btn)return;
+  const rev=isSlideReviewed(cur);
+  if(rev){
+    btn.textContent='✓ Revisado';
+    btn.classList.add('is-reviewed');
+    btn.title='Slide marcado como revisado. Clique pra desmarcar.';
+  } else {
+    btn.textContent='○ Marcar revisado';
+    btn.classList.remove('is-reviewed');
+    btn.title='Marca esse slide como revisado. Chip fica verde. Se editar o texto, reseta sozinho.';
   }
 }
 
