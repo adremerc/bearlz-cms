@@ -1063,27 +1063,43 @@ function _ensureEditButtons(){
   }
   const actions=document.querySelector('#textEditArea .edit-actions');
   if(!actions)return;
-  // Botao Revisar PT — injeta se nao existir
-  if(!actions.querySelector('.btn-revisar-pt')){
-    const btn=document.createElement('button');
-    btn.type='button';
-    btn.className='btn-revisar-pt';
-    btn.textContent='📝 Revisar PT';
-    btn.title='Verifica ortografia e gramática via LanguageTool';
-    btn.onclick=function(){revisarPortugues();};
+  // SVG do botao Revisar PT — Heroicons "language" icon
+  const SVG_REVISAR=
+    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    +'<path d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/>'
+    +'</svg>'
+    +'<span class="label">Revisar PT</span>';
+  // Botao Revisar PT — injeta se nao existir, ou MIGRA se ja existir
+  // com formato antigo (emoji 📝 estatico). Posts gerados antes da
+  // migracao pra SVG nao tem o markup novo no HTML.
+  let btnRev=actions.querySelector('.btn-revisar-pt');
+  if(!btnRev){
+    btnRev=document.createElement('button');
+    btnRev.type='button';
+    btnRev.className='btn-revisar-pt';
+    btnRev.title='Verifica ortografia e gramática via LanguageTool';
+    btnRev.onclick=function(){revisarPortugues();};
+    btnRev.innerHTML=SVG_REVISAR;
     const save=actions.querySelector('.btn-save');
-    if(save&&save.nextSibling)actions.insertBefore(btn,save.nextSibling);
-    else if(save)save.parentNode.appendChild(btn);
-    else actions.appendChild(btn);
+    if(save&&save.nextSibling)actions.insertBefore(btnRev,save.nextSibling);
+    else if(save)save.parentNode.appendChild(btnRev);
+    else actions.appendChild(btnRev);
+  } else if(!btnRev.querySelector('svg')){
+    // Migra botao legado (texto "📝 Revisar PT") pro novo SVG
+    btnRev.innerHTML=SVG_REVISAR;
   }
-  // Botao Polir — usa Claude pra reescrever sem vicios + simplificar
+  // Botao Polir — SVG "sparkles" (Heroicons) + label.
   if(!actions.querySelector('.btn-polir')){
     const btn=document.createElement('button');
     btn.type='button';
     btn.className='btn-polir';
-    btn.textContent='✨ Polir';
     btn.title='Reescreve o slide com Claude removendo vícios de IA e simplificando linguagem';
     btn.onclick=function(){polirSlide();};
+    btn.innerHTML=
+      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      +'<path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>'
+      +'</svg>'
+      +'<span class="label">Polir</span>';
     const revisar=actions.querySelector('.btn-revisar-pt');
     if(revisar&&revisar.nextSibling)actions.insertBefore(btn,revisar.nextSibling);
     else actions.appendChild(btn);

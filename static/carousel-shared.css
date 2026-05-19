@@ -87,20 +87,20 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
   color:#fff;
   border-bottom:3px solid #10b981;
 }
-/* Botao Marcar revisado — design coerente com Salvar/Polir.
-   Estado pendente: branco com borda sutil cinza + circulo vazio (SVG).
-   Estado revisado: gradient verde solido + check (SVG).
-   Animacao spring no toggle, SVGs trocam via display none/inline-block. */
+/* Botao Marcar revisado — toggle de estado.
+   Pendente: fundo slate-50, borda sutil, ícone slate cinza (parece
+   um botao "ghost" com identidade — nao se confunde com branco generico).
+   Revisado: gradient verde solido + check SVG branco. */
 .btn-mark-reviewed{
   display:inline-flex;
   align-items:center;
   gap:6px;
-  padding:7px 12px;
+  padding:7px 13px;
   font-size:12px;
   font-weight:600;
-  background:#fff;
-  color:#6b7280;
-  border:1.5px solid #e5e7eb;
+  background:#f8fafc;
+  color:#475569;
+  border:1.5px solid #cbd5e1;
   border-radius:7px;
   cursor:pointer;
   font-family:inherit;
@@ -115,11 +115,11 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
 }
 .btn-mark-reviewed .ico-check{display:none}
 .btn-mark-reviewed:hover{
-  background:#f0fdf4;
+  background:#ecfdf5;
   border-color:#10b981;
   color:#059669;
   transform:translateY(-1px);
-  box-shadow:0 2px 6px rgba(16,185,129,.18);
+  box-shadow:0 2px 6px rgba(16,185,129,.2);
 }
 .btn-mark-reviewed.is-reviewed{
   background:linear-gradient(135deg,#10b981,#059669);
@@ -161,23 +161,59 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
 .edit-actions{display:flex;gap:6px;margin-top:8px;align-items:center;position:sticky;bottom:0;background:#fff;padding:6px 0 2px;z-index:50}
 .btn-save{padding:9px 18px;font-size:13px;font-weight:700;background:#1d9bf0;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(29,155,240,.35)}
 .btn-save:hover{background:#1781cc}
+/* Botoes de acao do edit-area (Revisar PT / Polir / Marcar revisado).
+   Todos com mesma "linguagem visual": altura igual, padding igual,
+   SVG 13x13 com label flexbox e gap consistente.
+   So o que muda eh a paleta e o peso da fonte. */
 .btn-revisar-pt{
-  padding:7px 14px;font-size:12px;font-weight:600;
-  background:#fef3c7;color:#92400e;
-  border:1px solid #fde68a;border-radius:7px;
-  cursor:pointer;font-family:inherit;
-  transition:all .15s;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:7px 13px;
+  font-size:12px;
+  font-weight:600;
+  background:#fef3c7;
+  color:#92400e;
+  border:1.5px solid #fde68a;
+  border-radius:7px;
+  cursor:pointer;
+  font-family:inherit;
+  transition:all .18s cubic-bezier(.4,0,.2,1);
+  white-space:nowrap;
+  line-height:1;
 }
-.btn-revisar-pt:hover{background:#fcd34d;color:#78350f;transform:translateY(-1px)}
+.btn-revisar-pt svg{flex-shrink:0;opacity:.9}
+.btn-revisar-pt:hover{
+  background:#fde68a;
+  color:#78350f;
+  border-color:#fcd34d;
+  transform:translateY(-1px);
+  box-shadow:0 2px 6px rgba(217,119,6,.2);
+}
 .btn-polir{
-  padding:7px 14px;font-size:12px;font-weight:700;
-  background:linear-gradient(135deg,#a78bfa,#8b5cf6);color:#fff;
-  border:none;border-radius:7px;
-  cursor:pointer;font-family:inherit;
-  transition:all .15s;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:7px 13px;
+  font-size:12px;
+  font-weight:700;
+  background:linear-gradient(135deg,#a78bfa,#8b5cf6);
+  color:#fff;
+  border:1.5px solid transparent;
+  border-radius:7px;
+  cursor:pointer;
+  font-family:inherit;
+  transition:all .18s cubic-bezier(.4,0,.2,1);
   box-shadow:0 2px 6px rgba(139,92,246,.3);
+  white-space:nowrap;
+  line-height:1;
 }
-.btn-polir:hover{background:linear-gradient(135deg,#8b5cf6,#7c3aed);transform:translateY(-1px);box-shadow:0 3px 10px rgba(139,92,246,.5)}
+.btn-polir svg{flex-shrink:0}
+.btn-polir:hover{
+  background:linear-gradient(135deg,#8b5cf6,#7c3aed);
+  transform:translateY(-1px);
+  box-shadow:0 3px 10px rgba(139,92,246,.5);
+}
 
 /* Modo edicao: text-area SOBE acima da imagem e nao corta. O .card todo
    ganha class 'editing' pra ESCONDER a imagem temporariamente — assim

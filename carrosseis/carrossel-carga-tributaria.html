@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Carrossel — A Armadilha Fiscal Brasileira | Gabriel Bearlz</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Roboto:wght@400;700;900&family=Poppins:wght@400;600;700;800&family=Montserrat:wght@400;600;700;800&family=Open+Sans:wght@400;600;700;800&family=Lato:wght@400;700;900&family=Playfair+Display:wght@400;700;900&family=Merriweather:wght@400;700;900&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="/static/carousel-shared.css?v=27">
+<link rel="stylesheet" href="/static/carousel-shared.css?v=29">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 </head>
@@ -62,7 +62,7 @@
         <textarea class="edit-textarea" id="editTA" lang="pt-BR" spellcheck="true" oninput="updateEditPreview();_updateCharCount(this.value);if(typeof autoSave==='function')autoSave();if(typeof liveUpdate==='function')liveUpdate(this.value)"></textarea>
         <div class="edit-actions">
           <button class="btn-save" onclick="saveEdit()">Salvar</button>
-          <button class="btn-revisar-pt" type="button" onclick="revisarPortugues()" title="Verifica ortografia e gramática via LanguageTool">📝 Revisar PT</button>
+          <button class="btn-revisar-pt" type="button" onclick="revisarPortugues()" title="Verifica ortografia e gramática via LanguageTool"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/></svg><span class="label">Revisar PT</span></button>
           <span class="edit-hint">**texto** = negrito · Ctrl+S salva</span>
           <span class="char-count" id="charCount" style="margin-left:auto;font-size:11px;font-weight:700;color:#10b981">0 / 420</span>
         </div>
@@ -445,6 +445,6 @@ const slides=[
 window.CAROUSEL_SLUG='carga-tributaria';
 window.CAROUSEL_LS_KEY='bearlz_carga_tributaria_v1';
 </script>
-<script src="/static/carousel-shared.js?v=27"></script>
+<script src="/static/carousel-shared.js?v=29"></script>
 </body>
 </html>
