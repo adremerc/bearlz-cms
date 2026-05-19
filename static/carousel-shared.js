@@ -1088,13 +1088,25 @@ function _ensureEditButtons(){
     if(revisar&&revisar.nextSibling)actions.insertBefore(btn,revisar.nextSibling);
     else actions.appendChild(btn);
   }
-  // Botao Marcar revisao — toggle verde/vermelho do chip do slide atual
+  // Botao Marcar revisao — toggle verde/vermelho do chip do slide atual.
+  // SVG inline em vez de unicode pra renderizar igual em qualquer fonte.
+  // ico-empty = circulo vazio (pendente), ico-check = circulo preenchido
+  // com check dentro (revisado). CSS toggle via .is-reviewed mostra um ou outro.
   if(!actions.querySelector('.btn-mark-reviewed')){
     const btn=document.createElement('button');
     btn.type='button';
     btn.className='btn-mark-reviewed';
     btn.title='Marca esse slide como revisado. O chip fica verde no topo. Se editar o texto depois, o status reseta automaticamente.';
     btn.onclick=function(){toggleSlideReviewed();};
+    btn.innerHTML=
+      '<svg class="ico-empty" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      +'<circle cx="12" cy="12" r="9"/>'
+      +'</svg>'
+      +'<svg class="ico-check" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true">'
+      +'<circle cx="12" cy="12" r="10" fill="currentColor"/>'
+      +'<path d="M8 12.5 L11 15.5 L16.5 9.5" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+      +'</svg>'
+      +'<span class="label">Marcar revisado</span>';
     const polir=actions.querySelector('.btn-polir');
     if(polir&&polir.nextSibling)actions.insertBefore(btn,polir.nextSibling);
     else actions.appendChild(btn);
@@ -1123,18 +1135,21 @@ function _ensureEditButtons(){
 
 /* Atualiza estado visual do botao Marcar como revisado.
    Chamado pelo _ensureEditButtons (que roda apos cada entrada em
-   edit mode). Reflete o status atual do slide via hash. */
+   edit mode). Reflete o status atual do slide via hash.
+   Os SVGs (ico-empty/ico-check) ficam fixos no DOM — o toggle eh
+   feito por CSS via .is-reviewed. Aqui so atualizamos label e classe. */
 function _updateMarkReviewedBtn(){
   const btn=document.querySelector('#textEditArea .btn-mark-reviewed');
   if(!btn)return;
+  const label=btn.querySelector('.label');
   const rev=isSlideReviewed(cur);
   if(rev){
-    btn.textContent='✓ Revisado';
     btn.classList.add('is-reviewed');
+    if(label)label.textContent='Revisado';
     btn.title='Slide marcado como revisado. Clique pra desmarcar.';
   } else {
-    btn.textContent='○ Marcar revisado';
     btn.classList.remove('is-reviewed');
+    if(label)label.textContent='Marcar revisado';
     btn.title='Marca esse slide como revisado. Chip fica verde. Se editar o texto, reseta sozinho.';
   }
 }

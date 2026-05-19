@@ -63,23 +63,19 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
   position:relative;
 }
 .top-dot.reviewed:hover{background:#dcfce7;color:#14532d}
+/* Check verde no canto superior direito. SVG embutido via background-image
+   pra renderizar igual em qualquer fonte/browser (sem depender de unicode). */
 .top-dot.reviewed::before{
-  content:'✓';
+  content:'';
   position:absolute;
   top:-4px;
   right:-4px;
-  width:12px;
-  height:12px;
+  width:13px;
+  height:13px;
   border-radius:50%;
-  background:#10b981;
-  color:#fff;
-  font-size:9px;
-  font-weight:900;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  line-height:1;
-  box-shadow:0 1px 2px rgba(0,0,0,.15);
+  background:#10b981 url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'><polyline points='5 12 10 17 19 7'/></svg>") center/8px 8px no-repeat;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);
+  border:1.5px solid #fff;
 }
 .top-dot.active.pending{
   background:linear-gradient(135deg,#1d9bf0,#1781cc);
@@ -91,28 +87,57 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
   color:#fff;
   border-bottom:3px solid #10b981;
 }
-/* Botao Marcar revisado — toggle pendente/revisado pro slide atual */
+/* Botao Marcar revisado — design coerente com Salvar/Polir.
+   Estado pendente: branco com borda sutil cinza + circulo vazio (SVG).
+   Estado revisado: gradient verde solido + check (SVG).
+   Animacao spring no toggle, SVGs trocam via display none/inline-block. */
 .btn-mark-reviewed{
-  padding:7px 12px;font-size:11px;font-weight:700;
-  background:#fff;color:#6b7280;
-  border:1.5px solid #d1d5db;border-radius:7px;
-  cursor:pointer;font-family:inherit;
-  transition:all .15s;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:7px 12px;
+  font-size:12px;
+  font-weight:600;
+  background:#fff;
+  color:#6b7280;
+  border:1.5px solid #e5e7eb;
+  border-radius:7px;
+  cursor:pointer;
+  font-family:inherit;
+  transition:all .18s cubic-bezier(.4,0,.2,1);
   white-space:nowrap;
+  line-height:1;
 }
+.btn-mark-reviewed .ico-empty,
+.btn-mark-reviewed .ico-check{
+  flex-shrink:0;
+  display:inline-block;
+}
+.btn-mark-reviewed .ico-check{display:none}
 .btn-mark-reviewed:hover{
-  background:#f0fdf4;border-color:#10b981;color:#10b981;
+  background:#f0fdf4;
+  border-color:#10b981;
+  color:#059669;
   transform:translateY(-1px);
+  box-shadow:0 2px 6px rgba(16,185,129,.18);
 }
 .btn-mark-reviewed.is-reviewed{
   background:linear-gradient(135deg,#10b981,#059669);
-  color:#fff;border-color:#059669;
-  box-shadow:0 2px 6px rgba(16,185,129,.3);
+  color:#fff;
+  border-color:#059669;
+  box-shadow:0 2px 8px rgba(16,185,129,.35);
+  font-weight:700;
 }
+.btn-mark-reviewed.is-reviewed .ico-empty{display:none}
+.btn-mark-reviewed.is-reviewed .ico-check{display:inline-block}
 .btn-mark-reviewed.is-reviewed:hover{
   background:linear-gradient(135deg,#059669,#047857);
-  color:#fff;border-color:#047857;
+  border-color:#047857;
+  color:#fff;
+  transform:translateY(-1px);
+  box-shadow:0 3px 10px rgba(16,185,129,.45);
 }
+.btn-mark-reviewed:active{transform:translateY(0) scale(.97)}
 .nav-wrap{display:flex;align-items:center;gap:10px;width:100%;max-width:490px;justify-content:center}
 .arrow-btn{width:34px;height:34px;border-radius:50%;background:#fff;border:1px solid #e0e0e0;color:#333;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:inherit}
 .arrow-btn:disabled{background:#e8e8e8;color:#ccc;cursor:default}
