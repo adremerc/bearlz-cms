@@ -2356,9 +2356,9 @@ def _detect_vicios_ia(texto: str):
         (r"\bPor outro lado,?", "'Por outro lado' é muleta. Use 'mas', 'só que'."),
         # Ganchos dramáticos tipicos de IA — pseudo-suspense pra "criar engajamento"
         (r"\b(?:E\s+)?isso muda tudo\b\.?", "'Isso muda tudo' é fechamento dramático cara de IA. Reescreva mostrando O QUE muda concretamente."),
-        (r"\b(?:Só|So) que ningu[eé]m (?:est[aá]|ta) falando\b", "'Só que ninguém está falando' é gancho dramático de IA. Afirme o ponto direto."),
-        (r"\bningu[eé]m (?:te )?conta(?:\s+isso)?\b", "'Ninguém te conta' é gancho dramático de IA. Va direto pro fato."),
-        (r"\bo que ningu[eé]m (?:te\s+)?(?:fala|conta|diz)\b", "'O que ninguém te conta' é gancho dramático de IA."),
+        (r"\b(?:Só|So) que ningu[eé]m (?:est[aá]|ta|esta) (?:falando|comentando|olhando|notando|prestando|reparando)\b", "'Só que ninguém está falando' é gancho dramático de IA. Afirme o ponto direto."),
+        (r"\bningu[eé]m (?:te\s+)?(?:fala|comenta|conta|diz)(?:\s+(?:isso|sobre|disso|nisso))?\b", "'Ninguém fala/conta isso' é gancho dramático de IA. Va direto pro fato."),
+        (r"\bo que ningu[eé]m (?:te\s+)?(?:fala|conta|diz|comenta)\b", "'O que ninguém te conta' é gancho dramático de IA."),
         (r"\b(?:Mas\s+)?a verdade [eé] que,?", "'A verdade é que' é gancho de IA. Apenas afirme o fato."),
         (r"\bA realidade [eé] que,?", "'A realidade é que' é gancho de IA. Apenas afirme o fato."),
         (r"\bO que poucos sabem,?", "'O que poucos sabem' é gancho dramático de IA."),
@@ -3148,6 +3148,138 @@ def api_gerar():
 
 
 # ── Gerador de 3 hooks (slide 1) por abordagem: Curiosidade / Dor / Promessa ───
+
+def _extrair_todos_slides(slug: str):
+    """Le o HTML salvo do carrossel e retorna lista de {idx, text}.
+    Usado pelos endpoints de verificacao pra rodar checagem de dados
+    em carrosseis ja gerados. Retorna None se carrossel nao existe ou
+    HTML nao pode ser lido."""
+    with get_db() as conn:
+        row = conn.execute("SELECT arquivo, titulo FROM carrosseis WHERE slug=?", (slug,)).fetchone()
+    if not row or not row["arquivo"]:
+        return None
+    html_path = _find_carrossel_file(row["arquivo"])
+    if not html_path:
+        return None
+    try:
+        html = html_path.read_text(encoding="utf-8")
+    except Exception:
+        return None
+    arr_start = html.find("const slides=[")
+    if arr_start == -1:
+        return None
+    arr_end = html.find("\n];", arr_start)
+    if arr_end == -1:
+        return None
+    bloco = html[arr_start:arr_end]
+    textos = re.findall(r"text:`([^`]*)`", bloco, flags=re.DOTALL)
+    return [{"idx": i, "text": t.strip()} for i, t in enumerate(textos)]
+
+
+@app.route("/api/verificar-texto", methods=["POST"])
+def api_verificar_texto():
+    """Verifica um texto livre: detecta anos antigos sem contexto historico
+    + vicios de IA. Usado pelo painel /verificar pra checar conteudo antes
+    de virar carrossel."""
+    data = request.get_json() or {}
+    texto = (data.get("text") or "").strip()
+    if not texto:
+        return jsonify({"error": "texto vazio"}), 400
+    # Empacota como pseudo-slide pra reutilizar _validar_datas_2026
+    avisos_data = _validar_datas_2026([{"text": texto}], ano_atual=2026)
+    vicios = _detect_vicios_ia(texto)
+    return jsonify({
+        "ok": True,
+        "avisos_data": avisos_data,
+        "vicios_ia": vicios,
+        "chars": len(texto),
+    })
+
+
+@app.route("/api/verificar-carrossel/<slug>", methods=["GET"])
+def api_verificar_carrossel(slug):
+    """Roda validacao de datas + vicios IA em cada slide de um carrossel
+    ja gerado. Devolve: {slides: [{idx, text, avisos_data, vicios_ia}],
+    total_avisos, titulo}."""
+    slides = _extrair_todos_slides(slug)
+    if slides is None:
+        return jsonify({"error": "carrossel nao encontrado ou HTML invalido"}), 404
+    with get_db() as conn:
+        row = conn.execute("SELECT titulo FROM carrosseis WHERE slug=?", (slug,)).fetchone()
+    titulo = row["titulo"] if row else slug
+    # Valida em batch usando a funcao existente (que ja indexa por slide)
+    avisos_data_global = _validar_datas_2026(slides, ano_atual=2026)
+    # Indexa avisos por slide pra UI mostrar agrupado
+    avisos_por_slide = {}
+    for a in avisos_data_global:
+        avisos_por_slide.setdefault(a["slide"], []).append(a)
+    # Roda vicios IA por slide
+    out = []
+    total_avisos = len(avisos_data_global)
+    total_vicios = 0
+    for s in slides:
+        idx = s["idx"]
+        vicios = _detect_vicios_ia(s["text"])
+        total_vicios += len(vicios)
+        out.append({
+            "idx": idx,
+            "text": s["text"],
+            "avisos_data": avisos_por_slide.get(idx + 1, []),
+            "vicios_ia": vicios,
+        })
+    return jsonify({
+        "ok": True,
+        "slug": slug,
+        "titulo": titulo,
+        "slides": out,
+        "total_avisos_data": total_avisos,
+        "total_vicios": total_vicios,
+        "n_slides": len(slides),
+    })
+
+
+@app.route("/api/verificar-todos", methods=["GET"])
+def api_verificar_todos():
+    """Varre todos os carrosseis cadastrados e retorna resumo:
+    {carrosseis: [{slug, titulo, status, n_avisos_data, n_vicios, n_slides}]}.
+    Usado pelo dashboard /verificar pra mostrar overview rapido de
+    quais carrosseis precisam de revisao."""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT slug, titulo, status, created_at FROM carrosseis ORDER BY created_at DESC"
+        ).fetchall()
+    out = []
+    for r in rows:
+        slug = r["slug"]
+        slides = _extrair_todos_slides(slug)
+        if slides is None:
+            out.append({
+                "slug": slug, "titulo": r["titulo"], "status": r["status"],
+                "n_avisos_data": 0, "n_vicios": 0, "n_slides": 0,
+                "indisponivel": True,
+                "created_fmt": fmt_data(r["created_at"]),
+            })
+            continue
+        avisos = _validar_datas_2026(slides, ano_atual=2026)
+        n_vicios = 0
+        for s in slides:
+            n_vicios += len(_detect_vicios_ia(s["text"]))
+        out.append({
+            "slug": slug, "titulo": r["titulo"], "status": r["status"],
+            "n_avisos_data": len(avisos),
+            "n_vicios": n_vicios,
+            "n_slides": len(slides),
+            "created_fmt": fmt_data(r["created_at"]),
+        })
+    return jsonify({"ok": True, "carrosseis": out})
+
+
+@app.route("/verificar")
+def pagina_verificar():
+    """Painel de verificacao de dados — checa carrosseis existentes
+    + permite testar texto livre antes de gerar."""
+    return render_template("verificar.html")
+
 
 def _extrair_contexto_carrossel(slug: str):
     """Le o HTML do carrossel e extrai titulo + texto do slide 1 atual + resumo
