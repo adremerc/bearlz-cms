@@ -1462,6 +1462,24 @@ SYSTEM_GERAR_DEFAULT = (
     "Você é redator sênior de conteúdo financeiro para @gabriel.bearlz no Instagram.\n"
     "Estilo: análise aprofundada que cria autoridade. Público: investidores brasileiros 25-45.\n\n"
 
+    "🔴 CONTEXTO TEMPORAL — REGRA INVIOLÁVEL #0:\n"
+    "- Hoje é MAIO DE 2026. Todo conteúdo é publicado em 2026.\n"
+    "- Use SEMPRE tempos verbais e referencias compativeis com 2026:\n"
+    "  * 'neste ano' / 'em 2026' / 'atualmente' = AGORA, dado de 2026\n"
+    "  * 'ano passado' = 2025\n"
+    "  * Citar 2024 ou anterior SEM marcar como historico = ERRO GRAVE\n"
+    "- Se o brief tem fonte marcada com [FONTE ANTIGA] ou data <2026:\n"
+    "  * USE o dado, MAS contextualize com a data explicita: 'em 2024, ...'\n"
+    "  * NAO apresente como 'recente' ou 'atual'\n"
+    "- Se o brief NAO tem dado recente de 2026 sobre o topico central:\n"
+    "  * PREFIRA falar conceitualmente (causa/efeito, mecanica do problema)\n"
+    "  * NUNCA fabrique numeros 'parecidos com 2026' a partir de dados antigos\n"
+    "  * Mencione '2025 foi o ultimo dado disponivel' se for relevante\n"
+    "- Numeros sem data explicita devem ser DE 2026 ou claramente atemporais\n"
+    "  (ex: 'PIB do Brasil eh ~R$ 11 trilhoes' — atemporal-ish, OK; "
+    "'Selic esta em 11%' — implica 2026, so use se o brief confirmar)\n"
+    "- PROIBIDO: 'recentemente o BC anunciou X' sem o brief ter dado de 2026\n\n"
+
     "VOZ — ESCRITA HUMANIZADA (foco #1):\n"
     "- Escreva como um analista CONVERSANDO com o leitor, não como IA\n"
     "- Tom analítico, assertivo, levemente provocador — você vê o que outros não veem\n"
@@ -1712,6 +1730,84 @@ _BROWSER_HEADERS = {
     "Sec-Fetch-User": "?1",
     "Upgrade-Insecure-Requests": "1",
 }
+
+_INSTAGRAM_DOMAINS = ("instagram.com", "instagr.am")
+def _is_instagram_url(url: str) -> bool:
+    """Detecta URLs de Instagram (post, reel, perfil). Instagram requer
+    login pra ver conteudo via web — sem credenciais, scraping pega so
+    o HTML publico (meta tags). Util pra avisar o user."""
+    try:
+        from urllib.parse import urlparse
+        host = (urlparse(url).hostname or "").lower()
+        return any(host == d or host.endswith("." + d) for d in _INSTAGRAM_DOMAINS)
+    except Exception:
+        return False
+
+
+def _extract_publish_date(html_or_soup, url: str = ""):
+    """Tenta extrair a data de publicacao do HTML do artigo via:
+    1. <meta property="article:published_time">
+    2. <meta property="og:updated_time">, <meta itemprop="datePublished">
+    3. JSON-LD: {"@type":"NewsArticle","datePublished":"..."}
+    4. <time datetime="..."> dentro de article/header
+    Retorna 'YYYY-MM-DD' (string) ou None se nao achar."""
+    try:
+        if hasattr(html_or_soup, "find"):
+            soup = html_or_soup
+        else:
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html_or_soup, "html.parser")
+    except Exception:
+        return None
+
+    # 1. Meta tags padrao OpenGraph/Schema
+    META_KEYS = [
+        ("property", "article:published_time"),
+        ("name",     "article:published_time"),
+        ("property", "og:published_time"),
+        ("property", "og:updated_time"),
+        ("itemprop", "datePublished"),
+        ("name",     "datePublished"),
+        ("name",     "pubdate"),
+        ("name",     "publication-date"),
+        ("name",     "date"),
+        ("name",     "DC.date.issued"),
+    ]
+    for attr, val in META_KEYS:
+        tag = soup.find("meta", attrs={attr: val})
+        if tag and tag.get("content"):
+            m = re.search(r"(\d{4})-(\d{2})-(\d{2})", tag["content"])
+            if m:
+                return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+    # 2. JSON-LD
+    for script in soup.find_all("script", type="application/ld+json"):
+        try:
+            txt = script.string or script.get_text() or ""
+            for m in re.finditer(r'"datePublished"\s*:\s*"([^"]+)"', txt):
+                d = re.search(r"(\d{4})-(\d{2})-(\d{2})", m.group(1))
+                if d:
+                    return f"{d.group(1)}-{d.group(2)}-{d.group(3)}"
+        except Exception:
+            continue
+    # 3. <time datetime="...">
+    t = soup.find("time")
+    if t and t.get("datetime"):
+        m = re.search(r"(\d{4})-(\d{2})-(\d{2})", t["datetime"])
+        if m:
+            return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+    return None
+
+
+def _is_date_recent(date_str: str, min_year: int = 2026) -> bool:
+    """True se a data eh do ano corrente (>= min_year). False caso contrario.
+    Date format: YYYY-MM-DD"""
+    if not date_str:
+        return False
+    m = re.match(r"^(\d{4})-", date_str)
+    if not m:
+        return False
+    return int(m.group(1)) >= min_year
+
 
 def _wayback_fetch(url: str, max_chars: int = 4000):
     """Ultimo fallback: Wayback Machine. Util pra paginas de noticia
@@ -2010,17 +2106,30 @@ def _fetch_url_text(url: str, max_chars: int = 4000):
                     return fb
             if len(text) < 80:
                 return None
-        return {"text": text[:max_chars], "images": candidate_images, "source": "direct"}
+        # Extrai data de publicacao do HTML (meta tags + JSON-LD)
+        pub_date = _extract_publish_date(soup, url)
+        return {
+            "text": text[:max_chars],
+            "images": candidate_images,
+            "source": "direct",
+            "published_date": pub_date,
+        }
     except Exception:
         j = _jina_fetch(url, max_chars) or _wayback_fetch(url, max_chars)
         if j: j.setdefault("source", "jina")
         return j
 
-def _processar_brief_com_urls(brief: str):
+def _processar_brief_com_urls(brief: str, min_year: int = 2026):
     """Detecta URLs no brief, baixa o conteudo de cada uma e devolve:
     - brief com cada URL substituida por bloco [CONTEÚDO DO LINK ...]
-    - lista de info por URL (sucesso/falha + chars + qtd de imagens)
-    - lista global de imagens candidatas (com origem) que o Claude pode usar"""
+    - lista de info por URL (sucesso/falha + chars + qtd de imagens
+      + data de publicacao + flags is_instagram, is_stale)
+    - lista global de imagens candidatas (com origem) que o Claude pode usar
+
+    Tambem INJETA no brief enriquecido avisos sobre:
+    - URLs do Instagram: bloqueado pelo login wall, conteudo limitado
+    - URLs com data anterior a min_year: marca como [FONTE ANTIGA] pro Claude
+      saber que NÃO eh dado atual"""
     if not brief:
         return brief, [], []
     urls = URL_PATTERN.findall(brief)
@@ -2028,23 +2137,57 @@ def _processar_brief_com_urls(brief: str):
     urls = [u for u in urls if not (u in seen or seen.add(u))]
     info = []
     enriched = brief
-    all_images = []  # cada item: {"url_imagem": ..., "origem": <url do artigo>}
+    all_images = []
     for url in urls:
+        is_ig = _is_instagram_url(url)
         result = _fetch_url_text(url)
         if result:
-            bloco = f"\n\n[CONTEÚDO DO LINK {url}]\n{result['text']}\n[/CONTEÚDO]\n"
+            pub_date = result.get("published_date")
+            is_stale = bool(pub_date) and not _is_date_recent(pub_date, min_year)
+            # Header do bloco com avisos relevantes pro Claude
+            header_parts = [f"[CONTEÚDO DO LINK {url}]"]
+            if is_ig:
+                header_parts.append(
+                    "⚠ FONTE INSTAGRAM: conteudo pode estar incompleto. "
+                    "Instagram bloqueia scraping sem login. "
+                    "Use APENAS os fragmentos abaixo, NAO complete com suposicoes."
+                )
+            if pub_date:
+                if is_stale:
+                    header_parts.append(
+                        f"⚠ FONTE ANTIGA — publicada em {pub_date}. NAO use como "
+                        f"dado atual. Mencione data explicita ('em {pub_date[:4]}, ...') "
+                        f"ou peca por fonte mais recente."
+                    )
+                else:
+                    header_parts.append(f"Data de publicacao: {pub_date}")
+            bloco = "\n\n" + "\n".join(header_parts) + "\n" + result["text"] + "\n[/CONTEÚDO]\n"
             enriched = enriched.replace(url, bloco, 1)
             info.append({
                 "url": url, "ok": True,
                 "chars": len(result["text"]),
                 "imgs": len(result["images"]),
                 "source": result.get("source", "direct"),
+                "published_date": pub_date,
+                "is_instagram": is_ig,
+                "is_stale": is_stale,
             })
             for img_url in result["images"]:
                 all_images.append({"url_imagem": img_url, "origem": url})
         else:
-            info.append({"url": url, "ok": False, "chars": 0, "imgs": 0,
-                         "reason": "blocked"})
+            # Mesmo se falhou fetch: avisa Claude que era Instagram (provavel bloqueio)
+            if is_ig:
+                enriched = enriched.replace(
+                    url,
+                    f"[INSTAGRAM BLOQUEADO {url} — nao consegui ler. "
+                    f"NAO INVENTE conteudo desse post. Peca pro user colar o texto.]",
+                    1
+                )
+            info.append({
+                "url": url, "ok": False, "chars": 0, "imgs": 0,
+                "reason": "instagram_blocked" if is_ig else "blocked",
+                "is_instagram": is_ig,
+            })
     return enriched, info, all_images
 
 
@@ -2465,6 +2608,56 @@ def api_polir_slide():
         return jsonify({"error": str(e)}), 500
 
 
+def _validar_datas_2026(slides_raw, ano_atual: int = 2026):
+    """Varre o texto dos slides procurando datas suspeitas (anos antigos
+    sem contexto historico). Retorna lista de avisos pra UI mostrar
+    no painel de gerar pro user revisar manualmente.
+
+    Heuristica: ano 20XX < ano_atual eh suspeito A NAO SER QUE apareca
+    apos uma palavra-gatilho de contexto historico ('em', 'desde',
+    'durante', 'na crise de', 'fundado em', etc)."""
+    if not slides_raw:
+        return []
+    avisos = []
+    # Palavras antes do ano que indicam contexto historico legitimo
+    HIST_TRIGGER = re.compile(
+        r"\b(em|desde|antes\s+de|durante|durante\s+a|durante\s+o|"
+        r"na\s+crise\s+de|crise\s+de|do\s+ano\s+de|fundad[oa]\s+em|"
+        r"criad[oa]\s+em|nascid[oa]\s+em|recorde\s+de|historic[oa]|"
+        r"de\s+\d{4}\s+a|entre\s+\d{4}\s+e|relatorio\s+de|safra\s+de|"
+        r"eleicao\s+de|primeiro\s+semestre\s+de|segundo\s+semestre\s+de|"
+        r"trimestre\s+de|exercicio\s+de|balanco\s+de|resultado\s+de|"
+        r"ate)\s+$",
+        re.IGNORECASE
+    )
+    for i, s in enumerate(slides_raw):
+        texto = s.get("text", "")
+        if not texto:
+            continue
+        for m in re.finditer(r"\b(20\d{2})\b", texto):
+            ano = int(m.group(1))
+            if ano >= ano_atual:
+                continue  # ano atual ou futuro: OK
+            if ano < 1990:
+                continue  # nao vamos olhar antiguidade
+            ctx_antes = texto[max(0, m.start() - 60):m.start()]
+            # Se tem palavra-gatilho historica ANTES do ano, eh OK
+            if HIST_TRIGGER.search(ctx_antes + " "):
+                continue
+            # Se o ano tem barra/hifen depois (ex: 2024/2025, 2024-2026), pode ser range
+            ctx_depois = texto[m.end():m.end() + 5]
+            if re.match(r"\s*[/\-–—]\s*\d{4}", ctx_depois):
+                continue
+            avisos.append({
+                "slide": i + 1,
+                "ano_detectado": ano,
+                "trecho": texto[max(0, m.start() - 35):min(len(texto), m.end() + 35)],
+                "msg": f"Slide {i+1}: ano {ano} sem contexto historico explicito. "
+                       f"Confira se eh dado atual ou se precisa marcar com 'em {ano},...'",
+            })
+    return avisos
+
+
 def _shift_lt_offsets_to_original(lt_matches, original):
     """LanguageTool recebe texto SEM ** (markdown removido) e devolve
     offsets relativos a esse texto limpo. O frontend trabalha com o texto
@@ -2708,6 +2901,11 @@ def api_gerar():
         slides_raw   = dados.get("slides", [])
         titulo_gerado = dados.get("titulo", topico[:40])
 
+        # Validacao de datas: detecta anos < 2026 sem contexto historico
+        # (heuristica). NAO bloqueia geracao, devolve avisos_data pra UI
+        # mostrar pro user revisar manualmente.
+        avisos_data = _validar_datas_2026(slides_raw, ano_atual=2026)
+
         # Build image URLs
         PEXELS_FALLBACK = {
             "bitcoin": ["5980567","6770610","844124"],
@@ -2925,6 +3123,10 @@ def api_gerar():
 
         return jsonify({
             "ok": True, "slug": slug, "titulo": titulo_gerado, "url": f"/c/{slug}",
+            # Avisos pra revisao manual:
+            # - avisos_data: anos antigos detectados nos slides sem contexto
+            # - urls_fetched: cada URL tem is_instagram + is_stale + published_date
+            "avisos_data": avisos_data,
             "debug": {
                 "system_used":      SYSTEM,
                 "user_prompt":      prompt,
