@@ -609,7 +609,12 @@
       </div>
       <div style="max-height:60vh;overflow-y:auto">${body}</div>
     </div>`;
-    // Wire up sugestões clicáveis: aplica a correção no texto e re-envia pro iframe
+    // Wire up sugestões clicáveis: aplica a correção no texto e re-envia pro iframe.
+    // IMPORTANTE: cada match tem {offset, length} relativos ao texto ORIGINAL.
+    // Quando aplica uma correção, o texto encolhe/expande — preciso recalcular
+    // os offsets dos matches restantes pra eles continuarem apontando pro lugar
+    // certo no texto atualizado. Sem isso, aplicar 2 correções deixa fragmentos
+    // tipo "demaisdemais" porque a segunda usa offset desatualizado.
     m.querySelectorAll('.revisar-sug-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const i = parseInt(btn.dataset.i, 10);
@@ -617,7 +622,8 @@
         const match = matches[i];
         const sugText = match.suggestions[j];
         if (!match || sugText === undefined) return;
-        // Aplica a sugestão substituindo no texto original
+        if (match._applied || match._invalidated) return;  // proteção dupla-clique
+        // Aplica a sugestão substituindo no texto atualizado
         const before = _revisarTextOriginal.slice(0, match.offset);
         const after = _revisarTextOriginal.slice(match.offset + match.length);
         const newText = before + sugText + after;
@@ -627,12 +633,54 @@
         if (iframe && iframe.contentWindow) {
           iframe.contentWindow.postMessage({type: 'bearlz-revisar-pt-apply', text: newText}, '*');
         }
-        // Re-checa: marca esse match como aplicado
+        // Recalcula offsets dos OUTROS matches.
+        // - Se sobrepoem com o aplicado: invalida (não dá mais pra aplicar com confiança)
+        // - Se estão APÓS o aplicado: ajusta offset pelo delta (sugText - original)
+        // - Se estão ANTES do aplicado: não mexe
+        const delta = sugText.length - match.length;
+        const appliedStart = match.offset;
+        const appliedEnd = match.offset + match.length;
+        matches.forEach((other, idx) => {
+          if (idx === i || other._applied || other._invalidated) return;
+          const otherStart = other.offset;
+          const otherEnd = other.offset + other.length;
+          // Sobreposição: [otherStart, otherEnd) ∩ [appliedStart, appliedEnd) ≠ ∅
+          if (otherStart < appliedEnd && otherEnd > appliedStart) {
+            other._invalidated = true;
+            return;
+          }
+          // Após o aplicado: shift por delta
+          if (otherStart >= appliedEnd) {
+            other.offset += delta;
+          }
+        });
+        match._applied = true;
+        // UI: marca o botão clicado como aplicado
         btn.style.background = '#10b981';
         btn.style.color = '#fff';
         btn.textContent = '✓ ' + sugText;
         btn.disabled = true;
-        toast('Correção aplicada — feche e revise o restante');
+        // UI: desabilita os outros botões do MESMO match (já consumido)
+        m.querySelectorAll(`.revisar-sug-btn[data-i="${i}"]`).forEach(b => {
+          if (b === btn) return;
+          b.disabled = true;
+          b.style.opacity = '.35';
+          b.style.cursor = 'not-allowed';
+        });
+        // UI: desabilita botões de matches invalidados (sobrepostos)
+        m.querySelectorAll('.revisar-sug-btn').forEach(b => {
+          const bi = parseInt(b.dataset.i, 10);
+          if (bi === i) return;
+          if (matches[bi] && matches[bi]._invalidated && !b.disabled) {
+            b.disabled = true;
+            b.style.background = '#e5e7eb';
+            b.style.color = '#9ca3af';
+            b.style.textDecoration = 'line-through';
+            b.style.cursor = 'not-allowed';
+            b.title = 'Outra correção foi aplicada no mesmo trecho. Feche e rode Revisar PT de novo.';
+          }
+        });
+        toast('Correção aplicada');
       });
     });
     m.style.display = 'block';
