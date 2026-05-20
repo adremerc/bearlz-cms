@@ -2391,6 +2391,57 @@ def api_polir_slide():
         return jsonify({"error": str(e)}), 500
 
 
+def _shift_lt_offsets_to_original(lt_matches, original):
+    """LanguageTool recebe texto SEM ** (markdown removido) e devolve
+    offsets relativos a esse texto limpo. O frontend trabalha com o texto
+    ORIGINAL (com ** intactos). Sem ajuste, slice(offset, length) pega
+    trecho errado e a sugestao fica colada/duplicada na palavra.
+
+    Esta funcao constroi um mapping char-por-char do texto_limpo pro
+    texto original e traduz cada {offset, length} dos matches do LT.
+
+    Se nao ha ** no original, retorna os matches inalterados."""
+    if not lt_matches or "**" not in original:
+        return lt_matches
+    # clean_to_orig[k] = posicao no texto original equivalente ao char k
+    # do texto limpo (sem **). Cada par ** consome 2 indices do original
+    # sem avancar o limpo.
+    clean_to_orig = []
+    i = 0
+    n = len(original)
+    while i < n:
+        if i + 1 < n and original[i] == "*" and original[i+1] == "*":
+            i += 2
+            continue
+        clean_to_orig.append(i)
+        i += 1
+    n_clean = len(clean_to_orig)
+    for m in lt_matches:
+        off = m.get("offset", 0)
+        length = m.get("length", 0)
+        # Inicio (inclusivo) no texto original
+        if off < n_clean:
+            new_off = clean_to_orig[off]
+        elif n_clean > 0:
+            new_off = clean_to_orig[-1] + 1
+        else:
+            new_off = 0
+        # Fim (exclusivo) no texto original — pega o char limpo no
+        # offset+length-1 e soma 1 pra ter o fim exclusivo
+        end = off + length
+        if length == 0:
+            new_end = new_off
+        elif end - 1 < n_clean:
+            new_end = clean_to_orig[end - 1] + 1
+        elif n_clean > 0:
+            new_end = clean_to_orig[-1] + 1
+        else:
+            new_end = new_off
+        m["offset"] = new_off
+        m["length"] = new_end - new_off
+    return lt_matches
+
+
 @app.route("/api/check-pt", methods=["POST"])
 def api_check_pt():
     """Verifica erros ortograficos/gramaticais via LanguageTool (free API).
@@ -2400,11 +2451,11 @@ def api_check_pt():
     texto = (data.get("text") or "").strip()
     if not texto:
         return jsonify({"error": "texto vazio"}), 400
-    # Remove markdown bold pra nao confundir o checker (mas mantemos os offsets
-    # corretos no texto original tirando ** mas mantendo o texto interno).
-    # Pro check de vicios usamos o texto original (com ** intacto).
+    # Remove markdown bold pra nao confundir o checker. Os offsets do LT
+    # voltam relativos ao texto_limpo — sao traduzidos pro texto original
+    # via _shift_lt_offsets_to_original antes de virem pra UI.
     texto_limpo = re.sub(r"\*\*([^*]+)\*\*", r"\1", texto)
-    matches = []
+    lt_matches = []
 
     # ── PARTE 1: LanguageTool (ortografia/gramatica/pontuacao) ──
     try:
@@ -2423,7 +2474,7 @@ def api_check_pt():
             data_lt = r.json()
             for m in data_lt.get("matches", []):
                 sug = [r.get("value", "") for r in m.get("replacements", [])][:5]
-                matches.append({
+                lt_matches.append({
                     "offset": m.get("offset", 0),
                     "length": m.get("length", 0),
                     "message": m.get("message", ""),
@@ -2436,11 +2487,15 @@ def api_check_pt():
     except Exception:
         pass  # Falha no LT nao bloqueia os vicios IA
 
-    # ── PARTE 2: Vicios de IA (cliches, travessao, negrito, etc) ──
-    # Roda no texto ORIGINAL (com **) pra pegar negritos mal usados
-    matches += _detect_vicios_ia(texto)
+    # Ajusta offsets dos matches do LT pro espaco do texto original (com **)
+    lt_matches = _shift_lt_offsets_to_original(lt_matches, texto)
 
-    # Ordena por offset pra UI mostrar em ordem
+    # ── PARTE 2: Vicios de IA (cliches, travessao, negrito, etc) ──
+    # Roda no texto ORIGINAL (com **) — offsets ja estao no espaco certo
+    vicios = _detect_vicios_ia(texto)
+
+    # Combina, ordena por offset pra UI mostrar em ordem
+    matches = lt_matches + vicios
     matches.sort(key=lambda m: m.get("offset", 0))
     return jsonify({"ok": True, "matches": matches, "total": len(matches)})
 
