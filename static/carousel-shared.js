@@ -1220,6 +1220,10 @@ window.addEventListener('message',function(e){
       if(typeof liveUpdate==='function')liveUpdate(ta.value);
       if(typeof autoSave==='function')autoSave();
     }
+  } else if(e.data.type==='bearlz-polir-retry'){
+    // Parent pediu pra tentar polir de novo (apos erro de parsing).
+    // Re-dispara polirSlide() — vai chamar /api/polir-slide novamente.
+    if(typeof polirSlide==='function')polirSlide();
   }
 });
 

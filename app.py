@@ -1158,6 +1158,70 @@ def _revisar_carrega_html(slug):
         return None, jsonify({"error": "Não foi possível interpretar os slides"}), 400
     return (html_path, html, slide_objs), None, 0
 
+def _parse_polir_response(texto: str):
+    """Parser tolerante pra resposta do /api/polir-slide. O Claude as vezes
+    devolve JSON com aspas duplas INTERNAS nao escapadas no texto_novo
+    (ex: o texto polido contem 'frase entre aspas') — isso quebra json.loads.
+
+    Estrategia em camadas:
+    1. Tenta JSON limpo via _parse_claude_json (caso bom)
+    2. Regex que ancora em '"texto_novo": "' e procura a aspa de fim ANTES
+       da chave 'mudancas_principais' — tolera aspas duplas no meio
+    3. Fallback: pega tudo apos '"texto_novo": "', limpa caudas conhecidas
+       do JSON (}, "mudancas...) e usa como texto polido sem mudancas
+    Retorna dict {'texto_novo':..., 'mudancas_principais':[...]} ou None."""
+    if not texto:
+        return None
+    # 1. JSON direto
+    d = _parse_claude_json(texto)
+    if d and isinstance(d, dict) and 'texto_novo' in d:
+        # Garante mudancas como lista
+        mp = d.get('mudancas_principais', [])
+        if not isinstance(mp, list):
+            mp = []
+        d['mudancas_principais'] = mp
+        return d
+    # 2. Regex ancorada: texto_novo ... mudancas_principais
+    m = re.search(
+        r'"texto_novo"\s*:\s*"(.*?)"\s*,\s*"mudancas_principais"\s*:\s*\[(.*?)\]',
+        texto, re.DOTALL
+    )
+    if m:
+        texto_novo = m.group(1)
+        # Desescape minimo
+        texto_novo = (texto_novo
+                      .replace('\\"', '"')
+                      .replace('\\n', '\n')
+                      .replace('\\t', '\t')
+                      .replace('\\\\', '\\'))
+        # Mudancas: extrai strings dentro do array
+        mudancas = []
+        for sm in re.finditer(r'"((?:[^"\\]|\\.)*)"', m.group(2)):
+            v = (sm.group(1)
+                 .replace('\\"', '"')
+                 .replace('\\n', '\n')
+                 .replace('\\\\', '\\'))
+            mudancas.append(v)
+        return {'texto_novo': texto_novo, 'mudancas_principais': mudancas}
+    # 3. Fallback: pega depois de "texto_novo": " e limpa cauda
+    m = re.search(r'"texto_novo"\s*:\s*"(.*)', texto, re.DOTALL)
+    if m:
+        texto_novo = m.group(1)
+        # Remove cauda: ", "mudancas_principais"... ou "}\s*$
+        texto_novo = re.sub(
+            r'"\s*,\s*"mudancas_principais".*$', '', texto_novo, flags=re.DOTALL
+        )
+        texto_novo = re.sub(r'"\s*\}\s*$', '', texto_novo).rstrip('"\n ')
+        texto_novo = (texto_novo
+                      .replace('\\"', '"')
+                      .replace('\\n', '\n')
+                      .replace('\\t', '\t')
+                      .replace('\\\\', '\\'))
+        if texto_novo and len(texto_novo) > 30:
+            return {'texto_novo': texto_novo, 'mudancas_principais': []}
+    return None
+
+
 def _parse_claude_json(texto: str):
     """Tenta parsear JSON do Claude com varios fallbacks pra lidar com:
     - control chars (json.loads strict=True nao aceita)
@@ -2334,8 +2398,15 @@ de classe média que depende de crédito pra fechar o mês."
 POLIDO RUIM (encolheu demais): "O BC subiu os juros. Isso prejudica
 a classe média." — NÃO faça assim.
 
-RESPOSTA: SOMENTE JSON, sem markdown:
-{"texto_novo": "texto reescrito completo com densidade", "mudancas_principais": ["lista breve dos ajustes"]}"""
+RESPOSTA: SOMENTE JSON valido, sem markdown:
+{"texto_novo": "texto reescrito completo com densidade", "mudancas_principais": ["lista breve dos ajustes"]}
+
+REGRAS DE ESCAPE DO JSON (criticas — parsing quebra se voce errar):
+- Aspas duplas DENTRO do texto_novo devem ser ESCAPADAS com \\"
+  Exemplo: "texto_novo": "O CEO disse \\"foi um sucesso\\" no relatorio"
+  NUNCA: "texto_novo": "O CEO disse "foi um sucesso" no relatorio"
+- Prefira aspas SIMPLES (') ao citar fala. Eh mais seguro.
+- Quebras de linha viram \\n explicito"""
 
 
 @app.route("/api/polir-slide", methods=["POST"])
@@ -2364,9 +2435,12 @@ def api_polir_slide():
         if out.startswith("```"):
             out = re.sub(r"^```[a-z]*\n?", "", out)
             out = re.sub(r"\n?```$", "", out).strip()
-        dados = _parse_claude_json(out)
+        dados = _parse_polir_response(out)
         if not dados or "texto_novo" not in dados:
-            return jsonify({"error": "Resposta inválida do Claude", "raw": out[:300]}), 500
+            # Loga no stderr pra debug nos logs do Fly
+            import sys
+            print(f"[POLIR-PARSE-FAIL] {len(out)} chars: {out[:800]!r}", file=sys.stderr, flush=True)
+            return jsonify({"error": "Resposta inválida do Claude", "raw": out[:600]}), 500
         # Sanitiza o resultado pelos mesmos filtros que o gerador
         texto_novo = _sanitizar_slide(dados.get("texto_novo", ""))
         # Guardrail: se o polido encolheu mais de 25% do original, ALERTA

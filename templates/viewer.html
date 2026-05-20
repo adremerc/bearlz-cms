@@ -699,7 +699,15 @@
     const err = data && data.error;
     let body;
     if (err) {
-      body = `<div style="padding:16px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;color:#991b1b">${err}</div>`;
+      // Se o backend mandou o raw output do Claude (caso 'Resposta invalida'),
+      // mostra num <details> + botao "Tentar de novo" pra reenviar o request.
+      const rawBlock = data.raw
+        ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-size:11px;color:#6b7280;font-weight:600">Ver resposta bruta do Claude</summary><pre style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px;font-size:11px;color:#374151;white-space:pre-wrap;max-height:200px;overflow:auto;margin-top:6px">${data.raw.replace(/</g,'&lt;')}</pre></details>`
+        : '';
+      const retryBtn = original
+        ? `<div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end"><button id="parentPolirRetryBtn" style="padding:8px 16px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff;border:none;border-radius:7px;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">✨ Tentar de novo</button></div>`
+        : '';
+      body = `<div style="padding:14px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;color:#991b1b;font-size:13px"><strong>${err}</strong>${rawBlock}</div>${retryBtn}`;
     } else if (!data || !data.texto_novo) {
       body = `<div style="padding:16px;color:#888">Sem mudanças sugeridas.</div>`;
     } else {
@@ -743,6 +751,22 @@
         }
         m.style.display = 'none';
         toast('✨ Versão polida aplicada');
+      };
+    }
+    // Botao "Tentar de novo" no estado de erro — reenvia o request ao iframe
+    const retryBtn = document.getElementById('parentPolirRetryBtn');
+    if (retryBtn && original) {
+      retryBtn.onclick = () => {
+        // Pede pro iframe rodar polir() de novo. O iframe ja tem o texto
+        // do slide atual no editTA — basta disparar o handler novamente.
+        const iframe = document.getElementById('carrossel-frame');
+        if (iframe && iframe.contentWindow) {
+          iframe.contentWindow.postMessage({type: 'bearlz-polir-retry'}, '*');
+        }
+        // Mostra estado de loading
+        body = m.querySelector('div[style*="border-radius:14px"] > div:last-child');
+        m.querySelector('div[style*="border-radius:14px"]').lastChild.outerHTML =
+          `<div style="padding:30px;text-align:center;color:#8b5cf6"><div style="font-size:32px;margin-bottom:8px">✨</div><strong>Polindo de novo…</strong></div>`;
       };
     }
     m.style.display = 'block';
