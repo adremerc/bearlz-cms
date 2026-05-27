@@ -1804,20 +1804,27 @@ SYSTEM_FATIAR = (
     "- Exceção: o slide 1 (hook) pode ser um pouco mais curto.\n"
     "- NUNCA acima de 420.\n\n"
 
-    "FORMATO — UM PARÁGRAFO POR SLIDE (regra do estilo Varos):\n"
-    "- Cada slide é UM bloco de texto corrido, um único parágrafo.\n"
-    "- NÃO quebre o slide em vários parágrafos com linha em branco (\\n\\n).\n"
-    "- O Varos faz exatamente isso: cada slide é um parágrafo só, denso e\n"
-    "  uniforme. O que varia entre slides é o conteúdo, não o formato.\n\n"
+    "FORMATO VISUAL — PARÁGRAFOS CURTOS PRA RESPIRAR (igual ao Varos):\n"
+    "- Cada slide é quebrado em 2 a 4 parágrafos CURTOS, separados por uma\n"
+    "  linha em branco (\\n\\n). Cada parágrafo tem 1 ou 2 frases (~80-140\n"
+    "  caracteres). NUNCA um bloco corrido único de texto.\n"
+    "- Exemplo do visual desejado (1 slide):\n"
+    "    Hoje, mais uma empresa atingiu a marca de US$ 1 trilhão.\n\n"
+    "    Essa é a Micron, que fabrica os chips de memória que alimentam\n"
+    "    toda a infraestrutura de inteligência artificial.\n\n"
+    "    Mas tudo começou no porão de um consultório odontológico, com\n"
+    "    dinheiro de um fazendeiro de batatas.\n"
+    "- Esse respiro visual é parte do estilo. Bloco corrido cansa o olho.\n\n"
 
     "NÚMERO DE SLIDES: corte em EXATAMENTE {num_slides} slides.\n"
     "  Distribua o artigo de forma equilibrada entre eles.\n\n"
 
-    "NEGRITO CIRÚRGICO (regra rígida — o erro mais comum é exagerar):\n"
-    "- MÁXIMO 1 trecho em negrito por slide. Às vezes ZERO.\n"
-    "- O trecho tem 3-6 palavras: o dado mais impactante OU a virada do slide.\n"
-    "- NUNCA negrite uma frase inteira. NUNCA negrite por decoração.\n"
-    "- Quando tudo é destacado, nada é destacado.\n"
+    "NEGRITO — FRASES INTEIRAS ESTRATÉGICAS (como o Varos):\n"
+    "- Negrite FRASES INTEIRAS importantes (4-12 palavras), não palavras soltas.\n"
+    "- 1 a 2 trechos por slide: a frase do gancho, o dado-chave OU a virada.\n"
+    "- BOM: **a maior alta em 10 anos**, **sem os chips dela nada funciona**\n"
+    "- RUIM (palavra solta): **9%**, **Nvidia**, **Selic**\n"
+    "- RUIM (exagero): slide inteiro em negrito. Destaque 1-2 frases, não tudo.\n"
     "- Use **markdown** de negrito.\n\n"
 
     "IMAGENS — cada slide ganha UMA imagem com FUNÇÃO clara:\n"
@@ -1999,30 +2006,54 @@ def _sanitizar_legenda(text: str) -> str:
     return text.strip()
 
 
-def _colapsar_paragrafos(text: str) -> str:
-    """Garante 1 PARAGRAFO = 1 SLIDE (estilo Varos): junta multiplos
-    paragrafos (\\n\\n) num bloco unico de texto corrido. Preserva listas
-    de bullet (linhas com •/-/* ) — essas mantem as quebras de linha.
-    Usado SO no fluxo de geracao; o Polir/edicao manual continua livre
-    pra usar varios paragrafos."""
+def _formatar_paragrafos_varos(text: str) -> str:
+    """Formata o slide no VISUAL do Varos: quebra em paragrafos curtos
+    (1-2 frases, ~80-140 chars cada) separados por \\n\\n, pra respirar.
+    NAO eh 1 bloco corrido — sao varios blocos curtos como na imagem.
+    Preserva listas de bullet (linhas com •/-/* ) intactas."""
     if not text:
         return text
-    # Se ha bullets, nao colapsa (a estrutura de linhas eh intencional)
+    # Bullets: estrutura de linhas eh intencional, nao mexe
     if re.search(r'(?m)^\s*[•\-\*]\s+', text):
         return text
-    # Colapsa qualquer sequencia de quebras (\n, \n\n) num espaco unico
-    return re.sub(r'\s*\n+\s*', ' ', text).strip()
+    # Junta tudo num texto plano primeiro (remove quebras existentes)
+    flat = re.sub(r'\s*\n+\s*', ' ', text).strip()
+    # Divide em frases (fim de frase = . ! ? seguido de espaco)
+    sentences = re.split(r'(?<=[.!?])\s+', flat)
+    if len(sentences) <= 1:
+        return flat
+    # Agrupa em paragrafos curtos mirando ~130 chars. Fecha o bloco ANTES de
+    # adicionar uma frase que o faria estourar 135 chars — assim frases longas
+    # viram paragrafos proprios em vez de blocos gigantes de 200 chars.
+    ALVO = 130
+    paragraphs = []
+    current = []
+    current_len = 0
+    for s in sentences:
+        s_len = len(s) + 1
+        if current and (current_len + s_len) > ALVO + 5:
+            paragraphs.append(" ".join(current))
+            current = []
+            current_len = 0
+        current.append(s)
+        current_len += s_len
+    if current:
+        # Bloco final muito curto: funde no anterior pra nao ficar orfao
+        if paragraphs and current_len < 45:
+            paragraphs[-1] += " " + " ".join(current)
+        else:
+            paragraphs.append(" ".join(current))
+    return "\n\n".join(paragraphs)
 
 
 def _sanitizar_slide_varos(text: str) -> str:
-    """Sanitizacao pro fluxo de geracao em 2 fases: igual ao normal mas
-    forca 1 paragrafo (colapsa antes de truncar) e remove cliche de
-    abertura. Resultado: slide denso, uniforme, em bloco unico, sem
-    preambulo de IA — como os carrosseis do Varos."""
+    """Sanitizacao pro fluxo de geracao em 2 fases. Remove travessao/aspas,
+    limpa cliche de abertura e FORMATA em paragrafos curtos (visual Varos:
+    varios blocos de 1-2 frases separados por linha em branco)."""
     text = _strip_em_dash(text or "")
     text = _aspas_simples_pra_duplas(text)
     text = _limpar_cliches_abertura(text)
-    text = _colapsar_paragrafos(text)
+    text = _formatar_paragrafos_varos(text)
     text = _truncar_slide_se_grande(text)
     return text
 
