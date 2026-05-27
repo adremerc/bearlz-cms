@@ -1591,6 +1591,165 @@ SYSTEM_GERAR_DEFAULT = (
 )
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# GERACAO EM 2 FASES (estilo Leandro Varos)
+# Insight: criadores de elite NAO escrevem slide por slide. Escrevem UM texto
+# corrido, fluido, com inicio-meio-fim, e DEPOIS fatiam em pedacos. O resultado
+# eh um carrossel que, lido em sequencia, parece um artigo unico sem quebras
+# estranhas — cada slide comeca exatamente onde o anterior parou.
+#
+# FASE 1 (SYSTEM_ARTIGO): Claude escreve o ENSAIO. Nao pensa em slides.
+# FASE 2 (SYSTEM_FATIAR): Claude corta o ensaio em N slides + escolhe imagens.
+# ══════════════════════════════════════════════════════════════════════════════
+
+_CONTEXTO_TEMPORAL_2026 = (
+    "🔴 CONTEXTO TEMPORAL — REGRA INVIOLÁVEL #0:\n"
+    "- Hoje é MAIO DE 2026. Todo conteúdo é publicado em 2026.\n"
+    "- 'neste ano'/'atualmente'/'em 2026' = AGORA. 'ano passado' = 2025.\n"
+    "- Citar 2024 ou anterior SEM marcar como histórico = ERRO GRAVE.\n"
+    "- Brief com [FONTE ANTIGA] ou data <2026: USE o dado MAS com data\n"
+    "  explícita ('em 2024, ...'). NUNCA apresente como 'recente'/'atual'.\n"
+    "- Sem dado de 2026 sobre o tópico: PREFIRA falar conceitualmente\n"
+    "  (causa/efeito, mecânica). NUNCA fabrique número 'parecido com 2026'.\n\n"
+)
+
+SYSTEM_ARTIGO = (
+    "Você é redator sênior de análise de negócios e finanças para @gabriel.bearlz.\n"
+    "TAREFA AGORA: escrever UM ARTIGO CORRIDO, fluido, do começo ao fim.\n"
+    "NÃO pense em slides. NÃO numere nada. NÃO corte em blocos. Escreva um\n"
+    "ensaio único e contínuo, como uma reportagem de negócios.\n\n"
+
+    + _CONTEXTO_TEMPORAL_2026 +
+
+    "REFERÊNCIA DE ESTILO (analista culto conversando, NÃO repórter factual):\n"
+    "Um texto que começa com um fato surpreendente, constrói o contexto\n"
+    "histórico, explica o mecanismo por dentro, apresenta números concretos,\n"
+    "e termina com uma lição maior. Você RECONSTRÓI o raciocínio (por que tal\n"
+    "empresa/pessoa decidiu X), não apenas relata o evento. Coloca o leitor\n"
+    "DENTRO da tomada de decisão. Isso cria intimidade intelectual.\n\n"
+
+    "ARQUITETURA NARRATIVA (siga a ordem):\n"
+    "1. ABERTURA COM IMPACTO (1-2 frases): a primeira frase é uma manchete\n"
+    "   que instala tensão ou surpresa. O MELHOR gancho tem PARADOXO ou\n"
+    "   DETALHE HUMANO CONCRETO, não só um dado seco.\n"
+    "   - FRACO (só dado): 'Os juros nos EUA subiram mais que em 2008.'\n"
+    "   - FORTE (paradoxo+humano): 'Uma empresa de US$ 1 trilhão começou no\n"
+    "     porão de um consultório odontológico, com dinheiro de um fazendeiro\n"
+    "     de batatas.'\n"
+    "   - Evite abrir com pergunta genérica ('Bitcoin vai subir?'). Se usar\n"
+    "     pergunta, que seja inesperada.\n"
+    "2. DESENVOLVIMENTO: expande com contexto, dados, nomes próprios, valores.\n"
+    "   Mostra os dois lados (contraste), reconstrói decisões, explica o\n"
+    "   mecanismo invisível por trás do fato visível.\n"
+    "3. FECHAMENTO: uma SENTENÇA FILOSÓFICA — máxima generalizável que\n"
+    "   transcende o caso e vira insight universal. O tipo de frase que a\n"
+    "   pessoa copia e manda no WhatsApp. Ex: 'Nem toda revolução parece\n"
+    "   óbvia quando ela nasce.'\n\n"
+
+    "RITMO (marca registrada — siga à risca):\n"
+    "- ALTERNE frases curtas (1 linha, funcionam como respiração) com médias.\n"
+    "- Curtas de impacto: 'O projeto foi encerrado em 1991.' 'É matemática.'\n"
+    "- A alternância cria leitura dinâmica, como gente inteligente fala.\n\n"
+
+    "PERGUNTAS RETÓRICAS: use, curtas, com resposta IMEDIATA na frase seguinte.\n"
+    "  Ex: 'O motivo? A empresa achou que ninguém aceitaria outra injeção.'\n\n"
+
+    "CONTRASTE: use 'de um lado X, do outro Y' ou 'enquanto X, Y' pra mostrar\n"
+    "  que você entende os dois lados (dá credibilidade analítica).\n\n"
+
+    "DADOS — SEMPRE específicos, nunca vagos:\n"
+    "- BOM: 'subiu mais de 8x em 12 meses', 'R$ 3,8 bilhões', 'alta de 21%'\n"
+    "- RUIM: 'subiu muito', 'bilhões de reais', 'cresceu bastante'\n"
+    "- Nunca um parágrafo longo sem um dado concreto ancorando.\n"
+    "- Arredonde: 'R$ 14 bilhões' não 'R$ 14,247 bilhões'.\n\n"
+
+    "VOCABULÁRIO: técnico mas SEMPRE ancorado em linguagem simples ao redor.\n"
+    "  Pode usar termo técnico (HBM, P/L, FGC, Selic) explicando implícito no\n"
+    "  contexto. SEM gíria, SEM palavra de influencer ('top', 'incrível').\n\n"
+
+    "PROIBIDO (vícios que denunciam texto de IA):\n"
+    "- Clichês: 'Na prática,', 'O que acontece é que,', 'Vale destacar',\n"
+    "  'É importante ressaltar', 'Cabe destacar', 'Dessa forma,', 'Com isso,'\n"
+    "- Ganchos vazios: 'isso muda tudo', 'o que ninguém te conta', 'a verdade\n"
+    "  é que', 'só que ninguém está falando', 'pouca gente sabe'\n"
+    "- Travessão (—): NUNCA. Use vírgula, ponto ou parênteses.\n"
+    "- Frases picotadas em sequência: 'Queda. Alta. Recuperação.'\n"
+    "- Chamada de ação ('salva esse post', 'comenta', 'me segue').\n"
+    "- Emoji, hashtag, exclamação excessiva.\n"
+    "- Aspas simples: use SEMPRE duplas (\").\n\n"
+
+    "USO DE FONTES: se houver [CONTEÚDO DO LINK] no brief, use SÓ dados de lá.\n"
+    "  NUNCA invente número, data, citação. Sem dado, escreva conceitual.\n\n"
+
+    "IMPORTANTE: NÃO escreva chamada de venda/CTA. O CTA é adicionado depois.\n"
+    "  Termine no fechamento filosófico, no auge do conteúdo.\n\n"
+
+    "TAMANHO: escreva entre {min_chars} e {max_chars} caracteres no total.\n"
+    "  Denso o suficiente, mas SEM encher linguiça. Cada frase tem função.\n\n"
+
+    "RETORNE SOMENTE JSON VÁLIDO, sem markdown:\n"
+    '{"titulo":"título curto e forte","artigo":"texto corrido completo, '
+    'parágrafos separados por \\n\\n"}'
+)
+
+SYSTEM_FATIAR = (
+    "Você recebe um ARTIGO pronto e o fatia em slides para um carrossel do\n"
+    "Instagram. Você é um EDITOR que corta, não um redator que reescreve.\n\n"
+
+    "REGRA DE OURO: você NÃO reescreve o artigo. Você CORTA ele em pedaços.\n"
+    "Se concatenar os slides de volta, tem que dar o artigo original. Pode\n"
+    "fazer micro-ajustes pra cada slide fluir (trocar um 'ela' pelo nome,\n"
+    "ajustar uma conjunção inicial), mas NUNCA muda os dados, o conteúdo ou\n"
+    "a ordem das ideias. NÃO adiciona informação nova. NÃO inventa número.\n\n"
+
+    "ONDE CORTAR:\n"
+    "- Corte em pontos de CLIFFHANGER NATURAL: onde uma frase termina\n"
+    "  deixando curiosidade pro próximo ('Mas o produto que mudou tudo tem\n"
+    "  outro nome.'). Esses cortes já existem no texto, você só os encontra.\n"
+    "- Cada slide tem UMA ideia central. Quando o assunto vira, corte.\n"
+    "- Cada slide começa EXATAMENTE de onde o anterior parou. Sem reset,\n"
+    "  sem repetir o que já foi dito, sem 'como vimos', sem 'recapitulando'.\n\n"
+
+    "TAMANHO: 180-380 caracteres por slide. NUNCA acima de 420.\n"
+    "  O primeiro slide (hook) pode ser mais curto (150-280).\n\n"
+
+    "NÚMERO DE SLIDES: corte em EXATAMENTE {num_slides} slides.\n"
+    "  Distribua o artigo de forma equilibrada entre eles.\n\n"
+
+    "NEGRITO CIRÚRGICO (regra rígida — o erro mais comum é exagerar):\n"
+    "- MÁXIMO 1 trecho em negrito por slide. Às vezes ZERO.\n"
+    "- O trecho tem 3-6 palavras: o dado mais impactante OU a virada do slide.\n"
+    "- NUNCA negrite uma frase inteira. NUNCA negrite por decoração.\n"
+    "- Quando tudo é destacado, nada é destacado.\n"
+    "- Use **markdown** de negrito.\n\n"
+
+    "PARÁGRAFOS: cada slide tem 1-3 parágrafos curtos separados por \\n\\n.\n"
+    "  Máximo 3 linhas por parágrafo.\n\n"
+
+    "IMAGENS — cada slide ganha UMA imagem com FUNÇÃO clara:\n"
+    "- 'chart': quando o slide tem dados numéricos comparáveis. Inclua\n"
+    "  chart_title, chart_type (bar|horizontal_bar|line) e chart_data\n"
+    "  [{label,value,unit,highlight}].\n"
+    "- 'photo': contexto visual. photo_topic ESPECÍFICO:\n"
+    "  * NOMES PRÓPRIOS (foto real via Wikimedia): 'Powell Federal Reserve',\n"
+    "    'Banco Central Brasil Brasília', 'Faria Lima São Paulo', 'Nvidia logo'\n"
+    "  * ABSTRATO (Pexels cinematográfico): 3-6 palavras + modificador\n"
+    "    visual em inglês ('dramatic stock market crash screens',\n"
+    "    'golden hour Sao Paulo skyline aerial').\n"
+    "  * NUNCA: 'money', 'business', 'office'. NUNCA repita photo_topic.\n"
+    "  - photo_topic_alt: 2-3 palavras de fallback.\n"
+    "- Se o brief tinha [IMAGENS DISPONÍVEIS DOS LINKS], pode referenciar via\n"
+    "  image_from_link (índice 1-based) quando a imagem do artigo casa com\n"
+    "  o dado do slide. Senão, image_from_link: null.\n\n"
+
+    "RETORNE SOMENTE JSON VÁLIDO, sem markdown fora do JSON:\n"
+    '{"slides":[{"texto":"...","tema":"bitcoin|economia|mercado|geopolitica|ia|tecnologia",'
+    '"image_type":"chart|photo","chart_title":"...","chart_type":"bar|horizontal_bar|line",'
+    '"chart_data":[{"label":"...","value":0,"unit":"%","highlight":false}],'
+    '"photo_topic":"...","photo_topic_alt":"...","image_from_link":null}]}'
+)
+
+
 # ── Sanitizers do texto dos slides ────────────────────────────────────────────
 # O Claude as vezes ignora a regra "nao usar travessao" e tambem retorna o
 # slide inteiro como bloco corrido sem quebrar paragrafos. A gente forca o
@@ -2435,16 +2594,21 @@ def _detect_vicios_ia(texto: str):
             })
 
     # 5. Negrito em palavra isolada (**X** com 1-2 palavras curtas)
-    # Regra do prompt: negritos devem ser FRASES inteiras (4-12 palavras)
+    # Mau uso: **Brasil**, **Selic**, **9%** — palavra solta sem sentido proprio.
+    # EXCECAO (estilo Varos): sentenca curta de IMPACTO terminada em . ! ? eh
+    # negrito intencional e bom ("**E matematica.**", "**Ninguem viu isso.**").
+    # So marcamos como mau uso se for palavra solta SEM pontuacao de fechamento.
     for m in re.finditer(r"\*\*([^*\n]{1,40})\*\*", texto):
         content = m.group(1).strip()
         word_count = len(content.split())
-        # 1-3 palavras = palavra isolada (mau uso)
-        if word_count <= 3 and len(content) < 25:
+        termina_em_impacto = content.endswith((".", "!", "?"))
+        # 1-3 palavras sem pontuacao final = palavra isolada (mau uso).
+        # Com pontuacao = sentenca de impacto proposital (permitido).
+        if word_count <= 3 and len(content) < 25 and not termina_em_impacto:
             matches.append({
                 "offset": m.start(),
                 "length": m.end() - m.start(),
-                "message": f"Negrito em '{content}' é palavra isolada. Negrite FRASES inteiras (4-12 palavras).",
+                "message": f"Negrito em '{content}' é palavra isolada. Negrite FRASES inteiras (4-12 palavras) ou frase curta de impacto terminada em ponto.",
                 "short": "Negrito mal usado",
                 "suggestions": [],
                 "category": "Vício de IA",
@@ -2831,10 +2995,95 @@ def api_pexels_search():
         return jsonify({"error": str(e)}), 500
 
 
+def _gerar_conteudo_2fases(client, topico, brief_enriched, imagens_block,
+                            num_slides, system_artigo):
+    """Geracao em 2 fases (estilo Varos):
+      FASE 1: escreve o ARTIGO corrido fluido (system_artigo / SYSTEM_ARTIGO)
+      FASE 2: fatia o artigo em num_slides slides + escolhe imagens (SYSTEM_FATIAR)
+
+    Retorna (titulo, slides_raw, artigo, fase_debug).
+    Levanta ValueError se alguma fase falhar de forma irrecuperavel."""
+    # Tamanho-alvo do artigo: ~170-300 chars por slide de conteudo
+    min_chars = num_slides * 170
+    max_chars = num_slides * 300
+    sys_artigo = (system_artigo
+                  .replace("{min_chars}", str(min_chars))
+                  .replace("{max_chars}", str(max_chars)))
+
+    # ── FASE 1: ARTIGO CORRIDO ──
+    prompt_artigo = (
+        f"TÓPICO: {topico}\n\n"
+        f"BRIEF/CONTEÚDO:\n{brief_enriched or topico}\n\n"
+        "Escreva o artigo completo seguindo a arquitetura narrativa "
+        "(abertura com paradoxo/detalhe humano, desenvolvimento que reconstrói "
+        "o raciocínio, fechamento com sentença filosófica). Texto corrido, "
+        "fluido, SEM CTA. Retorne SOMENTE JSON."
+    )
+    resp1 = claude_call_with_retry(client,
+        model="claude-sonnet-4-5", max_tokens=4000,
+        system=sys_artigo,
+        messages=[{"role": "user", "content": prompt_artigo}]
+    )
+    out1 = resp1.content[0].text.strip()
+    if out1.startswith("```"):
+        out1 = re.sub(r"^```[a-z]*\n?", "", out1)
+        out1 = re.sub(r"\n?```$", "", out1).strip()
+    dados1 = _parse_claude_json(out1)
+    if dados1 and isinstance(dados1, dict) and dados1.get("artigo"):
+        artigo = str(dados1.get("artigo", "")).strip()
+        titulo = str(dados1.get("titulo") or topico[:40]).strip()
+    else:
+        # Fallback: Claude pode ter devolvido texto cru sem JSON. Usa como artigo.
+        artigo = out1
+        titulo = topico[:40]
+    if not artigo or len(artigo) < 100:
+        raise ValueError("Fase 1 (artigo) não gerou texto suficiente")
+
+    # ── FASE 2: FATIAR EM SLIDES ──
+    sys_fatiar = SYSTEM_FATIAR.replace("{num_slides}", str(num_slides))
+    prompt_fatiar = (
+        f"ARTIGO PARA FATIAR (título: {titulo}):\n\n{artigo}\n"
+        f"{imagens_block}\n"
+        f"Corte em EXATAMENTE {num_slides} slides nos pontos de cliffhanger "
+        "natural. NÃO reescreva, apenas corte e ilustre. Negrito cirúrgico "
+        "(máx 1 por slide). Retorne SOMENTE JSON."
+    )
+    resp2 = claude_call_with_retry(client,
+        model="claude-sonnet-4-5", max_tokens=6000,
+        system=sys_fatiar,
+        messages=[{"role": "user", "content": prompt_fatiar}]
+    )
+    out2 = resp2.content[0].text.strip()
+    if out2.startswith("```"):
+        out2 = re.sub(r"^```[a-z]*\n?", "", out2)
+        out2 = re.sub(r"\n?```$", "", out2).strip()
+    dados2 = _parse_claude_json(out2)
+    if not dados2 or not isinstance(dados2, dict) or not dados2.get("slides"):
+        raise ValueError("Fase 2 (fatiar) não gerou slides válidos")
+    slides_raw = dados2.get("slides", [])
+
+    fase_debug = {
+        "artigo": artigo,
+        "artigo_chars": len(artigo),
+        "prompt_artigo": prompt_artigo,
+        "prompt_fatiar": prompt_fatiar,
+        "min_chars": min_chars,
+        "max_chars": max_chars,
+    }
+    return titulo, slides_raw, artigo, fase_debug
+
+
 @app.route("/api/gerar/system-prompt", methods=["GET"])
 def api_gerar_system_prompt():
-    """Retorna o system prompt padrao pra UI exibir/editar."""
-    return jsonify({"system": SYSTEM_GERAR_DEFAULT})
+    """Retorna o system prompt da FASE 1 (escrita do artigo) pra UI editar.
+    Eh o prompt que define o CONTEUDO/ESTILO. A fase 2 (fatiar) usa
+    SYSTEM_FATIAR internamente e nao eh editavel pela UI.
+    Substitui os placeholders {min_chars}/{max_chars} por valores default
+    (base 11 slides) pra UI mostrar numeros reais em vez de '{min_chars}'."""
+    preview = (SYSTEM_ARTIGO
+               .replace("{min_chars}", str(11 * 170))
+               .replace("{max_chars}", str(11 * 300)))
+    return jsonify({"system": preview})
 
 
 @app.route("/api/gerar", methods=["POST"])
@@ -2855,7 +3104,9 @@ def api_gerar():
     if not topico:
         return jsonify({"error": "Tópico obrigatório"}), 400
 
-    SYSTEM = system_override if system_override else SYSTEM_GERAR_DEFAULT
+    # FASE 1 do system prompt: override da UI (se houver) ou SYSTEM_ARTIGO.
+    # A FASE 2 (fatiar em slides) sempre usa SYSTEM_FATIAR internamente.
+    system_artigo = system_override if system_override else SYSTEM_ARTIGO
 
     # Baixa conteudo dos links no brief antes de mandar pro Claude.
     # all_images: lista de {url_imagem, origem} pra Claude usar via image_from_link.
@@ -2870,36 +3121,20 @@ def api_gerar():
         linhas.append("[/IMAGENS]\n")
         imagens_block = "\n".join(linhas)
 
-    prompt = (
-        f"Crie exatamente {num_slides} slides sobre:\n\n"
-        f"TÓPICO: {topico}\n"
-        f"CONTEÚDO/BRIEF: {brief_enriched or topico}\n"
-        f"{imagens_block}\n"
-        f"Slide 1: Hook. Slides 2-{num_slides-1}: desenvolvimento com dados. "
-        f"Slide {num_slides}: implicação para o investidor.\n"
-        "Retorne SOMENTE JSON válido."
-    )
-
+    # prompt_para_debug eh preenchido dentro do try (vem de fase_debug)
+    prompt_para_debug = ""
     try:
         client = _anthropic_lib.Anthropic(api_key=ANTHROPIC_API_KEY)
-        resp   = claude_call_with_retry(client,
-            model="claude-sonnet-4-5", max_tokens=6000,
-            system=SYSTEM,
-            messages=[{"role": "user", "content": prompt}]
+        # ══ GERACAO EM 2 FASES (estilo Varos): artigo corrido -> fatiar ══
+        titulo_gerado, slides_raw, artigo_gerado, fase_debug = _gerar_conteudo_2fases(
+            client, topico, brief_enriched, imagens_block, num_slides, system_artigo
         )
-        texto = resp.content[0].text.strip()
-        if texto.startswith("```"):
-            texto = re.sub(r"^```[a-z]*\n?", "", texto)
-            texto = re.sub(r"\n?```$", "", texto).strip()
-
-        dados = _parse_claude_json(texto)  # robusto a JSON malformado
-        if dados is None:
+        prompt_para_debug = fase_debug.get("prompt_artigo", "")
+        if not slides_raw:
             return jsonify({
-                "error": "Resposta do Claude veio malformada. Tente novamente.",
-                "raw": texto[:500]
+                "error": "Geração não produziu slides. Tente novamente.",
+                "raw": (artigo_gerado or "")[:500]
             }), 500
-        slides_raw   = dados.get("slides", [])
-        titulo_gerado = dados.get("titulo", topico[:40])
 
         # Validacao de datas: detecta anos < 2026 sem contexto historico
         # (heuristica). NAO bloqueia geracao, devolve avisos_data pra UI
@@ -3128,8 +3363,12 @@ def api_gerar():
             # - urls_fetched: cada URL tem is_instagram + is_stale + published_date
             "avisos_data": avisos_data,
             "debug": {
-                "system_used":      SYSTEM,
-                "user_prompt":      prompt,
+                "system_used":      system_artigo,
+                "user_prompt":      prompt_para_debug,
+                "fluxo":            "2-fases (artigo + fatiar)",
+                "artigo_gerado":    fase_debug.get("artigo", ""),
+                "artigo_chars":     fase_debug.get("artigo_chars", 0),
+                "prompt_fatiar":    fase_debug.get("prompt_fatiar", ""),
                 "urls_fetched":     urls_info,
                 "system_is_custom": bool(system_override),
                 "model":            "claude-sonnet-4-5",
@@ -3139,9 +3378,16 @@ def api_gerar():
             }
         })
 
+    except ValueError as e:
+        # Falha controlada de uma das fases (artigo vazio, slides invalidos)
+        return jsonify({"error": f"Geração falhou: {e}. Tente novamente.",
+                        "debug": {"system_used": system_artigo,
+                                  "user_prompt": prompt_para_debug,
+                                  "urls_fetched": urls_info}}), 500
     except json.JSONDecodeError as e:
         return jsonify({"error": f"Resposta inválida do Claude: {e}",
-                        "debug": {"system_used": SYSTEM, "user_prompt": prompt,
+                        "debug": {"system_used": system_artigo,
+                                  "user_prompt": prompt_para_debug,
                                   "urls_fetched": urls_info}}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500

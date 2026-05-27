@@ -217,6 +217,14 @@
         </p>
         <div id="insp-imgs" class="grid grid-cols-3 sm:grid-cols-4 gap-2"></div>
       </div>
+      <!-- Artigo da fase 1 (texto corrido antes de fatiar) -->
+      <div id="insp-artigo-block" class="hidden">
+        <p class="text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-1">
+          Artigo gerado (fase 1, antes de fatiar)
+          <span id="insp-artigo-chars" class="text-purple-600 ml-1"></span>
+        </p>
+        <pre id="insp-artigo" class="text-[11px] font-mono bg-purple-50 border border-purple-200 rounded-lg p-3 whitespace-pre-wrap break-words max-h-64 overflow-y-auto"></pre>
+      </div>
       <!-- Pexels API status -->
       <div id="insp-pexels-block">
         <p class="text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-1">Pexels API</p>
@@ -357,6 +365,18 @@
           <span class="absolute bottom-1 left-1 bg-black/60 text-white text-[9px] px-1 rounded">#${idx1}</span>
         </a>`;
       }).join('');
+    }
+
+    // Artigo da fase 1 (texto corrido). So aparece no fluxo de 2 fases.
+    const artigoBlock = document.getElementById('insp-artigo-block');
+    const artigo = _ultimoDebug.artigo_gerado || '';
+    if (artigo) {
+      artigoBlock.classList.remove('hidden');
+      document.getElementById('insp-artigo').textContent = artigo;
+      document.getElementById('insp-artigo-chars').textContent =
+        `(${(_ultimoDebug.artigo_chars || artigo.length).toLocaleString()} chars)`;
+    } else {
+      artigoBlock.classList.add('hidden');
     }
 
     // Pexels status
