@@ -151,6 +151,18 @@
         </div>
       </div>
     </div>
+    <!-- Legenda + hashtags pro Instagram (copia direto) -->
+    <div id="success-legenda-box" class="hidden mb-3 bg-white border border-blue-200 rounded-lg p-3">
+      <div class="flex items-center justify-between mb-2">
+        <p class="text-xs font-bold text-gray-700">Legenda pro Instagram</p>
+        <button onclick="copiarLegendaGerada()" class="text-xs font-semibold px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+          Copiar legenda + #
+        </button>
+      </div>
+      <p id="success-legenda" class="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap mb-2"></p>
+      <p id="success-hashtags" class="text-xs text-blue-600 leading-relaxed break-words"></p>
+    </div>
     <div class="flex items-center gap-2 flex-wrap">
       <a id="success-link" href="#"
          class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-500 text-white text-sm font-semibold rounded-lg hover:bg-blue-600 transition-colors">
@@ -501,6 +513,19 @@
           avisosBox.classList.add('hidden');
         }
 
+        // Legenda + hashtags pro Instagram
+        const legBox = document.getElementById('success-legenda-box');
+        const legenda = d.legenda || '';
+        const hashtags = (d.hashtags || []).join(' ');
+        if (legenda || hashtags) {
+          document.getElementById('success-legenda').textContent = legenda;
+          document.getElementById('success-hashtags').textContent = hashtags;
+          _legendaGerada = (legenda + (hashtags ? '\n\n' + hashtags : '')).trim();
+          legBox.classList.remove('hidden');
+        } else {
+          legBox.classList.add('hidden');
+        }
+
         document.getElementById('success-box').classList.remove('hidden');
         toast('Carrossel gerado com sucesso!');
       } else {
@@ -518,6 +543,16 @@
       document.getElementById('error-box').classList.remove('hidden');
       btn.disabled = false;
     }
+  }
+
+  // Legenda + hashtags da ultima geracao (pro botao copiar)
+  let _legendaGerada = '';
+  function copiarLegendaGerada(){
+    if (!_legendaGerada) { toast('Sem legenda pra copiar'); return; }
+    navigator.clipboard.writeText(_legendaGerada).then(
+      () => toast('Legenda + hashtags copiadas!'),
+      () => toast('Falha ao copiar')
+    );
   }
 
   // Allow Ctrl+Enter in brief to submit

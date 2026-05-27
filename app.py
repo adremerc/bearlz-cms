@@ -262,7 +262,9 @@ def init_db():
             ("prioridade",      "TEXT NOT NULL DEFAULT 'media'"),
             ("tempo_revisao",   "INTEGER DEFAULT 0"),
             ("data_publicacao", "TEXT"),
-            ("artigo",          "TEXT"),  # texto corrido da fase 1 (vira legenda)
+            ("artigo",          "TEXT"),  # texto corrido completo (fase 1)
+            ("legenda",         "TEXT"),  # resumo executivo pro Instagram
+            ("hashtags",        "TEXT"),  # "#a #b #c" pro Instagram
         ]:
             try:
                 conn.execute(f"ALTER TABLE carrosseis ADD COLUMN {col} {definition}")
@@ -1630,22 +1632,58 @@ SYSTEM_ARTIGO = (
     "DENTRO da tomada de decisão. Isso cria intimidade intelectual.\n\n"
 
     "ARQUITETURA NARRATIVA (siga a ordem):\n"
-    "1. ABERTURA COM IMPACTO (1-2 frases): a primeira frase é uma manchete\n"
-    "   que instala tensão ou surpresa. O MELHOR gancho tem PARADOXO ou\n"
-    "   DETALHE HUMANO CONCRETO, não só um dado seco.\n"
-    "   - FRACO (só dado): 'Os juros nos EUA subiram mais que em 2008.'\n"
-    "   - FORTE (paradoxo+humano): 'Uma empresa de US$ 1 trilhão começou no\n"
-    "     porão de um consultório odontológico, com dinheiro de um fazendeiro\n"
-    "     de batatas.'\n"
-    "   - Evite abrir com pergunta genérica ('Bitcoin vai subir?'). Se usar\n"
-    "     pergunta, que seja inesperada.\n"
-    "2. DESENVOLVIMENTO: expande com contexto, dados, nomes próprios, valores.\n"
-    "   Mostra os dois lados (contraste), reconstrói decisões, explica o\n"
-    "   mecanismo invisível por trás do fato visível.\n"
-    "3. FECHAMENTO: uma SENTENÇA FILOSÓFICA — máxima generalizável que\n"
-    "   transcende o caso e vira insight universal. O tipo de frase que a\n"
-    "   pessoa copia e manda no WhatsApp. Ex: 'Nem toda revolução parece\n"
-    "   óbvia quando ela nasce.'\n\n"
+    "1. ABERTURA COM IMPACTO — A PARTE MAIS IMPORTANTE DO TEXTO TODO.\n"
+    "   A primeira frase decide se a pessoa para o dedo ou rola pra próxima.\n"
+    "   Se o início não fisga em 2 segundos, ninguém lê o resto.\n"
+    "   - O MELHOR gancho tem PARADOXO ou DETALHE HUMANO CONCRETO E INESPERADO.\n"
+    "   - Técnica: comece pelo detalhe mais ESTRANHO/CONTRAINTUITIVO da\n"
+    "     história, NÃO pelo resumo. Crie um 'espera, como assim?' na cabeça.\n"
+    "   - FRACO (não faça): dado seco ('Os juros subiram mais que em 2008.')\n"
+    "     ou pergunta genérica ('Bitcoin vai subir?', 'Você sabia que...?').\n"
+    "   - FORTE (faça assim):\n"
+    "     * 'Uma empresa de US$ 1 trilhão começou no porão de um consultório\n"
+    "       odontológico, com dinheiro de um fazendeiro de batatas.'\n"
+    "     * 'O remédio que move bilhões hoje foi engavetado por uma\n"
+    "       farmacêutica que achou que ninguém aceitaria outra injeção.'\n"
+    "     * 'O Brasil criou o sistema de pagamento mais avançado do mundo e,\n"
+    "       no processo, destruiu a maior fonte de lucro dos próprios bancos.'\n"
+    "   - A abertura deve prometer uma HISTÓRIA, não anunciar um tópico.\n\n"
+    "   DEPOIS DO GANCHO, percorra estes blocos NA ORDEM (nem todo tema tem\n"
+    "   todos, mas use os que fizerem sentido):\n"
+    "   GANCHO → ORIGEM → PRODUTO/MECANISMO → ESCASSEZ/TENSÃO → NÚMEROS →\n"
+    "   MARCO → CONTEXTO (geopolítico/setorial) → ANÁLISE → FECHAMENTO\n"
+    "   - ORIGEM: de onde isso veio, a história por trás (humaniza antes de\n"
+    "     explicar o técnico). Quase-fracassos e reviravoltas criam interesse.\n"
+    "   - PRODUTO/MECANISMO: explique COMO a coisa funciona, do simples ao\n"
+    "     específico. É aqui que o leitor aprende o conceito.\n"
+    "   - ESCASSEZ/TENSÃO: o conflito, o gargalo, o que está em jogo agora.\n"
+    "   - NÚMEROS: os dados financeiros brutais, sem adjetivo. Deixe os\n"
+    "     números falarem (não diga 'impressionante', mostre o +756%).\n"
+    "   - MARCO: o momento-clímax (a empresa cruzou X, o recorde, a virada).\n"
+    "   - CONTEXTO: amplie o horizonte (disputa global, posição no setor).\n"
+    "     Transforma 'notícia' em 'análise estratégica'.\n"
+    "   - ANÁLISE: a leitura de investimento. O que isso significa, o que olhar.\n"
+    "   - FECHAMENTO: uma SENTENÇA FILOSÓFICA — máxima generalizável que\n"
+    "     transcende o caso e vira insight universal. A frase que a pessoa\n"
+    "     copia e manda no WhatsApp. Ex: 'Nem toda revolução parece óbvia\n"
+    "     quando ela nasce.' Idealmente fecha o loop com o gancho inicial.\n\n"
+
+    "PRESSUPOSTO FUNDAMENTAL — O LEITOR NÃO SABE DE NADA:\n"
+    "- Escreva partindo do zero. Não assuma que a pessoa conhece a empresa,\n"
+    "  o termo técnico, o contexto histórico ou o porquê de aquilo importar.\n"
+    "- Toda sigla/termo técnico é explicado na primeira vez, dentro da frase\n"
+    "  ('a HBM, memória de altíssima largura de banda que alimenta as GPUs').\n"
+    "- Construa o raciocínio passo a passo: contexto antes do dado, causa\n"
+    "  antes da consequência. Quem nunca ouviu falar do assunto entende tudo.\n"
+    "- Mas SEM ser condescendente: explique com a naturalidade de quem sabe\n"
+    "  muito e conversa de igual pra igual, não de quem dá aula.\n\n"
+
+    "PROFUNDIDADE = AUTORIDADE:\n"
+    "- Cada afirmação ancorada em dado concreto, exemplo ou mecanismo.\n"
+    "- Vá à segunda ordem: não só 'o que aconteceu', mas 'por que' e 'o que\n"
+    "  isso desencadeia'. É o que separa análise de notícia.\n"
+    "- Reconstrua decisões (por que a empresa/pessoa escolheu X), mostrando\n"
+    "  o trade-off que ela enfrentava.\n\n"
 
     "RITMO (marca registrada — siga à risca):\n"
     "- ALTERNE frases curtas (1 linha, funcionam como respiração) com médias.\n"
@@ -1668,16 +1706,38 @@ SYSTEM_ARTIGO = (
     "  Pode usar termo técnico (HBM, P/L, FGC, Selic) explicando implícito no\n"
     "  contexto. SEM gíria, SEM palavra de influencer ('top', 'incrível').\n\n"
 
-    "PROIBIDO (vícios que denunciam texto de IA):\n"
-    "- Clichês: 'Na prática,', 'O que acontece é que,', 'Vale destacar',\n"
-    "  'É importante ressaltar', 'Cabe destacar', 'Dessa forma,', 'Com isso,'\n"
-    "- Ganchos vazios: 'isso muda tudo', 'o que ninguém te conta', 'a verdade\n"
-    "  é que', 'só que ninguém está falando', 'pouca gente sabe'\n"
-    "- Travessão (—): NUNCA. Use vírgula, ponto ou parênteses.\n"
-    "- Frases picotadas em sequência: 'Queda. Alta. Recuperação.'\n"
-    "- Chamada de ação ('salva esse post', 'comenta', 'me segue').\n"
-    "- Emoji, hashtag, exclamação excessiva.\n"
-    "- Aspas simples: use SEMPRE duplas (\").\n\n"
+    "════ PROIBIDO — VÍCIOS QUE DENUNCIAM TEXTO DE IA (regra crítica) ════\n"
+    "PRINCÍPIO MESTRE: textos humanos AFIRMAM. Textos de IA ANUNCIAM. Corte\n"
+    "todos os anúncios e mantenha as afirmações diretas.\n\n"
+
+    "1) CONECTORES BUROCRÁTICOS — nunca use:\n"
+    "   'Na prática,', 'O que acontece é que,', 'Vale destacar (que)',\n"
+    "   'É importante ressaltar', 'Cabe destacar', 'É fundamental',\n"
+    "   'Dessa forma,', 'Nesse sentido,', 'Em suma,', 'Por outro lado,'\n"
+    "   'Com isso,' (no máximo 1× no artigo inteiro; prefira 'O resultado',\n"
+    "   'Aliás', 'No fim', ou conectores naturais)\n"
+    "2) GANCHOS DRAMÁTICOS VAZIOS — nunca use (são a cara da IA):\n"
+    "   'isso muda tudo' / 'é isso que muda tudo' / 'muda o jogo' / 'vira o\n"
+    "   jogo' — em vez disso EXPLIQUE concretamente o que muda.\n"
+    "   'só que ninguém está falando' / 'ninguém te conta' / 'o que poucos\n"
+    "   sabem' / 'pouca gente sabe' — vá direto ao fato, sem anunciar que é raro.\n"
+    "   'a verdade é que' / 'a realidade é que' / 'o problema é que' (como\n"
+    "   abertura) — apenas afirme o ponto sem o preâmbulo.\n"
+    "   'eis o problema' / 'aqui está o ponto' / 'o pulo do gato' — corte.\n"
+    "   'isso não é coincidência' / 'isso não é à toa' — mostre a causa, não\n"
+    "   anuncie que ela existe.\n"
+    "3) LINGUAGEM REBUSCADA — troque por natural:\n"
+    "   'concomitantemente'→'ao mesmo tempo'; 'outrossim'→'além disso';\n"
+    "   'por conseguinte'→'por isso'. Jargão financeiro técnico (Selic, P/L,\n"
+    "   FGC, HBM) está OK — só evite formalismo desnecessário.\n"
+    "4) TRAVESSÃO (—): NUNCA, em hipótese alguma. Use vírgula, ponto ou ( ).\n"
+    "5) FRASES PICOTADAS em sequência: 'Queda. Alta. Recuperação.' — reescreva\n"
+    "   como ideia fluida (exceto a frase curta de impacto pontual do ritmo).\n"
+    "6) Chamada de ação ('salva esse post', 'comenta', 'me segue') — proibido.\n"
+    "7) Emoji, hashtag no corpo do texto, exclamação excessiva — proibido.\n"
+    "8) Aspas simples: use SEMPRE aspas duplas (\").\n"
+    "O texto final tem que estar 100% LIVRE desses vícios. Reler e limpar\n"
+    "antes de entregar.\n\n"
 
     "USO DE FONTES: se houver [CONTEÚDO DO LINK] no brief, use SÓ dados de lá.\n"
     "  NUNCA invente número, data, citação. Sem dado, escreva conceitual.\n\n"
@@ -1685,12 +1745,37 @@ SYSTEM_ARTIGO = (
     "IMPORTANTE: NÃO escreva chamada de venda/CTA. O CTA é adicionado depois.\n"
     "  Termine no fechamento filosófico, no auge do conteúdo.\n\n"
 
-    "TAMANHO: escreva entre {min_chars} e {max_chars} caracteres no total.\n"
-    "  Denso o suficiente, mas SEM encher linguiça. Cada frase tem função.\n\n"
+    "ESTRUTURA EM PARÁGRAFOS (1 parágrafo = 1 slide):\n"
+    "- Escreva o artigo em EXATAMENTE {num_slides} parágrafos, separados por\n"
+    "  \\n\\n. Cada parágrafo vira UM slide.\n"
+    "- Cada parágrafo é AUTO-CONTIDO (uma ideia central) mas CONECTADO ao\n"
+    "  anterior: começa de onde o outro parou, sem repetir, sem 'como vimos'.\n"
+    "- O último parágrafo de vários blocos pode terminar numa frase que puxa\n"
+    "  o próximo (cliffhanger natural), porque o corte será exatamente ali.\n\n"
+
+    "TAMANHO (CRÍTICO — não entregue artigo curto, é o erro mais comum):\n"
+    "- Cada parágrafo/slide tem ~300-330 caracteres, TODOS de tamanho parecido.\n"
+    "- O artigo inteiro PRECISA ter entre {min_chars} e {max_chars} caracteres.\n"
+    "- Artigo curto = slides rasos e ruins. Você precisa de material pra\n"
+    "  {num_slides} blocos densos. NÃO resuma os pontos — DESENVOLVA cada um\n"
+    "  com contexto histórico, dados, mecanismo, comparações e implicações.\n"
+    "- Antes de finalizar, confira: o texto tem pelo menos {min_chars} chars\n"
+    "  e {num_slides} parágrafos? Se não, está raso — adicione profundidade\n"
+    "  (mais contexto, mais dados, mais nuance), NUNCA enrolação ou repetição.\n\n"
+
+    "LEGENDA E HASHTAGS (pro post do Instagram):\n"
+    "- legenda: resumo executivo de 3-5 frases que entrega a TESE do post.\n"
+    "  Quem ler só a legenda já entende o essencial. Mesmo tom do artigo,\n"
+    "  sem clichê. Pode terminar com a sentença filosófica. SEM hashtag aqui.\n"
+    "- hashtags: 6-10 hashtags relevantes ao tema, misturando amplas\n"
+    "  (#investimentos, #economia) e específicas (#micron, #semicondutores).\n"
+    "  Em português quando fizer sentido. Cada uma começa com #.\n\n"
 
     "RETORNE SOMENTE JSON VÁLIDO, sem markdown:\n"
-    '{"titulo":"título curto e forte","artigo":"texto corrido completo, '
-    'parágrafos separados por \\n\\n"}'
+    '{"titulo":"título curto e forte",'
+    '"artigo":"texto corrido completo, parágrafos separados por \\n\\n",'
+    '"legenda":"resumo executivo de 3-5 frases",'
+    '"hashtags":["#tag1","#tag2","#tag3"]}'
 )
 
 SYSTEM_FATIAR = (
@@ -1873,6 +1958,71 @@ def _sanitizar_slide(text: str) -> str:
     text = _strip_em_dash(text or "")
     text = _aspas_simples_pra_duplas(text)
     text = _ensure_paragraphs(text)
+    text = _truncar_slide_se_grande(text)
+    return text
+
+
+def _limpar_cliches_abertura(text: str) -> str:
+    """Remove cliches de abertura vazios do INICIO de um bloco de texto
+    (preambulos de IA que nao agregam). Seguro: so corta no inicio e
+    recapitaliza. Cliches no meio sao deixados pro Polir/revisao humana."""
+    if not text:
+        return text
+    cliches = [
+        r'^Na pr[aá]tica,\s*',
+        r'^O que acontece [eé] que,?\s*',
+        r'^A verdade [eé] que,?\s*',
+        r'^A realidade [eé] que,?\s*',
+        r'^O (?:grande )?problema [eé] que,?\s*',
+        r'^Vale (?:destacar|ressaltar) que,?\s*',
+        r'^[EÉ] importante (?:destacar|ressaltar) que,?\s*',
+        r'^Cabe (?:destacar|ressaltar) que,?\s*',
+        r'^Dessa forma,\s*',
+        r'^Nesse sentido,\s*',
+        r'^Em suma,\s*',
+    ]
+    for pat in cliches:
+        novo = re.sub(pat, '', text, flags=re.IGNORECASE)
+        if novo != text and novo:
+            # Recapitaliza a primeira letra do que sobrou
+            text = novo[0].upper() + novo[1:]
+            break
+    return text
+
+
+def _sanitizar_legenda(text: str) -> str:
+    """Sanitiza a legenda do Instagram: tira travessao, aspas simples,
+    cliche de abertura. Mantem os paragrafos (legenda pode ter varios)."""
+    text = _strip_em_dash(text or "")
+    text = _aspas_simples_pra_duplas(text)
+    text = _limpar_cliches_abertura(text)
+    return text.strip()
+
+
+def _colapsar_paragrafos(text: str) -> str:
+    """Garante 1 PARAGRAFO = 1 SLIDE (estilo Varos): junta multiplos
+    paragrafos (\\n\\n) num bloco unico de texto corrido. Preserva listas
+    de bullet (linhas com •/-/* ) — essas mantem as quebras de linha.
+    Usado SO no fluxo de geracao; o Polir/edicao manual continua livre
+    pra usar varios paragrafos."""
+    if not text:
+        return text
+    # Se ha bullets, nao colapsa (a estrutura de linhas eh intencional)
+    if re.search(r'(?m)^\s*[•\-\*]\s+', text):
+        return text
+    # Colapsa qualquer sequencia de quebras (\n, \n\n) num espaco unico
+    return re.sub(r'\s*\n+\s*', ' ', text).strip()
+
+
+def _sanitizar_slide_varos(text: str) -> str:
+    """Sanitizacao pro fluxo de geracao em 2 fases: igual ao normal mas
+    forca 1 paragrafo (colapsa antes de truncar) e remove cliche de
+    abertura. Resultado: slide denso, uniforme, em bloco unico, sem
+    preambulo de IA — como os carrosseis do Varos."""
+    text = _strip_em_dash(text or "")
+    text = _aspas_simples_pra_duplas(text)
+    text = _limpar_cliches_abertura(text)
+    text = _colapsar_paragrafos(text)
     text = _truncar_slide_se_grande(text)
     return text
 
@@ -3012,26 +3162,30 @@ def _gerar_conteudo_2fases(client, topico, brief_enriched, imagens_block,
       FASE 1: escreve o ARTIGO corrido fluido (system_artigo / SYSTEM_ARTIGO)
       FASE 2: fatia o artigo em num_slides slides + escolhe imagens (SYSTEM_FATIAR)
 
-    Retorna (titulo, slides_raw, artigo, fase_debug).
+    Retorna (titulo, slides_raw, artigo, legenda, hashtags, fase_debug).
     Levanta ValueError se alguma fase falhar de forma irrecuperavel."""
-    # Tamanho-alvo do artigo: ~230-330 chars por slide (uniforme estilo Varos)
-    min_chars = num_slides * 230
-    max_chars = num_slides * 330
+    # Tamanho-alvo do artigo: ~290-360 chars por slide (estilo Varos, denso).
+    # Piso de seguranca pra nao gerar raso mesmo com poucos slides.
+    min_chars = max(num_slides * 290, 900)
+    max_chars = num_slides * 360
     sys_artigo = (system_artigo
                   .replace("{min_chars}", str(min_chars))
-                  .replace("{max_chars}", str(max_chars)))
+                  .replace("{max_chars}", str(max_chars))
+                  .replace("{num_slides}", str(num_slides)))
 
     # ── FASE 1: ARTIGO CORRIDO ──
     prompt_artigo = (
         f"TÓPICO: {topico}\n\n"
         f"BRIEF/CONTEÚDO:\n{brief_enriched or topico}\n\n"
-        "Escreva o artigo completo seguindo a arquitetura narrativa "
-        "(abertura com paradoxo/detalhe humano, desenvolvimento que reconstrói "
-        "o raciocínio, fechamento com sentença filosófica). Texto corrido, "
-        "fluido, SEM CTA. Retorne SOMENTE JSON."
+        f"Escreva o artigo completo ({min_chars}-{max_chars} caracteres) "
+        "seguindo a arquitetura narrativa: abertura com paradoxo/detalhe "
+        "humano inesperado, desenvolvimento que reconstrói o raciocínio com "
+        "dados, fechamento com sentença filosófica. Texto corrido, fluido, "
+        "SEM CTA. Inclua também legenda e hashtags. Retorne SOMENTE JSON."
     )
+    # max_tokens generoso: artigo grande + legenda + hashtags
     resp1 = claude_call_with_retry(client,
-        model="claude-sonnet-4-5", max_tokens=4000,
+        model="claude-sonnet-4-5", max_tokens=6000,
         system=sys_artigo,
         messages=[{"role": "user", "content": prompt_artigo}]
     )
@@ -3040,9 +3194,18 @@ def _gerar_conteudo_2fases(client, topico, brief_enriched, imagens_block,
         out1 = re.sub(r"^```[a-z]*\n?", "", out1)
         out1 = re.sub(r"\n?```$", "", out1).strip()
     dados1 = _parse_claude_json(out1)
+    legenda = ""
+    hashtags = []
     if dados1 and isinstance(dados1, dict) and dados1.get("artigo"):
         artigo = str(dados1.get("artigo", "")).strip()
         titulo = str(dados1.get("titulo") or topico[:40]).strip()
+        legenda = str(dados1.get("legenda") or "").strip()
+        ht = dados1.get("hashtags") or []
+        if isinstance(ht, list):
+            hashtags = [str(h).strip() for h in ht if str(h).strip()]
+        elif isinstance(ht, str):
+            # As vezes vem como string "#a #b #c"
+            hashtags = [w for w in ht.split() if w.startswith("#")]
     else:
         # Fallback: Claude pode ter devolvido texto cru sem JSON. Usa como artigo.
         artigo = out1
@@ -3076,12 +3239,14 @@ def _gerar_conteudo_2fases(client, topico, brief_enriched, imagens_block,
     fase_debug = {
         "artigo": artigo,
         "artigo_chars": len(artigo),
+        "legenda": legenda,
+        "hashtags": hashtags,
         "prompt_artigo": prompt_artigo,
         "prompt_fatiar": prompt_fatiar,
         "min_chars": min_chars,
         "max_chars": max_chars,
     }
-    return titulo, slides_raw, artigo, fase_debug
+    return titulo, slides_raw, artigo, legenda, hashtags, fase_debug
 
 
 @app.route("/api/gerar/system-prompt", methods=["GET"])
@@ -3092,8 +3257,9 @@ def api_gerar_system_prompt():
     Substitui os placeholders {min_chars}/{max_chars} por valores default
     (base 11 slides) pra UI mostrar numeros reais em vez de '{min_chars}'."""
     preview = (SYSTEM_ARTIGO
-               .replace("{min_chars}", str(11 * 230))
-               .replace("{max_chars}", str(11 * 330)))
+               .replace("{min_chars}", str(11 * 290))
+               .replace("{max_chars}", str(11 * 360))
+               .replace("{num_slides}", "11"))
     return jsonify({"system": preview})
 
 
@@ -3137,7 +3303,8 @@ def api_gerar():
     try:
         client = _anthropic_lib.Anthropic(api_key=ANTHROPIC_API_KEY)
         # ══ GERACAO EM 2 FASES (estilo Varos): artigo corrido -> fatiar ══
-        titulo_gerado, slides_raw, artigo_gerado, fase_debug = _gerar_conteudo_2fases(
+        (titulo_gerado, slides_raw, artigo_gerado, legenda_gerada,
+         hashtags_geradas, fase_debug) = _gerar_conteudo_2fases(
             client, topico, brief_enriched, imagens_block, num_slides, system_artigo
         )
         prompt_para_debug = fase_debug.get("prompt_artigo", "")
@@ -3268,8 +3435,8 @@ def api_gerar():
                 fid = (disponiveis[0] if disponiveis else ids[i % len(ids)])
                 used_pexels_ids.add(fid)
                 img  = f"{PX}{fid}/pexels-photo-{fid}.jpeg{Q}"
-            # Sanitiza texto: remove travessoes e garante quebras de paragrafo
-            texto_sanit = _sanitizar_slide(s.get("texto", ""))
+            # Sanitiza texto no modo Varos: 1 paragrafo unico por slide
+            texto_sanit = _sanitizar_slide_varos(s.get("texto", ""))
             slides_out.append({"texto": texto_sanit, "image_url": img})
 
         # Build slug
@@ -3357,20 +3524,30 @@ def api_gerar():
                 f"Carrossel gerado: {titulo_gerado}"
             )
 
-        # Register in DB. Guarda tambem o artigo corrido da fase 1 — serve
-        # de legenda do post e fica acessivel no viewer pra consulta/copia.
+        # Register in DB. Guarda artigo (texto corrido), legenda (resumo) e
+        # hashtags — tudo acessivel no viewer e na pagina de gerar.
+        # Sanitiza a legenda (tira travessao, aspas simples, cliche de abertura).
+        legenda_gerada = _sanitizar_legenda(legenda_gerada)
+        hashtags_str = " ".join(hashtags_geradas) if hashtags_geradas else ""
         with get_db() as conn:
             conn.execute("""
-                INSERT INTO carrosseis (slug, titulo, arquivo, num_slides, status, artigo)
-                VALUES (?, ?, ?, ?, 'rascunho', ?)
+                INSERT INTO carrosseis (slug, titulo, arquivo, num_slides, status,
+                                        artigo, legenda, hashtags)
+                VALUES (?, ?, ?, ?, 'rascunho', ?, ?, ?)
                 ON CONFLICT(slug) DO UPDATE SET
                     titulo=excluded.titulo, arquivo=excluded.arquivo,
                     num_slides=excluded.num_slides, artigo=excluded.artigo,
+                    legenda=excluded.legenda, hashtags=excluded.hashtags,
                     updated_at=datetime('now')
-            """, (slug, titulo_gerado, nome, len(slides_out)+1, artigo_gerado))
+            """, (slug, titulo_gerado, nome, len(slides_out)+1,
+                  artigo_gerado, legenda_gerada, hashtags_str))
 
         return jsonify({
             "ok": True, "slug": slug, "titulo": titulo_gerado, "url": f"/c/{slug}",
+            # Conteudo pro Instagram (mostrado na pagina de gerar):
+            "artigo": artigo_gerado,
+            "legenda": legenda_gerada,
+            "hashtags": hashtags_geradas,
             # Avisos pra revisao manual:
             # - avisos_data: anos antigos detectados nos slides sem contexto
             # - urls_fetched: cada URL tem is_instagram + is_stale + published_date
