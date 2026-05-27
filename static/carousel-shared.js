@@ -10,6 +10,28 @@ function toHTML(text){
     return p.b?`<strong>${esc}</strong>`:esc;
   }).join('');
 }
+// Regex de linha de bullet: comeca com • ou - (ou *) seguido de espaco.
+const BULLET_RE=/^\s*[•\-\*]\s+(.*)$/;
+// Converte o texto do slide em HTML pro display/preview.
+// - Paragrafos separados por \n\n viram blocos com margem.
+// - Dentro de um paragrafo, linhas que comecam com • ou - viram bullets
+//   com recuo pendurado (hanging indent) via classe .slide-bullet.
+function textToDisplayHTML(text){
+  return (text||'').split(/\n\n+/).map(para=>{
+    const linhas=para.split('\n');
+    const temBullet=linhas.some(l=>BULLET_RE.test(l));
+    if(temBullet){
+      const inner=linhas.map(l=>{
+        const bm=BULLET_RE.exec(l);
+        if(bm)return `<span class="slide-bullet">${toHTML(bm[1])}</span>`;
+        if(!l.trim())return '';
+        return `<span style="display:block">${toHTML(l)}</span>`;
+      }).join('');
+      return `<span style="display:block;margin-bottom:16px">${inner}</span>`;
+    }
+    return `<span style="display:block;margin-bottom:16px">${toHTML(para)}</span>`;
+  }).join('');
+}
 
 /* ── Auto-save / Auto-load (local + servidor compartilhado) ── */
 const LS_KEY=window.CAROUSEL_LS_KEY||'bearlz_carousel_v1';
@@ -387,8 +409,7 @@ function render(){
   }else{
     document.getElementById('textDisplay').style.display='block';
     document.getElementById('textEditArea').style.display='none';
-    const paras=s.text.split(/\n\n+/).map(p=>`<span style="display:block;margin-bottom:16px">${toHTML(p)}</span>`).join('');
-    document.getElementById('textDisplay').innerHTML=paras;
+    document.getElementById('textDisplay').innerHTML=textToDisplayHTML(s.text);
     if(textAreaEl)textAreaEl.classList.remove('editing-mode');
     if(cardEl)cardEl.classList.remove('editing-text');
   }
@@ -1048,7 +1069,36 @@ function _updateCharCount(value){
   el.style.color=color;
 }
 window._updateCharCount=_updateCharCount;
-function liveUpdate(val){slides[cur].text=val;const paras=val.split(/\n\n+/).map(p=>`<span style="display:block;margin-bottom:16px">${toHTML(p)}</span>`).join('');document.getElementById('textDisplay').innerHTML=paras;}
+function liveUpdate(val){slides[cur].text=val;document.getElementById('textDisplay').innerHTML=textToDisplayHTML(val);}
+/* Insere um topico (bullet "• ") na posicao do cursor do textarea.
+   - Se o cursor esta numa linha vazia, poe "• " no inicio dela.
+   - Se a linha ja tem conteudo, quebra linha e adiciona "• " (novo topico).
+   Atualiza preview, contador e autosave em seguida. */
+function inserirBullet(){
+  const ta=document.getElementById('editTA');
+  if(!ta)return;
+  const start=ta.selectionStart;
+  const val=ta.value;
+  const lineStart=val.lastIndexOf('\n',start-1)+1;
+  const antesNaLinha=val.slice(lineStart,start);
+  let novoVal,newPos;
+  if(antesNaLinha.trim()===''){
+    // linha vazia: poe "• " no inicio (sem criar linha nova)
+    novoVal=val.slice(0,lineStart)+'• '+val.slice(lineStart);
+    newPos=lineStart+2;
+  }else{
+    // linha com conteudo: quebra e adiciona novo topico
+    novoVal=val.slice(0,start)+'\n• '+val.slice(start);
+    newPos=start+3;
+  }
+  ta.value=novoVal;
+  ta.focus();
+  ta.setSelectionRange(newPos,newPos);
+  if(typeof _updateCharCount==='function')_updateCharCount(ta.value);
+  if(typeof liveUpdate==='function')liveUpdate(ta.value);
+  if(typeof autoSave==='function')autoSave();
+}
+window.inserirBullet=inserirBullet;
 function saveEdit(){slides[cur].text=document.getElementById('editTA').value;editingText=false;render();autoSave();}
 
 /* ── Garante elementos do edit area em posts ANTIGOS ──
@@ -1087,6 +1137,26 @@ function _ensureEditButtons(){
   } else if(!btnRev.querySelector('svg')){
     // Migra botao legado (texto "📝 Revisar PT") pro novo SVG
     btnRev.innerHTML=SVG_REVISAR;
+  }
+  // Botao Topico/Bullet — insere "• " no cursor. Fica logo apos o Salvar
+  // (afterend) pra ficar agrupado com as acoes de edicao de texto.
+  if(!actions.querySelector('.btn-bullet')){
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.className='btn-bullet';
+    btn.title='Insere um tópico (bullet point) na posição do cursor';
+    btn.onclick=function(){inserirBullet();};
+    btn.innerHTML=
+      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      +'<circle cx="4.5" cy="7" r="1.4" fill="currentColor" stroke="none"/>'
+      +'<circle cx="4.5" cy="12" r="1.4" fill="currentColor" stroke="none"/>'
+      +'<circle cx="4.5" cy="17" r="1.4" fill="currentColor" stroke="none"/>'
+      +'<line x1="9" y1="7" x2="20" y2="7"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="17" x2="20" y2="17"/>'
+      +'</svg>'
+      +'<span class="label">Tópico</span>';
+    const save=actions.querySelector('.btn-save');
+    if(save)save.insertAdjacentElement('afterend',btn);
+    else actions.appendChild(btn);
   }
   // Botao Polir — SVG "sparkles" (Heroicons) + label.
   if(!actions.querySelector('.btn-polir')){
@@ -1505,17 +1575,35 @@ async function drawSlideToCanvas(canvas,slide){
   const maxW=W-px*2;
   const paras=slide.text.split(/\n\n+/);
   for(let pi=0;pi<paras.length;pi++){
-    const segs=parseBold(paras[pi].replace(/\n/g,' '));
-    const lines=canvasWrapText(ctx,segs,maxW,fSize);
-    for(const ln of lines){
-      let lx=px;
-      for(const chunk of ln){
-        ctx.font=`${chunk.bold?'700':'400'} ${fSize}px Open Sans,sans-serif`;
-        ctx.fillStyle='#0f1419';
-        ctx.fillText(chunk.text,lx,cy);
-        lx+=ctx.measureText(chunk.text).width;
+    // Dentro do paragrafo, processa cada linha (\n). Linhas que comecam com
+    // • ou - viram bullets: marcador na 1a linha + recuo nas continuacoes.
+    const rawLines=paras[pi].split('\n');
+    for(let li=0;li<rawLines.length;li++){
+      let lineTxt=rawLines[li];
+      if(!lineTxt.trim()){cy+=Math.round(lh*0.4);continue;}
+      const bm=/^\s*[•\-\*]\s+(.*)$/.exec(lineTxt);
+      const isBullet=!!bm;
+      if(isBullet)lineTxt=bm[1];
+      ctx.font=`400 ${fSize}px Open Sans,sans-serif`;
+      const indent=isBullet?ctx.measureText('•  ').width:0;
+      const segs=parseBold(lineTxt);
+      const wrapped=canvasWrapText(ctx,segs,maxW-indent,fSize);
+      for(let wi=0;wi<wrapped.length;wi++){
+        const ln=wrapped[wi];
+        let lx=px+indent;
+        if(isBullet&&wi===0){
+          ctx.font=`400 ${fSize}px Open Sans,sans-serif`;
+          ctx.fillStyle='#0f1419';
+          ctx.fillText('•',px,cy);
+        }
+        for(const chunk of ln){
+          ctx.font=`${chunk.bold?'700':'400'} ${fSize}px Open Sans,sans-serif`;
+          ctx.fillStyle='#0f1419';
+          ctx.fillText(chunk.text,lx,cy);
+          lx+=ctx.measureText(chunk.text).width;
+        }
+        cy+=lh;
       }
-      cy+=lh;
     }
     if(pi<paras.length-1)cy+=24;
   }

@@ -157,6 +157,12 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
 .text-area{padding:0 22px 10px;overflow:hidden}
 .text-display{font-size:18px;line-height:1.4;color:#0f1419;white-space:pre-line;cursor:text;min-height:60px;padding:2px 0}
 .text-display strong{font-weight:700}
+/* Bullet point (topico). Hanging indent: o marcador "•" fica na margem e a
+   continuacao da linha recua, igual lista de verdade. O texto da linha NAO
+   inclui o "•" (vem do ::before) — bate com o canvas export que desenha o
+   marcador separado. */
+.slide-bullet{display:block;padding-left:1.4em;text-indent:-1.4em;margin:2px 0}
+.slide-bullet::before{content:'•  ';font-weight:700}
 .edit-textarea{width:100%;min-height:180px;border:1.5px solid #1d9bf0;border-radius:10px;padding:12px 14px;font-size:16px;font-family:inherit;line-height:1.6;resize:vertical;outline:none;color:#0f1419;background:#fafcff;box-sizing:border-box}
 .edit-actions{display:flex;gap:6px;margin-top:8px;align-items:center;position:sticky;bottom:0;background:#fff;padding:6px 0 2px;z-index:50}
 .btn-save{padding:9px 18px;font-size:13px;font-weight:700;background:#1d9bf0;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(29,155,240,.35)}
@@ -214,6 +220,22 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
   transform:translateY(-1px);
   box-shadow:0 3px 10px rgba(139,92,246,.5);
 }
+/* Botao Topico (bullet) — azul claro pra sinalizar acao de formatacao */
+.btn-bullet{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:7px 12px;font-size:12px;font-weight:600;
+  background:#eff6ff;color:#1d4ed8;
+  border:1.5px solid #bfdbfe;border-radius:7px;
+  cursor:pointer;font-family:inherit;
+  transition:all .18s cubic-bezier(.4,0,.2,1);
+  white-space:nowrap;line-height:1;
+}
+.btn-bullet svg{flex-shrink:0}
+.btn-bullet:hover{
+  background:#dbeafe;border-color:#93c5fd;color:#1e40af;
+  transform:translateY(-1px);box-shadow:0 2px 6px rgba(29,78,216,.18);
+}
+.btn-bullet:active{transform:translateY(0) scale(.97)}
 
 /* Modo edicao: text-area SOBE acima da imagem e nao corta. O .card todo
    ganha class 'editing' pra ESCONDER a imagem temporariamente — assim

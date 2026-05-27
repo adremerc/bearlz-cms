@@ -1710,8 +1710,19 @@ SYSTEM_FATIAR = (
     "- Cada slide começa EXATAMENTE de onde o anterior parou. Sem reset,\n"
     "  sem repetir o que já foi dito, sem 'como vimos', sem 'recapitulando'.\n\n"
 
-    "TAMANHO: 180-380 caracteres por slide. NUNCA acima de 420.\n"
-    "  O primeiro slide (hook) pode ser mais curto (150-280).\n\n"
+    "TAMANHO UNIFORME (regra importante — é assim que o Varos faz):\n"
+    "- Cada slide tem entre 220 e 340 caracteres.\n"
+    "- O tamanho deve ser CONSISTENTE entre todos os slides. Todos com\n"
+    "  comprimento parecido (~280). NÃO faça um slide com 150 e outro com\n"
+    "  400. Equilibre o corte pra que fiquem uniformes.\n"
+    "- Exceção: o slide 1 (hook) pode ser um pouco mais curto.\n"
+    "- NUNCA acima de 420.\n\n"
+
+    "FORMATO — UM PARÁGRAFO POR SLIDE (regra do estilo Varos):\n"
+    "- Cada slide é UM bloco de texto corrido, um único parágrafo.\n"
+    "- NÃO quebre o slide em vários parágrafos com linha em branco (\\n\\n).\n"
+    "- O Varos faz exatamente isso: cada slide é um parágrafo só, denso e\n"
+    "  uniforme. O que varia entre slides é o conteúdo, não o formato.\n\n"
 
     "NÚMERO DE SLIDES: corte em EXATAMENTE {num_slides} slides.\n"
     "  Distribua o artigo de forma equilibrada entre eles.\n\n"
@@ -1722,9 +1733,6 @@ SYSTEM_FATIAR = (
     "- NUNCA negrite uma frase inteira. NUNCA negrite por decoração.\n"
     "- Quando tudo é destacado, nada é destacado.\n"
     "- Use **markdown** de negrito.\n\n"
-
-    "PARÁGRAFOS: cada slide tem 1-3 parágrafos curtos separados por \\n\\n.\n"
-    "  Máximo 3 linhas por parágrafo.\n\n"
 
     "IMAGENS — cada slide ganha UMA imagem com FUNÇÃO clara:\n"
     "- 'chart': quando o slide tem dados numéricos comparáveis. Inclua\n"
@@ -1767,14 +1775,16 @@ def _strip_em_dash(text: str) -> str:
     return text
 
 def _ensure_paragraphs(text: str) -> str:
-    """Se o slide for longo (>180 chars) e nao tiver \\n\\n, divide em paragrafos
-    no fim de frases. Garante legibilidade mesmo se o Claude ignorar a regra."""
+    """Rede de seguranca: SO quebra em paragrafos se o slide for muito grande
+    (>400 chars) e sem \\n\\n. No estilo Varos cada slide eh UM paragrafo
+    corrido de ~280 chars, entao a maioria passa intacta. So divide blocos
+    realmente grandes (perto do limite de 420) pra nao virar muralha de texto."""
     if not text:
         return text
     if "\n\n" in text:
-        return text  # ja tem paragrafos
-    if len(text) < 180:
-        return text  # texto curto nao precisa quebrar
+        return text  # ja tem paragrafos (respeita o que veio)
+    if len(text) < 400:
+        return text  # ate 400 chars fica como 1 paragrafo (estilo Varos)
     # Divide em frases (final de frase = . ! ? seguido de espaco)
     sentences = re.split(r'(?<=[.!?])\s+', text.strip())
     if len(sentences) <= 1:
@@ -3003,9 +3013,9 @@ def _gerar_conteudo_2fases(client, topico, brief_enriched, imagens_block,
 
     Retorna (titulo, slides_raw, artigo, fase_debug).
     Levanta ValueError se alguma fase falhar de forma irrecuperavel."""
-    # Tamanho-alvo do artigo: ~170-300 chars por slide de conteudo
-    min_chars = num_slides * 170
-    max_chars = num_slides * 300
+    # Tamanho-alvo do artigo: ~230-330 chars por slide (uniforme estilo Varos)
+    min_chars = num_slides * 230
+    max_chars = num_slides * 330
     sys_artigo = (system_artigo
                   .replace("{min_chars}", str(min_chars))
                   .replace("{max_chars}", str(max_chars)))
@@ -3081,8 +3091,8 @@ def api_gerar_system_prompt():
     Substitui os placeholders {min_chars}/{max_chars} por valores default
     (base 11 slides) pra UI mostrar numeros reais em vez de '{min_chars}'."""
     preview = (SYSTEM_ARTIGO
-               .replace("{min_chars}", str(11 * 170))
-               .replace("{max_chars}", str(11 * 300)))
+               .replace("{min_chars}", str(11 * 230))
+               .replace("{max_chars}", str(11 * 330)))
     return jsonify({"system": preview})
 
 
@@ -3096,8 +3106,8 @@ def api_gerar():
     data       = request.get_json() or {}
     topico     = data.get("topico", "").strip()
     brief      = data.get("brief", "").strip()
-    # Min 10 slides (analise rasa = sem autoridade). Max 20 (limite Instagram).
-    num_slides = min(max(int(data.get("num_slides", 11)), 10), 20)
+    # Usuario escolhe 1-20 slides (Instagram aceita ate 20). Default 11.
+    num_slides = min(max(int(data.get("num_slides", 11)), 1), 20)
     # Override do system prompt vindo da UI (opcional). Se vazio, usa o default.
     system_override = (data.get("system_override") or "").strip()
 
