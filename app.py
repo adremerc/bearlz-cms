@@ -262,6 +262,7 @@ def init_db():
             ("prioridade",      "TEXT NOT NULL DEFAULT 'media'"),
             ("tempo_revisao",   "INTEGER DEFAULT 0"),
             ("data_publicacao", "TEXT"),
+            ("artigo",          "TEXT"),  # texto corrido da fase 1 (vira legenda)
         ]:
             try:
                 conn.execute(f"ALTER TABLE carrosseis ADD COLUMN {col} {definition}")
@@ -3356,15 +3357,17 @@ def api_gerar():
                 f"Carrossel gerado: {titulo_gerado}"
             )
 
-        # Register in DB
+        # Register in DB. Guarda tambem o artigo corrido da fase 1 — serve
+        # de legenda do post e fica acessivel no viewer pra consulta/copia.
         with get_db() as conn:
             conn.execute("""
-                INSERT INTO carrosseis (slug, titulo, arquivo, num_slides, status)
-                VALUES (?, ?, ?, ?, 'rascunho')
+                INSERT INTO carrosseis (slug, titulo, arquivo, num_slides, status, artigo)
+                VALUES (?, ?, ?, ?, 'rascunho', ?)
                 ON CONFLICT(slug) DO UPDATE SET
                     titulo=excluded.titulo, arquivo=excluded.arquivo,
-                    num_slides=excluded.num_slides, updated_at=datetime('now')
-            """, (slug, titulo_gerado, nome, len(slides_out)+1))
+                    num_slides=excluded.num_slides, artigo=excluded.artigo,
+                    updated_at=datetime('now')
+            """, (slug, titulo_gerado, nome, len(slides_out)+1, artigo_gerado))
 
         return jsonify({
             "ok": True, "slug": slug, "titulo": titulo_gerado, "url": f"/c/{slug}",
