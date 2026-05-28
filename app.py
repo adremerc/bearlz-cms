@@ -1665,10 +1665,20 @@ SYSTEM_ARTIGO = (
     "   - CONTEXTO: amplie o horizonte (disputa global, posição no setor).\n"
     "     Transforma 'notícia' em 'análise estratégica'.\n"
     "   - ANÁLISE: a leitura de investimento. O que isso significa, o que olhar.\n"
-    "   - FECHAMENTO: uma SENTENÇA FILOSÓFICA — máxima generalizável que\n"
-    "     transcende o caso e vira insight universal. A frase que a pessoa\n"
-    "     copia e manda no WhatsApp. Ex: 'Nem toda revolução parece óbvia\n"
-    "     quando ela nasce.' Idealmente fecha o loop com o gancho inicial.\n\n"
+    "   - FECHAMENTO: uma conclusão DIRETA, CONCRETA e específica do caso.\n"
+    "     O que o leitor leva pra casa, em linguagem clara. PODE fechar o\n"
+    "     loop com o gancho inicial.\n"
+    "     PROIBIDO no fechamento (e em qualquer slide): FRASE DE EFEITO\n"
+    "     'poética'. Nada de aforismo, máxima de almanaque, rima, paralelismo\n"
+    "     ou antítese bonitinha tentando soar profundo. Isso é vício de IA\n"
+    "     fingindo ser poeta e fica genérico/vazio.\n"
+    "     RUIM (NÃO faça): 'Nem todo remédio amargo cura, mas todo veneno\n"
+    "     doce mata devagar.' / 'Não importa a cor da bandeira.' / 'O trade-off\n"
+    "     está nu.' / 'Estabilização comprada com recessão, futuro pago com\n"
+    "     presente.' — frases que rimam/equilibram pra impressionar.\n"
+    "     BOM (faça): conclusão concreta. 'Se a recessão durar até a eleição\n"
+    "     de 2027, o ajuste pode ser revertido antes de dar resultado, e a\n"
+    "     Argentina volta à estaca zero.' — diz algo REAL, não um provérbio.\n\n"
 
     "PRESSUPOSTO FUNDAMENTAL — O LEITOR NÃO SABE DE NADA:\n"
     "- Escreva partindo do zero. Não assuma que a pessoa conhece a empresa,\n"
@@ -1774,7 +1784,7 @@ SYSTEM_ARTIGO = (
     "LEGENDA E HASHTAGS (pro post do Instagram):\n"
     "- legenda: resumo executivo de 3-5 frases que entrega a TESE do post.\n"
     "  Quem ler só a legenda já entende o essencial. Mesmo tom do artigo,\n"
-    "  sem clichê. Pode terminar com a sentença filosófica. SEM hashtag aqui.\n"
+    "  sem clichê e SEM frase de efeito poética/aforismo. SEM hashtag aqui.\n"
     "- hashtags: 6-10 hashtags relevantes ao tema, misturando amplas\n"
     "  (#investimentos, #economia) e específicas (#micron, #semicondutores).\n"
     "  Em português quando fizer sentido. Cada uma começa com #.\n\n"
@@ -2979,6 +2989,31 @@ def _detect_vicios_ia(texto: str):
             "context": texto[max(0,m.start()-15):min(len(texto), m.end()+15)]
         })
 
+    # 8. Frase de efeito "poetica" (aforismo/rima/paralelismo) — a IA tentando
+    # ser poeta. Generico e vazio. Detecta os padroes mais classicos.
+    frase_efeito = [
+        (r"\bNem\s+to[dt]o\b[^.!?]{3,70}\b(?:mas\s+)?to[dt][oa]\b",
+         "Frase de efeito (paralelismo 'nem todo X... todo Y'). Soa proverbio de almanaque. Diga o ponto direto."),
+        (r"\bn[ãa]o\s+importa\s+(?:a\s+cor|o\s+nome|de\s+que|quem\s|onde\s|qual\s)",
+         "'Não importa a cor/o nome...' é relativização de efeito. Va direto ao ponto concreto."),
+        (r"\bn[ãa]o\s+[eé]\s+sobre\s+[^.!?]{3,40},?\s+[eé]\s+sobre\b",
+         "Antítese de efeito ('não é sobre X, é sobre Y'). Clichê de IA. Reescreva direto."),
+        (r"\b([a-zçãõáéíóúâêô]+)\s+n[ãa]o\s+\1\b",
+         "Repetição/quiasmo de efeito. Soa frase de almanaque."),
+    ]
+    for pat, msg in frase_efeito:
+        for m in re.finditer(pat, texto, re.IGNORECASE):
+            matches.append({
+                "offset": m.start(),
+                "length": m.end() - m.start(),
+                "message": msg,
+                "short": "Frase de efeito poética",
+                "suggestions": [],
+                "category": "Vício de IA",
+                "type": "AI_AFORISMO",
+                "context": texto[max(0,m.start()-15):min(len(texto), m.end()+25)],
+            })
+
     return matches
 
 
@@ -3005,7 +3040,19 @@ VOZ HUMANIZADA — remova clichês SUBSTITUINDO por linguagem natural:
 - "Dessa forma," "Nesse sentido," "Em suma," → use transições humanas
   ("E aí", "O resultado", "No fim")
 - NUNCA travessão (—) — use vírgula ou parênteses
+- NUNCA dois-pontos de anúncio ("X: Y") — vira frase de PowerPoint. Reescreva fluindo.
 - Frases picotadas ("Queda. Alta.") → reescreva como ideia fluida
+
+FRASE DE EFEITO "POÉTICA" — REMOVA SEMPRE (vício de IA fingindo ser poeta):
+- Aforismo/máxima de almanaque: "Nem todo remédio amargo cura, mas todo
+  veneno doce mata devagar." → CORTE. Diga o ponto concreto e direto.
+- Paralelismo/rima/antítese bonitinha: "não é sobre X, é sobre Y", "não
+  importa a cor da bandeira", "futuro pago com presente", "o trade-off está
+  nu" → REESCREVA como afirmação direta e específica.
+- Metáfora elaborada ("cirurgia sem anestesia, o paciente gritou") → diga
+  o fato real sem floreio.
+- Regra: o fechamento é uma CONCLUSÃO concreta do caso, NÃO um provérbio
+  que quer se destacar. Se a frase parece feita pra ser citada/rimar, corte.
 
 GANCHOS DRAMÁTICOS DE IA — REMOVA SEMPRE (são a cara da IA):
 - "Isso muda tudo" / "E isso muda tudo" / "é isso que muda tudo" /
@@ -3430,10 +3477,11 @@ def _gerar_conteudo_2fases(client, topico, brief_enriched, imagens_block,
         f"TÓPICO: {topico}\n\n"
         f"BRIEF/CONTEÚDO:\n{brief_enriched or topico}\n\n"
         f"Escreva o artigo completo ({min_chars}-{max_chars} caracteres) "
-        "seguindo a arquitetura narrativa: abertura com paradoxo/detalhe "
-        "humano inesperado, desenvolvimento que reconstrói o raciocínio com "
-        "dados, fechamento com sentença filosófica. Texto corrido, fluido, "
-        "SEM CTA. Inclua também legenda e hashtags. Retorne SOMENTE JSON."
+        "seguindo a arquitetura narrativa: abertura com PERGUNTA provocativa, "
+        "desenvolvimento que reconstrói o raciocínio com dados, fechamento com "
+        "conclusão DIRETA e concreta (SEM frase de efeito poética, aforismo ou "
+        "rima). Texto corrido, fluido, SEM CTA. Inclua legenda e hashtags. "
+        "Retorne SOMENTE JSON."
     )
     # max_tokens generoso: artigo grande + legenda + hashtags
     resp1 = claude_call_with_retry(client,
