@@ -1888,6 +1888,25 @@ SYSTEM_FATIAR = (
 # slide inteiro como bloco corrido sem quebrar paragrafos. A gente forca o
 # resultado pra cumprir as regras.
 
+def _remover_dois_pontos_anuncio(text: str) -> str:
+    """Remove o vicio de DOIS-PONTOS de anuncio/lista ('X: Y'), que faz o
+    texto parecer slide de PowerPoint. Troca por '. ' e capitaliza a proxima
+    letra. Preserva horas (15:30), proporcoes (1:2) e URLs (:// ) — esses
+    nao tem LETRA antes ou espaco depois do ':'.
+    Ex: 'E matematica: sem emissao' -> 'E matematica. Sem emissao'
+        'loop vicioso: emissao, inflacao' -> 'loop vicioso. Emissao, inflacao'"""
+    if not text or ":" not in text:
+        return text
+    def _repl(m):
+        return m.group(1) + ". " + m.group(2).upper()
+    # ':' precedido de LETRA, seguido de espaco(s) + LETRA
+    return re.sub(
+        r"([A-Za-zÁÉÍÓÚÂÊÔÃÕÇÀáéíóúâêôãõçà])\s*:\s+"
+        r"([A-Za-zÁÉÍÓÚÂÊÔÃÕÇÀáéíóúâêôãõçà])",
+        _repl, text,
+    )
+
+
 def _strip_em_dash(text: str) -> str:
     """Remove travessoes (—) substituindo por virgula/espaco conforme contexto."""
     if not text or "—" not in text:
@@ -2033,6 +2052,7 @@ def _sanitizar_legenda(text: str) -> str:
     """Sanitiza a legenda do Instagram: tira travessao, aspas simples,
     cliche de abertura. Mantem os paragrafos (legenda pode ter varios)."""
     text = _strip_em_dash(text or "")
+    text = _remover_dois_pontos_anuncio(text)
     text = _aspas_simples_pra_duplas(text)
     text = _limpar_cliches_abertura(text)
     return text.strip()
@@ -2083,6 +2103,7 @@ def _sanitizar_slide_varos(text: str) -> str:
     limpa cliche de abertura e FORMATA em paragrafos curtos (visual Varos:
     varios blocos de 1-2 frases separados por linha em branco)."""
     text = _strip_em_dash(text or "")
+    text = _remover_dois_pontos_anuncio(text)
     text = _aspas_simples_pra_duplas(text)
     text = _limpar_cliches_abertura(text)
     text = _formatar_paragrafos_varos(text)
@@ -2930,18 +2951,16 @@ def _detect_vicios_ia(texto: str):
     # Tique de IA que faz o texto parecer slide de PowerPoint.
     # Pega: palavra capitalizada (com ate 2 palavras seguintes) + ":" + texto.
     # Ignora 15:30 (sem letras antes), https:// (sem letras antes), 1:2.
+    # Pega ':' precedido de LETRA (maiuscula OU minuscula) e seguido de
+    # espaco + letra. Cobre 'A verdade: X', 'loop vicioso: X', 'austeridade: X'.
+    # Ignora hora (15:30, digito antes), proporcao (1:2) e URL (:// sem espaco).
     cdois_pat = re.compile(
-        r"\b([A-ZÁÉÍÓÚÂÊÔÃÕÇ][a-záéíóúâêôãõç]{0,15}"
-        r"(?:\s+[a-záéíóúâêôãõç]+){0,2})"
-        r":\s+[A-Za-zÁÉÍÓÚÂÊÔÃÕÇ]"
+        r"([A-Za-zÁÉÍÓÚÂÊÔÃÕÇÀáéíóúâêôãõçà]{2,})"
+        r":\s+[A-Za-zÁÉÍÓÚÂÊÔÃÕÇÀ]"
     )
     for m in cdois_pat.finditer(texto):
         anuncio = m.group(1)
-        # Pula falsos positivos comuns (palavras sozinhas que aparecem em
-        # contextos legitimos de pontuacao tipo "Hoje:" como data).
-        if len(anuncio) <= 1:
-            continue
-        if anuncio.lower() in ("hoje", "ontem", "amanha", "agora", "obs"):
+        if anuncio.lower() in ("hoje", "ontem", "amanha", "agora", "obs", "http", "https"):
             continue
         # Posicao do ":" no texto
         colon_offset = m.start() + len(anuncio)
@@ -3441,6 +3460,12 @@ def _gerar_conteudo_2fases(client, topico, brief_enriched, imagens_block,
         titulo = topico[:40]
     if not artigo or len(artigo) < 100:
         raise ValueError("Fase 1 (artigo) não gerou texto suficiente")
+
+    # Limpa vicios no ARTIGO antes de fatiar e salvar — assim o artigo (que
+    # vira a base de tudo) e os slides ficam consistentes e sem dois-pontos
+    # de anuncio / travessao.
+    artigo = _remover_dois_pontos_anuncio(_strip_em_dash(artigo))
+    legenda = _remover_dois_pontos_anuncio(_strip_em_dash(legenda)) if legenda else legenda
 
     # ── FASE 2: FATIAR EM SLIDES ──
     sys_fatiar = SYSTEM_FATIAR.replace("{num_slides}", str(num_slides))
