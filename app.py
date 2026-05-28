@@ -2817,10 +2817,12 @@ def _detect_vicios_ia(texto: str):
     if not texto:
         return matches
 
-    # 1. Cliches/mulet
+    # 1. Cliches/mulet. O '(?:^|(?<=[.!?]\\s)|(?<=\\n))' restringe ao INICIO
+    # de frase, pra nao pegar uso legitimo no meio ('testar na pratica').
+    _ini = r"(?:^|(?<=[.!?]\s)|(?<=\n))"
     cliches = [
-        # Conectores burocráticos
-        (r"\bNa pr[áa]tica,?", "'Na prática' é clichê de IA. Va direto ao ponto."),
+        # Conectores burocráticos (so como ABERTURA de frase)
+        (_ini + r"Na pr[áa]tica,?", "'Na prática' como abertura é clichê de IA. Va direto ao ponto."),
         (r"\bO que acontece [eé] que,?", "'O que acontece é que' é clichê de IA."),
         (r"\bVale destacar(?:\s+que)?,?", "'Vale destacar' soa burocrático. Apenas destaque o ponto."),
         (r"\bÉ importante ressaltar(?:\s+que)?,?", "'É importante ressaltar' soa burocrático."),
