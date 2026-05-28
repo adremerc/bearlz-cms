@@ -1853,14 +1853,24 @@ SYSTEM_FATIAR = (
     "- 'chart': quando o slide tem dados numéricos comparáveis. Inclua\n"
     "  chart_title, chart_type (bar|horizontal_bar|line) e chart_data\n"
     "  [{label,value,unit,highlight}].\n"
-    "- 'photo': contexto visual. photo_topic ESPECÍFICO:\n"
-    "  * NOMES PRÓPRIOS (foto real via Wikimedia): 'Powell Federal Reserve',\n"
-    "    'Banco Central Brasil Brasília', 'Faria Lima São Paulo', 'Nvidia logo'\n"
-    "  * ABSTRATO (Pexels cinematográfico): 3-6 palavras + modificador\n"
-    "    visual em inglês ('dramatic stock market crash screens',\n"
-    "    'golden hour Sao Paulo skyline aerial').\n"
-    "  * NUNCA: 'money', 'business', 'office'. NUNCA repita photo_topic.\n"
-    "  - photo_topic_alt: 2-3 palavras de fallback.\n"
+    "- 'photo': contexto visual. Você DECIDE a fonte via photo_source:\n"
+    "  * photo_source='real' — SÓ pra PESSOA, EMPRESA, PRÉDIO ou LUGAR\n"
+    "    ESPECÍFICO E FAMOSO que tem foto real (busca no Wikimedia). O\n"
+    "    photo_topic deve ser o NOME PRÓPRIO exato em ingles ou portugues:\n"
+    "    'Javier Milei', 'Banco Central Argentina', 'Jerome Powell',\n"
+    "    'Casa Rosada Buenos Aires', 'Nvidia headquarters'.\n"
+    "  * photo_source='stock' — pra QUALQUER conceito abstrato (crise,\n"
+    "    mercado, otimismo, indústria, dinheiro, recessão). Busca no Pexels.\n"
+    "    photo_topic = 3-6 palavras descritivas EM INGLÊS + modificador\n"
+    "    visual: 'dramatic stock market crash screens', 'argentine peso\n"
+    "    banknotes close up', 'empty factory industrial decline'.\n"
+    "  REGRA DE OURO: se você não tem CERTEZA de que existe foto real e\n"
+    "    famosa daquele nome, use 'stock'. Conceito abstrato com Wikimedia\n"
+    "    devolve imagem aleatória e errada (rio, locomotiva, etc). Na dúvida,\n"
+    "    SEMPRE 'stock'. Nomes próprios de pessoa/lugar famoso = 'real'.\n"
+    "  * NUNCA photo_topic generico: 'money', 'business', 'office', 'people'.\n"
+    "  * NUNCA repita o mesmo photo_topic entre slides.\n"
+    "  - photo_topic_alt: 2-3 palavras de fallback (mesma linha do source).\n"
     "- Se o brief tinha [IMAGENS DISPONÍVEIS DOS LINKS], pode referenciar via\n"
     "  image_from_link (índice 1-based) quando a imagem do artigo casa com\n"
     "  o dado do slide. Senão, image_from_link: null.\n\n"
@@ -1869,7 +1879,7 @@ SYSTEM_FATIAR = (
     '{"slides":[{"texto":"...","tema":"bitcoin|economia|mercado|geopolitica|ia|tecnologia",'
     '"image_type":"chart|photo","chart_title":"...","chart_type":"bar|horizontal_bar|line",'
     '"chart_data":[{"label":"...","value":0,"unit":"%","highlight":false}],'
-    '"photo_topic":"...","photo_topic_alt":"...","image_from_link":null}]}'
+    '"photo_source":"real|stock","photo_topic":"...","photo_topic_alt":"...","image_from_link":null}]}'
 )
 
 
@@ -2599,6 +2609,72 @@ def _pexels_search(query: str, used_ids: set, orientation: str = "portrait", n: 
         return src.get("portrait") or src.get("large") or src.get("original")
     except Exception:
         return None
+
+
+def _montar_chart_url(ctype: str, ctitle: str, cdata: list) -> str:
+    """Monta a URL de um grafico do quickchart LEGIVEL e CORRETO.
+    Retorna '' (sem grafico, slide cai pra foto) se os dados nao formam
+    um grafico bom. Regras aprendidas na marra:
+    - quickchart REJEITA (HTTP 400) config com funcao JS (callback/formatter).
+      Entao a unidade vai no TITULO, datalabel mostra o numero puro.
+    - Escalas dispares no mesmo grafico (ex: 10 milhoes + -6%) ficam
+      ilegiveis. Se max/min dos valores > 50x, NAO faz grafico.
+    - Labels longos espremem o eixo. Encurta os > 16 chars.
+    - Fontes GRANDES (titulo 30, ticks 22, datalabel 26) pra ler no mobile.
+    - 2 a 6 pontos. Menos que isso nao vale grafico; mais polui."""
+    if not cdata:
+        return ""
+    try:
+        pts = [(str(d.get("label", "")).strip(),
+                float(d.get("value")),
+                bool(d.get("highlight")))
+               for d in cdata if d.get("value") is not None]
+    except (ValueError, TypeError):
+        return ""
+    if not (2 <= len(pts) <= 6):
+        return ""
+    valores = [v for _, v, _ in pts]
+    nonzero = [abs(v) for v in valores if v != 0]
+    # Escalas muito diferentes = grafico sem sentido visual -> melhor foto
+    if nonzero and (max(nonzero) / min(nonzero)) > 50:
+        return ""
+    unit = (cdata[0].get("unit") or "").strip()
+
+    def _short(lbl):
+        return lbl if len(lbl) <= 16 else lbl[:15].rstrip() + "."
+    labels = [_short(l) for l, _, _ in pts]
+    colors = ["rgba(239,68,68,0.9)" if hl else "rgba(29,155,240,0.9)" for _, _, hl in pts]
+    cjs = {"horizontal_bar": "horizontalBar", "line": "line"}.get(ctype, "bar")
+    titulo = ctitle or ""
+    if unit and unit.lower() not in titulo.lower():
+        titulo = f"{titulo} (em {unit})" if titulo else f"Valores em {unit}"
+    cfg = {
+        "type": cjs,
+        "data": {"labels": labels, "datasets": [{
+            "data": valores, "backgroundColor": colors,
+            "borderColor": colors, "borderWidth": 3, "fill": False,
+            "pointRadius": 6, "lineTension": 0.2,
+        }]},
+        "options": {
+            "title": {"display": True, "text": titulo,
+                      "fontSize": 30, "fontStyle": "bold", "fontColor": "#0f1419", "padding": 18},
+            "legend": {"display": False},
+            "layout": {"padding": {"top": 28, "bottom": 14, "left": 14, "right": 28}},
+            "scales": {
+                "xAxes": [{"ticks": {"fontSize": 22, "fontStyle": "bold", "fontColor": "#0f1419"},
+                           "gridLines": {"display": False}}],
+                "yAxes": [{"ticks": {"fontSize": 20, "fontColor": "#6b7280"}}],
+            },
+            "plugins": {"datalabels": {
+                "anchor": "end", "align": "end", "offset": 2,
+                "font": {"weight": "bold", "size": 28},
+                "color": "#0f1419",
+            }},
+        },
+    }
+    return ("https://quickchart.io/chart?c="
+            + urllib.parse.quote(json.dumps(cfg, separators=(",", ":")))
+            + "&width=1080&height=760&backgroundColor=white&version=2&devicePixelRatio=2")
 
 
 @app.route("/gerar")
@@ -3444,70 +3520,42 @@ def api_gerar():
                 img = all_images[link_idx - 1]["url_imagem"]
                 used_link_indices.add(link_idx)
             if not img and itype == "chart":
-                ctype  = s.get("chart_type", "bar").lower()
-                ctitle = s.get("chart_title", "")
-                cdata  = s.get("chart_data") or []
-                if cdata:
-                    # IMPORTANTE: o quickchart REJEITA (HTTP 400) configs com
-                    # funcoes JS como string (callback/formatter). Por isso NAO
-                    # usamos callbacks de eixo nem formatter de datalabels. A
-                    # unidade vai pro TITULO e os data labels mostram o numero,
-                    # com a unidade embutida via string no proprio label do dado.
-                    unit   = cdata[0].get("unit", "") if cdata else ""
-                    labels = [str(d["label"]) for d in cdata]
-                    values = [float(d["value"]) for d in cdata]
-                    colors = ["rgba(239,68,68,0.85)" if d.get("highlight") else "rgba(29,155,240,0.85)" for d in cdata]
-                    bcols  = ["rgba(239,68,68,1)"    if d.get("highlight") else "rgba(29,155,240,1)"    for d in cdata]
-                    cjs = {"horizontal_bar": "horizontalBar", "line": "line"}.get(ctype, "bar")
-                    # Unidade no titulo pra nao perder o contexto numerico
-                    titulo_chart = ctitle
-                    if unit and unit not in ctitle:
-                        titulo_chart = f"{ctitle} (em {unit})" if ctitle else f"Valores em {unit}"
-                    cfg = {
-                        "type": cjs,
-                        "data": {"labels": labels, "datasets": [{
-                            "data": values, "backgroundColor": colors,
-                            "borderColor": bcols, "borderWidth": 2, "fill": False,
-                        }]},
-                        "options": {
-                            "title": {"display": True, "text": titulo_chart, "fontSize": 18, "fontStyle": "bold"},
-                            "legend": {"display": False},
-                            "plugins": {"datalabels": {
-                                "anchor": "end", "align": "top",
-                                "font": {"weight": "bold", "size": 14},
-                                "color": "#111827",
-                            }},
-                        },
-                    }
-                    img = (
-                        "https://quickchart.io/chart?c="
-                        + urllib.parse.quote(json.dumps(cfg, separators=(",", ":")))
-                        + "&width=1080&height=720&backgroundColor=white&version=2"
-                    )
-            # ── PRIORIDADE 2: Wikimedia primeiro (fotos reais), Pexels fallback ──
+                img = _montar_chart_url(
+                    s.get("chart_type", "bar").lower(),
+                    s.get("chart_title", ""),
+                    s.get("chart_data") or [],
+                )
+            # ── PRIORIDADE 2: foto. A FONTE depende do photo_source que o
+            # Claude decidiu: 'real' = Wikimedia primeiro (foto real de
+            # pessoa/lugar famoso), 'stock' = Pexels primeiro (conceito
+            # abstrato). Isso evita o Wikimedia devolver imagem aleatoria
+            # (rio, locomotiva) pra termo abstrato. Default: stock (mais seguro).
             if not img:
                 photo_topic = (s.get("photo_topic") or "").strip()
                 photo_topic_alt = (s.get("photo_topic_alt") or "").strip()
+                photo_source = (s.get("photo_source") or "stock").strip().lower()
                 queries = [q for q in [photo_topic, photo_topic_alt] if q]
-                # Tenta Wikimedia primeiro pra cada query — retorna fotos REAIS
-                # de pessoas/predios/marcas se a query for um nome proprio
-                for q in queries:
-                    wiki_results = _wikimedia_search(q, n=5)
-                    if wiki_results:
-                        # Pega a primeira que ainda nao foi usada
-                        for w in wiki_results:
-                            if w["url"] not in used_pexels_ids:
-                                img = w["url"]
-                                used_pexels_ids.add(w["url"])
-                                break
-                        if img: break
-                # Fallback Pexels se Wikimedia nao retornou nada
-                if not img:
+
+                def _try_wikimedia():
                     for q in queries:
-                        pexels_url = _pexels_search(q, used_pexels_ids)
-                        if pexels_url:
-                            img = pexels_url
-                            break
+                        for w in (_wikimedia_search(q, n=5) or []):
+                            if w["url"] not in used_pexels_ids:
+                                used_pexels_ids.add(w["url"])
+                                return w["url"]
+                    return ""
+                def _try_pexels():
+                    for q in queries:
+                        u = _pexels_search(q, used_pexels_ids)
+                        if u:
+                            return u
+                    return ""
+
+                if photo_source == "real":
+                    # Nome proprio: Wikimedia primeiro, Pexels como fallback
+                    img = _try_wikimedia() or _try_pexels()
+                else:
+                    # Conceito abstrato: Pexels primeiro, Wikimedia como fallback
+                    img = _try_pexels() or _try_wikimedia()
             # ── PRIORIDADE 3: Pexels API por tema (fallback se topic vazio/falhou) ──
             if not img and PEXELS_API_KEY:
                 tema_query = {
