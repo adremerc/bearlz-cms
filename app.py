@@ -2630,13 +2630,19 @@ def _wikimedia_search(query: str, n: int = 12):
             return []
         pages = (r.json().get("query") or {}).get("pages") or {}
         out = []
+        # SO formatos que renderizam direto no browser/canvas. djvu, tiff,
+        # pdf, gif e svg passariam pelo 'image/' mas quebram (o caso do
+        # '.djvu' que apareceu nos slides). Whitelist explicita:
+        MIMES_OK = ("image/jpeg", "image/png", "image/webp")
         for pid, page in pages.items():
             ii = (page.get("imageinfo") or [{}])[0]
             mime = ii.get("mime", "")
-            if not mime.startswith("image/"):
+            if mime not in MIMES_OK:
                 continue
-            if mime in ("image/svg+xml",):
-                continue  # SVG vetorial pode quebrar canvas
+            url = ii.get("url", "") or ""
+            # Reforco por extensao (alguns mimes vem errados)
+            if not url.lower().rsplit("?", 1)[0].endswith((".jpg", ".jpeg", ".png", ".webp")):
+                continue
             # Filtra imagens muito pequenas
             w = ii.get("width", 0)
             h = ii.get("height", 0)
@@ -2646,15 +2652,15 @@ def _wikimedia_search(query: str, n: int = 12):
             ratio = (w / h) if h else 1
             if ratio > 2.5 or ratio < 0.4:
                 continue
-            url = ii.get("url")
+            # Usa o thumb de 800px (mais leve e confiavel que o original, que
+            # pode ter varios MB e 4000px+ e carregar lento ou falhar).
             thumb = ii.get("thumburl") or url
-            if url:
-                out.append({
-                    "url": url,
-                    "thumb": thumb,
-                    "title": page.get("title", "").replace("File:", "").rsplit(".", 1)[0],
-                    "source": "wikimedia",
-                })
+            out.append({
+                "url": thumb,
+                "thumb": thumb,
+                "title": page.get("title", "").replace("File:", "").rsplit(".", 1)[0],
+                "source": "wikimedia",
+            })
         return out
     except Exception:
         return []
@@ -3305,8 +3311,12 @@ def _gerar_conteudo_2fases(client, topico, brief_enriched, imagens_block,
         "natural. NÃO reescreva, apenas corte e ilustre. Negrito cirúrgico "
         "(máx 1 por slide). Retorne SOMENTE JSON."
     )
+    # max_tokens escala com o numero de slides: cada slide gera ~400-500
+    # tokens de JSON (texto + chart_data + photo_topic). Pra 15-20 slides
+    # 6000 estourava e truncava o JSON -> parse falhava. Damos folga.
+    max_tok_fatiar = min(16000, 2500 + num_slides * 650)
     resp2 = claude_call_with_retry(client,
-        model="claude-sonnet-4-5", max_tokens=6000,
+        model="claude-sonnet-4-5", max_tokens=max_tok_fatiar,
         system=sys_fatiar,
         messages=[{"role": "user", "content": prompt_fatiar}]
     )
@@ -3316,6 +3326,9 @@ def _gerar_conteudo_2fases(client, topico, brief_enriched, imagens_block,
         out2 = re.sub(r"\n?```$", "", out2).strip()
     dados2 = _parse_claude_json(out2)
     if not dados2 or not isinstance(dados2, dict) or not dados2.get("slides"):
+        import sys as _sys
+        print(f"[FATIAR-FAIL] num_slides={num_slides} max_tok={max_tok_fatiar} "
+              f"out_len={len(out2)} tail={out2[-200:]!r}", file=_sys.stderr, flush=True)
         raise ValueError("Fase 2 (fatiar) não gerou slides válidos")
     slides_raw = dados2.get("slides", [])
 
@@ -3435,21 +3448,21 @@ def api_gerar():
                 ctitle = s.get("chart_title", "")
                 cdata  = s.get("chart_data") or []
                 if cdata:
+                    # IMPORTANTE: o quickchart REJEITA (HTTP 400) configs com
+                    # funcoes JS como string (callback/formatter). Por isso NAO
+                    # usamos callbacks de eixo nem formatter de datalabels. A
+                    # unidade vai pro TITULO e os data labels mostram o numero,
+                    # com a unidade embutida via string no proprio label do dado.
+                    unit   = cdata[0].get("unit", "") if cdata else ""
                     labels = [str(d["label"]) for d in cdata]
                     values = [float(d["value"]) for d in cdata]
-                    unit   = cdata[0].get("unit", "") if cdata else ""
                     colors = ["rgba(239,68,68,0.85)" if d.get("highlight") else "rgba(29,155,240,0.85)" for d in cdata]
                     bcols  = ["rgba(239,68,68,1)"    if d.get("highlight") else "rgba(29,155,240,1)"    for d in cdata]
-                    fmt_cb = f"function(v){{return v+'{unit}';}}"
-                    if ctype == "horizontal_bar":
-                        cjs = "horizontalBar"
-                        scales = {"xAxes": [{"ticks": {"beginAtZero": True, "callback": fmt_cb}}]}
-                    elif ctype == "line":
-                        cjs    = "line"
-                        scales = {"yAxes": [{"ticks": {"callback": fmt_cb}}]}
-                    else:
-                        cjs    = "bar"
-                        scales = {"yAxes": [{"ticks": {"beginAtZero": False, "callback": fmt_cb}}]}
+                    cjs = {"horizontal_bar": "horizontalBar", "line": "line"}.get(ctype, "bar")
+                    # Unidade no titulo pra nao perder o contexto numerico
+                    titulo_chart = ctitle
+                    if unit and unit not in ctitle:
+                        titulo_chart = f"{ctitle} (em {unit})" if ctitle else f"Valores em {unit}"
                     cfg = {
                         "type": cjs,
                         "data": {"labels": labels, "datasets": [{
@@ -3457,20 +3470,19 @@ def api_gerar():
                             "borderColor": bcols, "borderWidth": 2, "fill": False,
                         }]},
                         "options": {
-                            "title": {"display": True, "text": ctitle, "fontSize": 16, "fontStyle": "bold"},
+                            "title": {"display": True, "text": titulo_chart, "fontSize": 18, "fontStyle": "bold"},
                             "legend": {"display": False},
-                            "scales": scales,
                             "plugins": {"datalabels": {
                                 "anchor": "end", "align": "top",
-                                "font": {"weight": "bold", "size": 12},
-                                "color": "#111827", "formatter": fmt_cb,
+                                "font": {"weight": "bold", "size": 14},
+                                "color": "#111827",
                             }},
                         },
                     }
                     img = (
                         "https://quickchart.io/chart?c="
                         + urllib.parse.quote(json.dumps(cfg, separators=(",", ":")))
-                        + "&width=1080&height=520&backgroundColor=white&version=2"
+                        + "&width=1080&height=720&backgroundColor=white&version=2"
                     )
             # ── PRIORIDADE 2: Wikimedia primeiro (fotos reais), Pexels fallback ──
             if not img:
