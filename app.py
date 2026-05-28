@@ -3537,7 +3537,7 @@ def api_gerar():
                           f"<title>Carrossel — {titulo_gerado} | Gabriel Bearlz</title>", html)
             html = re.sub(r"(<h1>).*?(</h1>)", rf"\g<1>{titulo_gerado}\g<2>", html)
             html = re.sub(r'(<p id="subtitle">).*?(</p>)',
-                          rf"\g<1>{len(slides_out)+1} slides · Gabriel Bearlz\g<2>", html)
+                          rf"\g<1>{len(slides_out)} slides · Gabriel Bearlz\g<2>", html)
             # Slug JS para sync com servidor (identifica o carrossel no /api/carrossel/<slug>/...)
             html = re.sub(r"window\.CAROUSEL_SLUG='[^']*'",
                           f"window.CAROUSEL_SLUG='{slug}'", html)
@@ -3577,24 +3577,13 @@ def api_gerar():
             def _esc(t):
                 return t.replace("\\","\\\\").replace("`","\\`").replace("${","\\${").replace("\n","\\n")
 
-            # Sem raw string: precisamos de newlines reais para o _esc() converter
-            # em '\n' JS (que eh quebra de linha no template literal).
-            CTA_TEXT = (
-                "Dólar em baixa e Ibovespa em alta podem esconder um **cenário estrutural frágil** no Brasil.\n\n"
-                "Existem boas oportunidades de investimento no país, mas estar com o patrimônio 100% exposto a esses riscos é uma decisão arriscada.\n\n"
-                "Posso te ajudar a montar uma **Estratégia de Investimento Global**.\n\n"
-                'Comenta **"Estratégia"** aqui embaixo.'
-            )
+            # CTA fixo removido (usuario nao usa o copy padrao). Os slides
+            # gerados sao APENAS os de conteudo. Se quiser um slide de venda,
+            # adiciona manualmente no editor.
             linhas = [
                 f"  {{id:{i+1},text:`{_esc(s['texto'])}`,image:'{s['image_url']}',zoom:1,ox:50,oy:50}}"
                 for i, s in enumerate(slides_out)
             ]
-            n_cta = len(slides_out) + 1
-            linhas.append(
-                f"  {{id:{n_cta},text:`{_esc(CTA_TEXT)}`,"
-                f"image:'https://images.pexels.com/photos/636190/pexels-photo-636190.jpeg?auto=compress&cs=tinysrgb&w=1080',"
-                f"zoom:1,ox:50,oy:50}}"
-            )
             novo_array = "const slides=[\n" + ",\n".join(linhas) + "\n];"
             html = re.sub(r"const slides=\[.*?\];", lambda _: novo_array, html, flags=re.DOTALL)
             # Grava em GENERATED_DIR. Como o disco do Render free tier eh
@@ -3622,7 +3611,7 @@ def api_gerar():
                     num_slides=excluded.num_slides, artigo=excluded.artigo,
                     legenda=excluded.legenda, hashtags=excluded.hashtags,
                     updated_at=datetime('now')
-            """, (slug, titulo_gerado, nome, len(slides_out)+1,
+            """, (slug, titulo_gerado, nome, len(slides_out),
                   artigo_gerado, legenda_gerada, hashtags_str))
 
         return jsonify({
