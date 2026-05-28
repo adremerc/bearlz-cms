@@ -3098,6 +3098,70 @@ def api_polir_slide():
         return jsonify({"error": str(e)}), 500
 
 
+def _numeros_normalizados(texto: str):
+    """Extrai numeros do texto como conjunto de strings de digitos puros
+    (sem separador). '47,9' e '47.9' viram '479'. Usado pra comparar os
+    dados do conteudo gerado com o material de origem."""
+    out = set()
+    for m in re.finditer(r"\d[\d.,]*\d|\d", texto or ""):
+        d = re.sub(r"[.,]", "", m.group(0))
+        if d:
+            out.add(d)
+            out.add(d.lstrip("0") or "0")  # tambem sem zeros a esquerda
+    return out
+
+
+def _verificar_dados_inventados(slides_raw, fonte_texto):
+    """CHECK-IN ANTI-INVENCAO: compara os numeros que aparecem nos slides
+    com os que existem no material de origem (brief + conteudo dos links).
+    Retorna lista de {slide, numero, trecho} pros numeros do conteudo que
+    NAO tem respaldo na fonte — candidatos a dado inventado/alucinado.
+
+    Heuristica conservadora pra reduzir falso positivo:
+    - So checa numeros COM peso (>=2 digitos, ou com unidade $/%/bi/mi/mil).
+    - Ignora anos (19xx/20xx) — esses sao cobertos pelo _validar_datas_2026.
+    - Aceita o numero se a sequencia de digitos aparece em QUALQUER lugar
+      da fonte (tolera formatacao diferente: 47,9 ~ 47.9 ~ 479)."""
+    if not slides_raw or not fonte_texto:
+        return []
+    fonte = _numeros_normalizados(fonte_texto)
+    # Padrao: numero opcionalmente precedido de R$/US$ e seguido de unidade
+    pat = re.compile(
+        r"(R\$|US\$|US|€)?\s?(\d[\d.,]*\d|\d)\s?"
+        r"(%|mil|milh[õo]es|milh[ãa]o|bilh[õo]es|bilh[ãa]o|bi|tri|trilh[õo]es|"
+        r"pontos|ponto|p\.?p\.?|x|vezes)?",
+        re.IGNORECASE,
+    )
+    avisos = []
+    vistos = set()
+    for i, s in enumerate(slides_raw):
+        texto = s.get("texto", "") if isinstance(s, dict) else str(s)
+        for m in pat.finditer(texto):
+            simbolo, num, unidade = m.group(1), m.group(2), m.group(3)
+            digits = re.sub(r"[.,]", "", num)
+            if len(digits) < 2:
+                # numero de 1 digito so conta se tiver unidade/simbolo forte
+                if not (simbolo or unidade):
+                    continue
+            # ignora anos
+            if len(digits) == 4 and digits.startswith(("19", "20")):
+                continue
+            # tem respaldo na fonte?
+            if digits in fonte or (digits.lstrip("0") or "0") in fonte:
+                continue
+            chave = (i, digits)
+            if chave in vistos:
+                continue
+            vistos.add(chave)
+            trecho = texto[max(0, m.start()-25):min(len(texto), m.end()+25)].replace("\n", " ")
+            avisos.append({
+                "slide": i + 1,
+                "numero": m.group(0).strip(),
+                "trecho": trecho.strip(),
+            })
+    return avisos
+
+
 def _validar_datas_2026(slides_raw, ano_atual: int = 2026):
     """Varre o texto dos slides procurando datas suspeitas (anos antigos
     sem contexto historico). Retorna lista de avisos pra UI mostrar
@@ -3490,6 +3554,9 @@ def api_gerar():
         # (heuristica). NAO bloqueia geracao, devolve avisos_data pra UI
         # mostrar pro user revisar manualmente.
         avisos_data = _validar_datas_2026(slides_raw, ano_atual=2026)
+        # CHECK-IN ANTI-INVENCAO: numeros nos slides que NAO aparecem no
+        # material de origem (brief + links). Candidatos a dado alucinado.
+        avisos_dados = _verificar_dados_inventados(slides_raw, brief_enriched)
 
         # Build image URLs
         PEXELS_FALLBACK = {
@@ -3519,12 +3586,11 @@ def api_gerar():
             if link_idx and 1 <= link_idx <= len(all_images) and link_idx not in used_link_indices:
                 img = all_images[link_idx - 1]["url_imagem"]
                 used_link_indices.add(link_idx)
-            if not img and itype == "chart":
-                img = _montar_chart_url(
-                    s.get("chart_type", "bar").lower(),
-                    s.get("chart_title", ""),
-                    s.get("chart_data") or [],
-                )
+            # GRAFICOS: nao geramos mais grafico sintetico (dados podiam ser
+            # inventados pelo Claude). Grafico SO vem de imagem real de um link
+            # que o usuario colou (via image_from_link, tratado acima). Se o
+            # slide eh 'chart' mas nao tem imagem de link, cai pra foto e o
+            # numero permanece no TEXTO do slide (que passa pelo check-in).
             # ── PRIORIDADE 2: foto. A FONTE depende do photo_source que o
             # Claude decidiu: 'real' = Wikimedia primeiro (foto real de
             # pessoa/lugar famoso), 'stock' = Pexels primeiro (conceito
@@ -3682,8 +3748,10 @@ def api_gerar():
             "hashtags": hashtags_geradas,
             # Avisos pra revisao manual:
             # - avisos_data: anos antigos detectados nos slides sem contexto
+            # - avisos_dados: numeros sem respaldo no material de origem
             # - urls_fetched: cada URL tem is_instagram + is_stale + published_date
             "avisos_data": avisos_data,
+            "avisos_dados": avisos_dados,
             "debug": {
                 "system_used":      system_artigo,
                 "user_prompt":      prompt_para_debug,
