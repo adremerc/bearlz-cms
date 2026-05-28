@@ -1736,6 +1736,12 @@ SYSTEM_ARTIGO = (
     "6) Chamada de ação ('salva esse post', 'comenta', 'me segue') — proibido.\n"
     "7) Emoji, hashtag no corpo do texto, exclamação excessiva — proibido.\n"
     "8) Aspas simples: use SEMPRE aspas duplas (\").\n"
+    "9) DOIS-PONTOS COMO ANÚNCIO — vício pesado de IA. EVITE estruturas tipo\n"
+    "   'A verdade: tal coisa', 'O resultado: assim', 'Pergunta: resposta'.\n"
+    "   Esse padrão 'X: Y' faz parecer slide de PowerPoint, não texto humano.\n"
+    "   Em vez disso, reescreva fluindo: 'A verdade é tal coisa', 'O resultado\n"
+    "   foi assim'. Dois-pontos legítimos só pra listar (raro) ou em hora\n"
+    "   (15:30). No corpo do texto, prefira ponto, vírgula ou conector natural.\n"
     "O texto final tem que estar 100% LIVRE desses vícios. Reler e limpar\n"
     "antes de entregar.\n\n"
 
@@ -1783,10 +1789,13 @@ SYSTEM_FATIAR = (
     "Instagram. Você é um EDITOR que corta, não um redator que reescreve.\n\n"
 
     "REGRA DE OURO: você NÃO reescreve o artigo. Você CORTA ele em pedaços.\n"
-    "Se concatenar os slides de volta, tem que dar o artigo original. Pode\n"
-    "fazer micro-ajustes pra cada slide fluir (trocar um 'ela' pelo nome,\n"
-    "ajustar uma conjunção inicial), mas NUNCA muda os dados, o conteúdo ou\n"
-    "a ordem das ideias. NÃO adiciona informação nova. NÃO inventa número.\n\n"
+    "O ARTIGO É O CORAÇÃO — RESPEITE INTEGRALMENTE:\n"
+    "Você NÃO escreve conteúdo novo. NÃO reformula em outras palavras. NÃO\n"
+    "cria slide do zero. NÃO 'melhora' o texto. NÃO adiciona informação que\n"
+    "não está lá. Você é um EDITOR que apenas COLOCA TESOURAS no artigo.\n"
+    "Se concatenar os slides, tem que dar o artigo original (palavra por\n"
+    "palavra, salvo micro-ajuste de coesão tipo trocar 'ela' pelo nome ou\n"
+    "ajustar uma conjunção no início). NUNCA muda dados, conteúdo ou ordem.\n\n"
 
     "ONDE CORTAR:\n"
     "- Corte em pontos de CLIFFHANGER NATURAL: onde uma frase termina\n"
@@ -1795,6 +1804,19 @@ SYSTEM_FATIAR = (
     "- Cada slide tem UMA ideia central. Quando o assunto vira, corte.\n"
     "- Cada slide começa EXATAMENTE de onde o anterior parou. Sem reset,\n"
     "  sem repetir o que já foi dito, sem 'como vimos', sem 'recapitulando'.\n\n"
+
+    "SLIDE 1 — O HOOK É O TUDO (atenção máxima aqui):\n"
+    "O slide 1 decide se a pessoa continua passando os slides ou rola pra\n"
+    "o próximo post. Se ele não fisga em 1 segundo, todo o resto não importa.\n"
+    "- Use a abertura do artigo (paradoxo/detalhe humano inesperado) — JÁ\n"
+    "  estará lá se o redator fez certo. Não suavize, não 'contextualize'.\n"
+    "- Pode ser MAIS CURTO que os outros slides (150-280 chars): o hook tem\n"
+    "  espaço pra respirar, não precisa de densidade — precisa de IMPACTO.\n"
+    "- Negrite a FRASE DO IMPACTO (a manchete-paradoxo) pra puxar o olho.\n"
+    "- Termine com uma frase que CRIE PERGUNTA na cabeça do leitor ('e tudo\n"
+    "  começou num porão'), nunca com explicação completa do tópico.\n"
+    "- Se o slide 1 estiver morno, REORDENE: pegue a frase mais surpreendente\n"
+    "  do artigo e use ela como abertura.\n\n"
 
     "TAMANHO UNIFORME (regra importante — é assim que o Varos faz):\n"
     "- Cada slide tem entre 220 e 340 caracteres.\n"
@@ -2819,6 +2841,36 @@ def _detect_vicios_ia(texto: str):
             "suggestions": [f'"{m.group(1)}"'],
             "category": "Vício de IA",
             "type": "AI_QUOTES",
+            "context": texto[max(0,m.start()-15):min(len(texto), m.end()+15)]
+        })
+
+    # 7. Dois-pontos como anuncio ('A verdade:', 'O resultado:', etc).
+    # Tique de IA que faz o texto parecer slide de PowerPoint.
+    # Pega: palavra capitalizada (com ate 2 palavras seguintes) + ":" + texto.
+    # Ignora 15:30 (sem letras antes), https:// (sem letras antes), 1:2.
+    cdois_pat = re.compile(
+        r"\b([A-ZÁÉÍÓÚÂÊÔÃÕÇ][a-záéíóúâêôãõç]{0,15}"
+        r"(?:\s+[a-záéíóúâêôãõç]+){0,2})"
+        r":\s+[A-Za-zÁÉÍÓÚÂÊÔÃÕÇ]"
+    )
+    for m in cdois_pat.finditer(texto):
+        anuncio = m.group(1)
+        # Pula falsos positivos comuns (palavras sozinhas que aparecem em
+        # contextos legitimos de pontuacao tipo "Hoje:" como data).
+        if len(anuncio) <= 1:
+            continue
+        if anuncio.lower() in ("hoje", "ontem", "amanha", "agora", "obs"):
+            continue
+        # Posicao do ":" no texto
+        colon_offset = m.start() + len(anuncio)
+        matches.append({
+            "offset": colon_offset,
+            "length": 1,
+            "message": f"'{anuncio}:' soa como anúncio de slide PowerPoint. Reescreva fluindo (vírgula ou conector natural).",
+            "short": "Dois-pontos de anúncio",
+            "suggestions": [],
+            "category": "Vício de IA",
+            "type": "AI_COLON",
             "context": texto[max(0,m.start()-15):min(len(texto), m.end()+15)]
         })
 
