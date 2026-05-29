@@ -1867,6 +1867,9 @@ SYSTEM_FATIAR = (
     "ajustar uma conjunção no início). NUNCA muda dados, conteúdo ou ordem.\n\n"
 
     "ONDE CORTAR:\n"
+    "- Corte SEMPRE no FIM de uma frase completa (depois de . ! ?). NUNCA\n"
+    "  corte no meio de uma frase nem termine um slide em vírgula. Cada slide\n"
+    "  começa com letra maiúscula e termina com ponto final.\n"
     "- Corte em pontos de CLIFFHANGER NATURAL: onde uma frase termina\n"
     "  deixando curiosidade pro próximo ('Mas o produto que mudou tudo tem\n"
     "  outro nome.'). Esses cortes já existem no texto, você só os encontra.\n"
@@ -2207,6 +2210,11 @@ def _sanitizar_slide_varos(text: str) -> str:
     text = _limpar_cliches_abertura(text)
     text = _formatar_paragrafos_varos(text)
     text = _truncar_slide_se_grande(text)
+    # Rede de seguranca: slide NUNCA deve terminar em virgula/ponto-e-virgula
+    # (fatiador cortou no meio de frase). Troca por ponto final.
+    text = text.rstrip()
+    if text.endswith((",", ";")):
+        text = text[:-1] + "."
     return text
 
 
