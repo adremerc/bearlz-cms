@@ -1880,6 +1880,20 @@ SYSTEM_FATIAR = (
     "    famosa daquele nome, use 'stock'. Conceito abstrato com Wikimedia\n"
     "    devolve imagem aleatória e errada (rio, locomotiva, etc). Na dúvida,\n"
     "    SEMPRE 'stock'. Nomes próprios de pessoa/lugar famoso = 'real'.\n"
+    "  * APROVEITE LUGARES/ESTRUTURAS REAIS quando o slide tratar de algo\n"
+    "    concreto. Em vez de stock genérico, mapeie o conceito pro ÍCONE\n"
+    "    real e use photo_source='real'. Exemplos de mapeamento:\n"
+    "      energia/hidrelétrica -> 'Itaipu Dam' / 'Belo Monte Dam'\n"
+    "      bolsa/mercado/ações BR -> 'B3 stock exchange Sao Paulo building'\n"
+    "      petróleo/pré-sal -> 'Petrobras oil platform' / 'P-51 platform Brazil'\n"
+    "      política/governo/fiscal BR -> 'Congresso Nacional Brasilia' /\n"
+    "        'Palacio do Planalto'\n"
+    "      juros/Banco Central -> 'Banco Central do Brasil building Brasilia'\n"
+    "      minério/nióbio -> 'Araxa mine Brazil' / 'iron ore mine Carajas'\n"
+    "      cidade/economia -> 'Sao Paulo skyline' / 'Avenida Paulista'\n"
+    "    Use o NOME da estrutura/lugar (prédio, usina, plataforma, mina,\n"
+    "    monumento) — esses têm foto real boa. EVITE conceito amplo como\n"
+    "    'soybean field', 'amazon river', 'hydroelectric' (viram satélite).\n"
     "  * NUNCA photo_topic generico: 'money', 'business', 'office', 'people'.\n"
     "  * NUNCA repita o mesmo photo_topic entre slides.\n"
     "  - photo_topic_alt: 2-3 palavras de fallback (mesma linha do source).\n"
@@ -2743,6 +2757,13 @@ def _wikimedia_search(query: str, n: int = 12):
         # pdf, gif e svg passariam pelo 'image/' mas quebram (o caso do
         # '.djvu' que apareceu nos slides). Whitelist explicita:
         MIMES_OK = ("image/jpeg", "image/png", "image/webp")
+        # Palavras que denunciam imagem que NAO eh foto normal (satelite,
+        # selo, mapa, diagrama, bandeira, brasao). Essas aparecem quando a
+        # query eh conceitual ('soybean field' -> imagem Sentinel/Copernicus).
+        LIXO_TITULO = ("satellite", "sentinel", "copernicus", "cbers", "aster",
+                       " esa", "landsat", "stamp", "selo", "map of", "mapa",
+                       "diagram", "diagrama", "logo", "coat of arms", "flag of",
+                       "brasão", "seal of", "chart", "graph")
         for pid, page in pages.items():
             ii = (page.get("imageinfo") or [{}])[0]
             mime = ii.get("mime", "")
@@ -2751,6 +2772,10 @@ def _wikimedia_search(query: str, n: int = 12):
             url = ii.get("url", "") or ""
             # Reforco por extensao (alguns mimes vem errados)
             if not url.lower().rsplit("?", 1)[0].endswith((".jpg", ".jpeg", ".png", ".webp")):
+                continue
+            # Descarta satelite/selo/mapa/logo pelo titulo (nao sao fotos)
+            titulo_low = page.get("title", "").lower()
+            if any(lx in titulo_low for lx in LIXO_TITULO):
                 continue
             # Filtra imagens muito pequenas
             w = ii.get("width", 0)
