@@ -2200,13 +2200,39 @@ def _formatar_paragrafos_varos(text: str) -> str:
     return "\n\n".join(paragraphs)
 
 
+def _juntar_frases_curtas(text: str) -> str:
+    """Junta frase ULTRA-CURTA de efeito (1-3 palavras, sem numero) com a
+    frase ANTERIOR via virgula, eliminando o picote dramatico.
+    'O plano era claro. Deficit zero.' -> 'O plano era claro, deficit zero.'
+    'Isso e real. E matematica.' -> 'Isso e real, e matematica.'"""
+    if not text:
+        return text
+    partes = re.split(r'(?<=[.!?])\s+', text.strip())
+    out = []
+    for p in partes:
+        nuc = p.strip().rstrip(".!?").strip().strip("*").strip()
+        palavras = nuc.split()
+        curta = (1 <= len(palavras) <= 3 and len(nuc) <= 24
+                 and not any(c.isdigit() for c in nuc) and nuc[:1].isupper())
+        if curta and out:
+            # junta com a anterior: tira o ponto final dela, vira virgula
+            ant = out[-1].rstrip()
+            if ant and ant[-1] in ".!?":
+                ant = ant[:-1]
+            out[-1] = ant + ", " + nuc[0].lower() + nuc[1:] + p.strip()[len(nuc):]
+        else:
+            out.append(p)
+    return " ".join(out)
+
+
 def _sanitizar_slide_varos(text: str) -> str:
     """Sanitizacao pro fluxo de geracao em 2 fases. Remove travessao/aspas,
-    limpa cliche de abertura e FORMATA em paragrafos curtos (visual Varos:
-    varios blocos de 1-2 frases separados por linha em branco)."""
+    junta frases ultra-curtas, limpa cliche, e FORMATA em paragrafos com
+    respiro (2-3 blocos fluidos por slide)."""
     text = _strip_em_dash(text or "")
     text = _remover_dois_pontos_anuncio(text)
     text = _aspas_simples_pra_duplas(text)
+    text = _juntar_frases_curtas(text)
     text = _limpar_cliches_abertura(text)
     text = _formatar_paragrafos_varos(text)
     text = _truncar_slide_se_grande(text)
