@@ -1892,19 +1892,21 @@ SYSTEM_FATIAR = (
     "- Exceção: o slide 1 (hook/pergunta) pode ser um pouco mais curto.\n"
     "- NUNCA acima de 420.\n\n"
 
-    "FORMATO VISUAL — TEXTO FLUIDO, NO MÁXIMO 1 QUEBRA POR SLIDE:\n"
-    "- Cada slide é texto DENSO e CONECTADO, com no MÁXIMO 1 linha em branco\n"
-    "  (\\n\\n) — ou seja, 1 ou 2 parágrafos por slide, nunca mais.\n"
-    "- NÃO pique o slide em 3-4 frases curtas soltas. Isso cansa e tem cara\n"
-    "  de IA. As frases se conectam numa narrativa, com conectores.\n"
-    "- Exemplo do desejado (1 slide, fluido):\n"
+    "FORMATO VISUAL — RESPIRO + FLUIDEZ (o equilíbrio certo):\n"
+    "- Cada slide tem 2 ou 3 PARÁGRAFOS separados por linha em branco (\\n\\n).\n"
+    "  Esse espaço entre parágrafos é essencial pra respirar e não cansar.\n"
+    "- MAS cada parágrafo tem 1-2 frases CONECTADAS (com conectores), não uma\n"
+    "  frase curta solta. A diferença é tudo:\n"
+    "  RUIM (picotado, frase solta por parágrafo):\n"
+    "    A indústria caiu 6%.\n\n    Mas a inflação despencou.\n\n    O salário subiu.\n"
+    "  RUIM (tudo junto, sem respiro): um bloco único de 350 caracteres.\n"
+    "  BOM (respiro + fluidez):\n"
     "    Quando Milei assumiu em dezembro de 2023, a Argentina acumulava 211%\n"
-    "    de inflação no ano e tinha metade da população perto da pobreza,\n"
-    "    resultado de décadas gastando acima do que arrecadava.\n\n"
-    "    Foi nesse cenário de quase colapso que ele aplicou o choque que\n"
-    "    prometeu, começando pela desvalorização de 54% do peso na primeira\n"
-    "    semana.\n"
-    "- Cada parágrafo tem 2-4 frases CONECTADAS, não uma frase solta.\n\n"
+    "    de inflação e metade da população perto da pobreza, resultado de\n"
+    "    décadas gastando acima do que arrecadava.\n\n"
+    "    Foi nesse cenário de quase colapso que ele aplicou o choque, começando\n"
+    "    pela desvalorização de 54% do peso na primeira semana.\n"
+    "- Então: VÁRIOS parágrafos (respiro), cada um fluido e conectado.\n\n"
 
     "NÚMERO DE SLIDES: corte em EXATAMENTE {num_slides} slides.\n"
     "  Distribua o artigo de forma equilibrada entre eles.\n\n"
@@ -2141,10 +2143,11 @@ def _sanitizar_legenda(text: str) -> str:
 
 
 def _formatar_paragrafos_varos(text: str) -> str:
-    """Formata o slide no estilo MEIO-TERMO (feedback Gabriel): texto FLUIDO
-    e conectado, com NO MAXIMO 1 quebra por slide (2 paragrafos). NAO picota
-    em frases curtas soltas. Slide curto fica 1 paragrafo so; slide grande
-    (>240 chars) ganha 1 quebra perto do meio, no fim de uma frase.
+    """Formata o slide com RESPIRO VISUAL + fluidez. O equilibrio certo:
+    varios paragrafos separados por linha em branco (espaco pra respirar),
+    MAS cada paragrafo tem 1-2 frases CONECTADAS (~150 chars), nao uma frase
+    curta solta picotada. O conteudo fluido vem do prompt; aqui so agrupamos
+    em paragrafos de tamanho confortavel.
     Preserva listas de bullet (linhas com •/-/* ) intactas."""
     if not text:
         return text
@@ -2153,27 +2156,28 @@ def _formatar_paragrafos_varos(text: str) -> str:
         return text
     # Junta tudo num texto plano (remove quebras que o Claude tenha posto)
     flat = re.sub(r'\s*\n+\s*', ' ', text).strip()
-    # Slide curto: 1 paragrafo unico, sem quebra
-    if len(flat) <= 240:
-        return flat
     sentences = re.split(r'(?<=[.!?])\s+', flat)
-    if len(sentences) <= 2:
-        return flat  # poucas frases: deixa corrido
-    # 1 quebra so: acha o ponto de divisao mais proximo do MEIO (no fim de
-    # uma frase) pra ter 2 paragrafos equilibrados.
-    meio = len(flat) / 2
-    melhor_i, melhor_dist = 1, 10**9
-    acc = 0
-    for i, s in enumerate(sentences[:-1]):  # nao divide na ultima
-        acc += len(s) + 1
-        dist = abs(acc - meio)
-        if dist < melhor_dist:
-            melhor_dist, melhor_i = dist, i + 1
-    p1 = " ".join(sentences[:melhor_i]).strip()
-    p2 = " ".join(sentences[melhor_i:]).strip()
-    if not p1 or not p2:
+    if len(sentences) <= 1:
         return flat
-    return p1 + "\n\n" + p2
+    # Agrupa frases em paragrafos com RESPIRO. ALVO ~115: frase media/longa
+    # (~120-180 chars, densa) vira 1 paragrafo proprio (respiro estilo Varos);
+    # frases curtas (~50-70) agrupam em 2 pra nao ficarem soltas/picotadas.
+    # O conteudo fluido (conectores) vem do prompt — aqui so quebramos.
+    ALVO = 115
+    paragraphs, current, clen = [], [], 0
+    for s in sentences:
+        current.append(s)
+        clen += len(s) + 1
+        if clen >= ALVO:
+            paragraphs.append(" ".join(current))
+            current, clen = [], 0
+    if current:
+        # sobra curta (<60 chars) funde no paragrafo anterior pra nao ficar orfa
+        if paragraphs and clen < 60:
+            paragraphs[-1] += " " + " ".join(current)
+        else:
+            paragraphs.append(" ".join(current))
+    return "\n\n".join(paragraphs)
 
 
 def _sanitizar_slide_varos(text: str) -> str:
