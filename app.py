@@ -399,6 +399,60 @@ STATUS_LABELS = {
 def _admin_check_key():
     return request.headers.get("X-Admin-Key", "") == CMS_API_KEY
 
+@app.route("/api/_admin/editar-textos/<slug>", methods=["POST"])
+def api_admin_editar_textos(slug):
+    """Substitui SO os textos dos slides no HTML do carrossel, preservando
+    imagens, zoom, profile e tudo mais. Body: {textos:["t1","t2",...]} na
+    ordem dos slides. Aplica a sanitizacao Varos (respiro + anti-vicio).
+    Tambem apaga edits salvos pra a nova versao aparecer. Requer X-Admin-Key."""
+    if not _admin_check_key():
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json() or {}
+    textos = data.get("textos") or []
+    if not isinstance(textos, list) or not textos:
+        return jsonify({"error": "textos (lista) obrigatorio"}), 400
+    with get_db() as conn:
+        row = conn.execute("SELECT arquivo FROM carrosseis WHERE slug=?", (slug,)).fetchone()
+    if not row or not row["arquivo"]:
+        return jsonify({"error": "carrossel nao encontrado"}), 404
+    html_path = _find_carrossel_file(row["arquivo"])
+    if not html_path:
+        return jsonify({"error": "HTML nao encontrado"}), 404
+    html = html_path.read_text(encoding="utf-8")
+    arr_start = html.find("const slides=[")
+    arr_end = html.find("\n];", arr_start)
+    if arr_start == -1 or arr_end == -1:
+        return jsonify({"error": "array de slides nao encontrado"}), 500
+    bloco = html[arr_start:arr_end]
+
+    def _esc(t):
+        return t.replace("\\", "\\\\").replace("`", "\\`").replace("${", "\\${").replace("\n", "\\n")
+
+    # Substitui o N-esimo text:`...` pelo texto[N] sanitizado, mantendo o resto
+    contador = {"i": 0}
+    def _repl(m):
+        i = contador["i"]; contador["i"] += 1
+        if i < len(textos):
+            novo = _sanitizar_slide_varos(str(textos[i]))
+            return "text:`" + _esc(novo) + "`"
+        return m.group(0)
+    bloco_novo = re.sub(r"text:`(?:[^`\\]|\\.)*`", _repl, bloco, flags=re.DOTALL)
+    html = html[:arr_start] + bloco_novo + html[arr_end:]
+    html_path.write_text(html, encoding="utf-8")
+    _gh_save_async(f"data/generated/{html_path.name}", html.encode("utf-8"),
+                   f"Edicao manual de textos: {slug}")
+    # Remove edits salvos (state) pra a nova versao do HTML aparecer
+    try:
+        ep = _edits_path(slug)
+        if ep.exists():
+            ep.unlink()
+    except Exception:
+        pass
+    with get_db() as conn:
+        conn.execute("UPDATE carrosseis SET updated_at=datetime('now') WHERE slug=?", (slug,))
+    return jsonify({"ok": True, "substituidos": min(contador["i"], len(textos))})
+
+
 @app.route("/api/_admin/bump-asset-version", methods=["POST"])
 def api_admin_bump_assets():
     """Faz patch em todos os HTMLs em data/generated/ trocando
