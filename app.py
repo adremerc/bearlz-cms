@@ -2764,6 +2764,13 @@ def _wikimedia_search(query: str, n: int = 12):
                        " esa", "landsat", "stamp", "selo", "map of", "mapa",
                        "diagram", "diagrama", "logo", "coat of arms", "flag of",
                        "brasão", "seal of", "chart", "graph")
+        # Se a busca eh sobre o Brasil, descarta foto que claramente eh de
+        # OUTRO pais (ex: query 'mine Brazil' devolveu 'Chuquicamata, Chile').
+        q_low = (query or "").lower()
+        quer_brasil = ("brazil" in q_low or "brasil" in q_low)
+        OUTROS_PAISES = ("chile", "argentina", "peru", "bolivia", "colombia",
+                         "mexico", "uruguay", "paraguay", "venezuela", "ecuador",
+                         "chuquicamata", "calama")
         for pid, page in pages.items():
             ii = (page.get("imageinfo") or [{}])[0]
             mime = ii.get("mime", "")
@@ -2776,6 +2783,9 @@ def _wikimedia_search(query: str, n: int = 12):
             # Descarta satelite/selo/mapa/logo pelo titulo (nao sao fotos)
             titulo_low = page.get("title", "").lower()
             if any(lx in titulo_low for lx in LIXO_TITULO):
+                continue
+            # Busca sobre Brasil mas foto eh de outro pais -> descarta
+            if quer_brasil and any(p in titulo_low for p in OUTROS_PAISES):
                 continue
             # Filtra imagens muito pequenas
             w = ii.get("width", 0)
