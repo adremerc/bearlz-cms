@@ -1734,9 +1734,12 @@ SYSTEM_ARTIGO = (
     "  narrativa: 'A indústria recuou 6%, mas no mesmo período a inflação\n"
     "  despencou de 13% para 2% ao mês, o que devolveu poder de compra ao\n"
     "  salário real.'\n"
-    "- Frases predominantemente MÉDIAS e conectadas. Uma frase curta de\n"
-    "  impacto é permitida MUITO raramente (1x no texto todo, no máximo), só\n"
-    "  num momento de virada — nunca como muleta de ritmo.\n\n"
+    "- Frases predominantemente MÉDIAS e conectadas.\n"
+    "- PROIBIDO frase isolada de 1 a 3 palavras pra dar drama ('Recessão.',\n"
+    "  'É matemática.', 'E não para por aí.'). TODA frase tem sujeito e\n"
+    "  desenvolvimento, integrada ao texto. Nada de palavra solta com ponto.\n"
+    "  Em vez de 'O resultado foi o esperado. Recessão.', escreva 'O resultado\n"
+    "  foi a recessão que ele mesmo havia previsto.'\n\n"
 
     "PERGUNTAS RETÓRICAS: use, curtas, com resposta IMEDIATA na frase seguinte.\n"
     "  Ex: 'O motivo? A empresa achou que ninguém aceitaria outra injeção.'\n\n"
@@ -3105,6 +3108,26 @@ def _detect_vicios_ia(texto: str):
                 "category": "Vício de IA",
                 "type": "AI_AFORISMO",
                 "context": texto[max(0,m.start()-15):min(len(texto), m.end()+25)],
+            })
+
+    # 9. Sentenca ULTRA-CURTA isolada (1-3 palavras) usada pra dar drama:
+    # 'Recessao.', 'E matematica.', 'Mudou tudo.'. Pega sentencas entre
+    # delimitadores. So flagra se <=3 palavras, <=24 chars e sem digito.
+    for sm in re.finditer(r"(?:^|(?<=[.!?]\s))([^.!?\n]{2,40}?)([.!?])(?=\s|$)", texto):
+        frase = sm.group(1).strip().strip("*").strip()
+        if not frase or any(c.isdigit() for c in frase):
+            continue
+        palavras = frase.split()
+        if len(palavras) <= 3 and len(frase) <= 24 and frase[0:1].isupper():
+            matches.append({
+                "offset": sm.start(1),
+                "length": len(sm.group(1)),
+                "message": f"'{frase}.' é frase ultra-curta de efeito (cara de IA, picota a leitura). Integre numa frase com sujeito e desenvolvimento.",
+                "short": "Frase curta de efeito",
+                "suggestions": [],
+                "category": "Vício de IA",
+                "type": "AI_FRASE_CURTA",
+                "context": texto[max(0,sm.start()-20):min(len(texto), sm.end()+15)],
             })
 
     return matches
