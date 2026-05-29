@@ -1649,7 +1649,12 @@ SYSTEM_ARTIGO = (
     "   - FRACO (NÃO faça): pergunta genérica e preguiçosa ('Você sabia\n"
     "     que...?', 'Bitcoin vai subir?', 'Já parou pra pensar...?'). Nada\n"
     "     de pergunta óbvia que qualquer um faria. Tem que ser afiada.\n"
-    "   - A pergunta promete uma HISTÓRIA/resposta, não anuncia um tópico.\n\n"
+    "   - A pergunta promete uma HISTÓRIA/resposta, não anuncia um tópico.\n"
+    "   - DEPOIS da pergunta, VÁ DIRETO pro conteúdo que responde. NÃO escreva\n"
+    "     'A resposta está em...', 'A resposta é...', 'A resposta surpreende'.\n"
+    "     Isso é gancho de suspense barato. Comece a responder com o FATO:\n"
+    "     ex. após 'por que os juros estão em 14,5%?', siga com 'O plano\n"
+    "     Lula aposta em arrecadar mais e gastar mais...' — direto, sem rodeio.\n\n"
     "   DEPOIS DO GANCHO, percorra estes blocos NA ORDEM (nem todo tema tem\n"
     "   todos, mas use os que fizerem sentido):\n"
     "   GANCHO → ORIGEM → PRODUTO/MECANISMO → ESCASSEZ/TENSÃO → NÚMEROS →\n"
@@ -2891,7 +2896,8 @@ def _detect_vicios_ia(texto: str):
         (r"\bPor outro lado,?", "'Por outro lado' é muleta. Use 'mas', 'só que'."),
         # Ganchos dramáticos tipicos de IA — pseudo-suspense pra "criar engajamento"
         (r"\bmuda tudo\b\.?", "'Muda tudo' é fechamento dramático cara de IA (qualquer sujeito). Mostre O QUE muda concretamente."),
-        (r"\bA resposta\s+(?:muda|[eé]|est[aá]|surpreende|vai)", "'A resposta muda/é...' é gancho de suspense de IA. Afirme o ponto direto."),
+        (r"\bA resposta\s+(?:muda|[eé]|est[aá]|surpreende|vai|vir[áa]|ser[áa])", "'A resposta muda/é/virá...' é gancho de suspense de IA. Afirme o ponto direto."),
+        (r"\bA (?:pergunta|d[úu]vida) que (?:fica|resta|permanece|importa)\b", "'A pergunta que fica' é fechamento dramático de IA. Conclua direto."),
         (r"\b(?:Só|So) que ningu[eé]m (?:est[aá]|ta|esta) (?:falando|comentando|olhando|notando|prestando|reparando)\b", "'Só que ninguém está falando' é gancho dramático de IA. Afirme o ponto direto."),
         (r"\bningu[eé]m (?:te\s+)?(?:fala|comenta|conta|diz)(?:\s+(?:isso|sobre|disso|nisso))?\b", "'Ninguém fala/conta isso' é gancho dramático de IA. Va direto pro fato."),
         (r"\bo que ningu[eé]m (?:te\s+)?(?:fala|conta|diz|comenta)\b", "'O que ninguém te conta' é gancho dramático de IA."),
@@ -3942,7 +3948,12 @@ def _extrair_todos_slides(slug: str):
         return None
     bloco = html[arr_start:arr_end]
     textos = re.findall(r"text:`([^`]*)`", bloco, flags=re.DOTALL)
-    return [{"idx": i, "text": t.strip()} for i, t in enumerate(textos)]
+    # No HTML os \n vem ESCAPADOS (literal '\'+'n'). Desescapa pra quebra real,
+    # senao o '\n' literal gruda na palavra ('ano?\\n\\nA resposta') e quebra
+    # os regex do detector que usam \b (vicios passavam batido no verificar).
+    def _unesc(t):
+        return t.replace("\\n", "\n").replace("\\`", "`").replace("\\\\", "\\").strip()
+    return [{"idx": i, "text": _unesc(t)} for i, t in enumerate(textos)]
 
 
 @app.route("/api/verificar-texto", methods=["POST"])
