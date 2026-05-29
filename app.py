@@ -1754,6 +1754,16 @@ SYSTEM_ARTIGO = (
     "   Em vez disso, reescreva fluindo: 'A verdade é tal coisa', 'O resultado\n"
     "   foi assim'. Dois-pontos legítimos só pra listar (raro) ou em hora\n"
     "   (15:30). No corpo do texto, prefira ponto, vírgula ou conector natural.\n"
+    "10) FRASE CURTA DE EFEITO/SUSPENSE — e o DISFARCE do dois-pontos. NÃO\n"
+    "    crie pausa dramática com frase curtinha sentenciosa. Exemplos do que\n"
+    "    NÃO fazer: 'A resposta muda tudo.', 'Não é tese política.', 'E não\n"
+    "    para por aí.', 'O número assusta.', 'Aí que mora o problema.'\n"
+    "    ATENÇÃO AO TRUQUE: às vezes você evita o dois-pontos mas escreve\n"
+    "    'Frase curta de efeito. Explicação...' — é o MESMO vício disfarçado,\n"
+    "    o ponto ali era pra ser dois-pontos. NÃO faça. Junte numa frase só,\n"
+    "    afirmando direto. Ex RUIM: 'A resposta surpreende. O déficit dobrou.'\n"
+    "    Ex BOM: 'O déficit dobrou no período, contrariando a expectativa.'\n"
+    "    'Muda tudo' / 'a resposta é...' / negação curta de efeito: PROIBIDO.\n"
     "O texto final tem que estar 100% LIVRE desses vícios. Reler e limpar\n"
     "antes de entregar.\n\n"
 
@@ -2880,7 +2890,8 @@ def _detect_vicios_ia(texto: str):
         (r"\bEm suma,?", "'Em suma' soa formal demais. Reescreva o fechamento."),
         (r"\bPor outro lado,?", "'Por outro lado' é muleta. Use 'mas', 'só que'."),
         # Ganchos dramáticos tipicos de IA — pseudo-suspense pra "criar engajamento"
-        (r"\b(?:E\s+)?isso muda tudo\b\.?", "'Isso muda tudo' é fechamento dramático cara de IA. Reescreva mostrando O QUE muda concretamente."),
+        (r"\bmuda tudo\b\.?", "'Muda tudo' é fechamento dramático cara de IA (qualquer sujeito). Mostre O QUE muda concretamente."),
+        (r"\bA resposta\s+(?:muda|[eé]|est[aá]|surpreende|vai)", "'A resposta muda/é...' é gancho de suspense de IA. Afirme o ponto direto."),
         (r"\b(?:Só|So) que ningu[eé]m (?:est[aá]|ta|esta) (?:falando|comentando|olhando|notando|prestando|reparando)\b", "'Só que ninguém está falando' é gancho dramático de IA. Afirme o ponto direto."),
         (r"\bningu[eé]m (?:te\s+)?(?:fala|comenta|conta|diz)(?:\s+(?:isso|sobre|disso|nisso))?\b", "'Ninguém fala/conta isso' é gancho dramático de IA. Va direto pro fato."),
         (r"\bo que ningu[eé]m (?:te\s+)?(?:fala|conta|diz|comenta)\b", "'O que ninguém te conta' é gancho dramático de IA."),
@@ -3035,6 +3046,13 @@ def _detect_vicios_ia(texto: str):
          "Antítese de efeito ('não é sobre X, é sobre Y'). Clichê de IA. Reescreva direto."),
         (r"\b([a-zçãõáéíóúâêô]+)\s+n[ãa]o\s+\1\b",
          "Repetição/quiasmo de efeito. Soa frase de almanaque."),
+        # 'Não é X.' / 'Não é X. É Y.' — negação curta de efeito (o Claude
+        # usa pra criar drama no lugar do dois-pontos que ele evita).
+        (r"(?:^|(?<=[.!?]\s)|(?<=\n))N[ãa]o\s+(?:é|e|foi|será|sera)\s+[^.!?,;]{2,28}\.",
+         "'Não é X.' como frase curta isolada é efeito dramático de IA. Afirme o que É, direto."),
+        # Frase curtíssima sentenciosa de suspense no meio do texto
+        (r"(?:^|(?<=[.!?]\s))(?:E n[ãa]o para por a[íi]|A[íi] que (?:mora|est[áa]) o)\b[^.!?]{0,30}\.",
+         "Frase de suspense ('e não para por aí', 'aí que mora o...'). Tique de IA. Corte."),
     ]
     for pat, msg in frase_efeito:
         for m in re.finditer(pat, texto, re.IGNORECASE):
@@ -3090,10 +3108,13 @@ FRASE DE EFEITO "POÉTICA" — REMOVA SEMPRE (vício de IA fingindo ser poeta):
   que quer se destacar. Se a frase parece feita pra ser citada/rimar, corte.
 
 GANCHOS DRAMÁTICOS DE IA — REMOVA SEMPRE (são a cara da IA):
-- "Isso muda tudo" / "E isso muda tudo" / "é isso que muda tudo" /
-  "muda o jogo" / "vira o jogo" → REMOVA o fechamento dramático e
-  EXPLIQUE concretamente o que muda (ex.: "isso muda tudo pra renda
-  fixa" → "investidor de renda fixa vai sentir no rendimento mensal")
+- "muda tudo" (qualquer sujeito) / "muda o jogo" / "vira o jogo" → REMOVA
+  o fechamento dramático e EXPLIQUE concretamente o que muda.
+- FRASE CURTA DE EFEITO/SUSPENSE: "A resposta muda tudo.", "Não é tese
+  política.", "E não para por aí.", "O número assusta." → CORTE e junte
+  numa frase só, afirmando direto. CUIDADO com o disfarce do dois-pontos:
+  "Frase curta de efeito. Explicação" era pra ser dois-pontos; junte tudo
+  numa afirmação direta, sem a pausa dramática.
 - "Só que ninguém está falando" / "Ninguém te conta" / "O que poucos
   sabem" / "Pouca gente sabe" → CORTA o gancho de suspense. Vá direto
   pro fato. Não precisa anunciar que é informação rara.
