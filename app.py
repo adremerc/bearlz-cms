@@ -1695,17 +1695,48 @@ SYSTEM_ARTIGO = (
     "- Mas SEM ser condescendente: explique com a naturalidade de quem sabe\n"
     "  muito e conversa de igual pra igual, não de quem dá aula.\n\n"
 
-    "PROFUNDIDADE = AUTORIDADE:\n"
+    "PROFUNDIDADE = AUTORIDADE (não seja superficial):\n"
     "- Cada afirmação ancorada em dado concreto, exemplo ou mecanismo.\n"
+    "- EXPLIQUE o MECANISMO econômico por dentro: não diga só 'a inflação\n"
+    "  caiu', mostre POR QUE caiu (o que o governo fez, como isso afeta os\n"
+    "  preços). O leitor tem que ENTENDER a engrenagem, não só ver o número.\n"
     "- Vá à segunda ordem: não só 'o que aconteceu', mas 'por que' e 'o que\n"
     "  isso desencadeia'. É o que separa análise de notícia.\n"
-    "- Reconstrua decisões (por que a empresa/pessoa escolheu X), mostrando\n"
-    "  o trade-off que ela enfrentava.\n\n"
+    "- Reconstrua decisões (por que a pessoa/governo escolheu X), mostrando\n"
+    "  o trade-off que enfrentava. Traga contexto histórico de verdade.\n"
+    "- Evite o raso: se um slide só repete um número sem explicar a causa e\n"
+    "  a consequência, ele está incompleto.\n\n"
 
-    "RITMO (marca registrada — siga à risca):\n"
-    "- ALTERNE frases curtas (1 linha, funcionam como respiração) com médias.\n"
-    "- Curtas de impacto: 'O projeto foi encerrado em 1991.' 'É matemática.'\n"
-    "- A alternância cria leitura dinâmica, como gente inteligente fala.\n\n"
+    "IMPARCIALIDADE (regra inegociável quando o tema é político/econômico):\n"
+    "- Analista NEUTRO, não militante. NUNCA pareça campanha a favor ou\n"
+    "  contra um governo, político ou ideologia.\n"
+    "- Para CADA ponto positivo, traga o custo/risco correspondente, e\n"
+    "  vice-versa. Mostre os DOIS lados com o mesmo peso e os mesmos dados.\n"
+    "- Não use adjetivo de torcida ('brilhante', 'desastroso', 'corajoso').\n"
+    "  Deixe os números falarem; o leitor tira a conclusão.\n"
+    "- Se o resultado é ambíguo (melhorou X mas piorou Y), DIGA que é ambíguo.\n\n"
+
+    "FOCO NO TEMA:\n"
+    "- O post é sobre o TÓPICO pedido. Aprofunde NELE. Um paralelo ou\n"
+    "  comparação é bem-vindo se ILUMINA o tema, mas NÃO desvie o post pra\n"
+    "  outro assunto. Se o tema é a Argentina, a maior parte é Argentina.\n\n"
+
+    "RITMO E FLUIDEZ (regra crítica — leia com atenção):\n"
+    "- O texto tem que FLUIR como uma narrativa que se desenrola, com começo,\n"
+    "  meio e fim CONECTADOS. NÃO é um amontoado de frases soltas.\n"
+    "- USE CONECTORES e relações de causa-tempo entre as ideias: 'foi aí que',\n"
+    "  'o resultado disso', 'meses depois', 'a consequência', 'por causa de',\n"
+    "  'enquanto isso', 'o que explica', 'na sequência'. Cada frase puxa a\n"
+    "  próxima — o leitor é levado por uma CRONOLOGIA, não por tópicos jogados.\n"
+    "- PROIBIDO o texto picotado de frases curtas soltas que não conectam\n"
+    "  ('A indústria caiu. Mas a inflação despencou. O salário subiu.'). Isso\n"
+    "  cansa, não conta história e tem cara de IA. Junte com conectores numa\n"
+    "  narrativa: 'A indústria recuou 6%, mas no mesmo período a inflação\n"
+    "  despencou de 13% para 2% ao mês, o que devolveu poder de compra ao\n"
+    "  salário real.'\n"
+    "- Frases predominantemente MÉDIAS e conectadas. Uma frase curta de\n"
+    "  impacto é permitida MUITO raramente (1x no texto todo, no máximo), só\n"
+    "  num momento de virada — nunca como muleta de ritmo.\n\n"
 
     "PERGUNTAS RETÓRICAS: use, curtas, com resposta IMEDIATA na frase seguinte.\n"
     "  Ex: 'O motivo? A empresa achou que ninguém aceitaria outra injeção.'\n\n"
@@ -1850,25 +1881,27 @@ SYSTEM_FATIAR = (
     "- Se o slide 1 estiver morno, REORDENE: pegue a frase mais surpreendente\n"
     "  do artigo e use ela como abertura.\n\n"
 
-    "TAMANHO UNIFORME (regra importante — é assim que o Varos faz):\n"
-    "- Cada slide tem entre 220 e 340 caracteres.\n"
-    "- O tamanho deve ser CONSISTENTE entre todos os slides. Todos com\n"
-    "  comprimento parecido (~280). NÃO faça um slide com 150 e outro com\n"
-    "  400. Equilibre o corte pra que fiquem uniformes.\n"
-    "- Exceção: o slide 1 (hook) pode ser um pouco mais curto.\n"
+    "TAMANHO — SLIDES DENSOS (não rasos):\n"
+    "- Cada slide tem entre 280 e 400 caracteres. Slide com pouco texto fica\n"
+    "  raso e sem conteúdo — evite. Aproveite o espaço pra desenvolver a ideia.\n"
+    "- Tamanho razoavelmente CONSISTENTE entre os slides (não um com 150 e\n"
+    "  outro com 400).\n"
+    "- Exceção: o slide 1 (hook/pergunta) pode ser um pouco mais curto.\n"
     "- NUNCA acima de 420.\n\n"
 
-    "FORMATO VISUAL — PARÁGRAFOS CURTOS PRA RESPIRAR (igual ao Varos):\n"
-    "- Cada slide é quebrado em 2 a 4 parágrafos CURTOS, separados por uma\n"
-    "  linha em branco (\\n\\n). Cada parágrafo tem 1 ou 2 frases (~80-140\n"
-    "  caracteres). NUNCA um bloco corrido único de texto.\n"
-    "- Exemplo do visual desejado (1 slide):\n"
-    "    Hoje, mais uma empresa atingiu a marca de US$ 1 trilhão.\n\n"
-    "    Essa é a Micron, que fabrica os chips de memória que alimentam\n"
-    "    toda a infraestrutura de inteligência artificial.\n\n"
-    "    Mas tudo começou no porão de um consultório odontológico, com\n"
-    "    dinheiro de um fazendeiro de batatas.\n"
-    "- Esse respiro visual é parte do estilo. Bloco corrido cansa o olho.\n\n"
+    "FORMATO VISUAL — TEXTO FLUIDO, NO MÁXIMO 1 QUEBRA POR SLIDE:\n"
+    "- Cada slide é texto DENSO e CONECTADO, com no MÁXIMO 1 linha em branco\n"
+    "  (\\n\\n) — ou seja, 1 ou 2 parágrafos por slide, nunca mais.\n"
+    "- NÃO pique o slide em 3-4 frases curtas soltas. Isso cansa e tem cara\n"
+    "  de IA. As frases se conectam numa narrativa, com conectores.\n"
+    "- Exemplo do desejado (1 slide, fluido):\n"
+    "    Quando Milei assumiu em dezembro de 2023, a Argentina acumulava 211%\n"
+    "    de inflação no ano e tinha metade da população perto da pobreza,\n"
+    "    resultado de décadas gastando acima do que arrecadava.\n\n"
+    "    Foi nesse cenário de quase colapso que ele aplicou o choque que\n"
+    "    prometeu, começando pela desvalorização de 54% do peso na primeira\n"
+    "    semana.\n"
+    "- Cada parágrafo tem 2-4 frases CONECTADAS, não uma frase solta.\n\n"
 
     "NÚMERO DE SLIDES: corte em EXATAMENTE {num_slides} slides.\n"
     "  Distribua o artigo de forma equilibrada entre eles.\n\n"
@@ -2105,43 +2138,39 @@ def _sanitizar_legenda(text: str) -> str:
 
 
 def _formatar_paragrafos_varos(text: str) -> str:
-    """Formata o slide no VISUAL do Varos: quebra em paragrafos curtos
-    (1-2 frases, ~80-140 chars cada) separados por \\n\\n, pra respirar.
-    NAO eh 1 bloco corrido — sao varios blocos curtos como na imagem.
+    """Formata o slide no estilo MEIO-TERMO (feedback Gabriel): texto FLUIDO
+    e conectado, com NO MAXIMO 1 quebra por slide (2 paragrafos). NAO picota
+    em frases curtas soltas. Slide curto fica 1 paragrafo so; slide grande
+    (>240 chars) ganha 1 quebra perto do meio, no fim de uma frase.
     Preserva listas de bullet (linhas com •/-/* ) intactas."""
     if not text:
         return text
     # Bullets: estrutura de linhas eh intencional, nao mexe
     if re.search(r'(?m)^\s*[•\-\*]\s+', text):
         return text
-    # Junta tudo num texto plano primeiro (remove quebras existentes)
+    # Junta tudo num texto plano (remove quebras que o Claude tenha posto)
     flat = re.sub(r'\s*\n+\s*', ' ', text).strip()
-    # Divide em frases (fim de frase = . ! ? seguido de espaco)
-    sentences = re.split(r'(?<=[.!?])\s+', flat)
-    if len(sentences) <= 1:
+    # Slide curto: 1 paragrafo unico, sem quebra
+    if len(flat) <= 240:
         return flat
-    # Agrupa em paragrafos curtos mirando ~130 chars. Fecha o bloco ANTES de
-    # adicionar uma frase que o faria estourar 135 chars — assim frases longas
-    # viram paragrafos proprios em vez de blocos gigantes de 200 chars.
-    ALVO = 130
-    paragraphs = []
-    current = []
-    current_len = 0
-    for s in sentences:
-        s_len = len(s) + 1
-        if current and (current_len + s_len) > ALVO + 5:
-            paragraphs.append(" ".join(current))
-            current = []
-            current_len = 0
-        current.append(s)
-        current_len += s_len
-    if current:
-        # Bloco final muito curto: funde no anterior pra nao ficar orfao
-        if paragraphs and current_len < 45:
-            paragraphs[-1] += " " + " ".join(current)
-        else:
-            paragraphs.append(" ".join(current))
-    return "\n\n".join(paragraphs)
+    sentences = re.split(r'(?<=[.!?])\s+', flat)
+    if len(sentences) <= 2:
+        return flat  # poucas frases: deixa corrido
+    # 1 quebra so: acha o ponto de divisao mais proximo do MEIO (no fim de
+    # uma frase) pra ter 2 paragrafos equilibrados.
+    meio = len(flat) / 2
+    melhor_i, melhor_dist = 1, 10**9
+    acc = 0
+    for i, s in enumerate(sentences[:-1]):  # nao divide na ultima
+        acc += len(s) + 1
+        dist = abs(acc - meio)
+        if dist < melhor_dist:
+            melhor_dist, melhor_i = dist, i + 1
+    p1 = " ".join(sentences[:melhor_i]).strip()
+    p2 = " ".join(sentences[melhor_i:]).strip()
+    if not p1 or not p2:
+        return flat
+    return p1 + "\n\n" + p2
 
 
 def _sanitizar_slide_varos(text: str) -> str:
@@ -3532,8 +3561,8 @@ def _gerar_conteudo_2fases(client, topico, brief_enriched, imagens_block,
     Levanta ValueError se alguma fase falhar de forma irrecuperavel."""
     # Tamanho-alvo do artigo: ~290-360 chars por slide (estilo Varos, denso).
     # Piso de seguranca pra nao gerar raso mesmo com poucos slides.
-    min_chars = max(num_slides * 290, 900)
-    max_chars = num_slides * 360
+    min_chars = max(num_slides * 320, 1100)
+    max_chars = num_slides * 400
     sys_artigo = (system_artigo
                   .replace("{min_chars}", str(min_chars))
                   .replace("{max_chars}", str(max_chars))
@@ -3637,8 +3666,8 @@ def api_gerar_system_prompt():
     Substitui os placeholders {min_chars}/{max_chars} por valores default
     (base 11 slides) pra UI mostrar numeros reais em vez de '{min_chars}'."""
     preview = (SYSTEM_ARTIGO
-               .replace("{min_chars}", str(11 * 290))
-               .replace("{max_chars}", str(11 * 360))
+               .replace("{min_chars}", str(11 * 320))
+               .replace("{max_chars}", str(11 * 400))
                .replace("{num_slides}", "11"))
     return jsonify({"system": preview})
 
