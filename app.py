@@ -1721,7 +1721,12 @@ SYSTEM_ARTIGO = (
 
     "VOCABULÁRIO: técnico mas SEMPRE ancorado em linguagem simples ao redor.\n"
     "  Pode usar termo técnico (HBM, P/L, FGC, Selic) explicando implícito no\n"
-    "  contexto. SEM gíria, SEM palavra de influencer ('top', 'incrível').\n\n"
+    "  contexto. SEM gíria, SEM palavra de influencer ('top', 'incrível').\n"
+    "  VARIE O VOCABULÁRIO — não repita a mesma palavra-chave o tempo todo.\n"
+    "  Ex: em vez de usar 'tese' em todo slide, alterne com 'argumento',\n"
+    "  'leitura', 'aposta', 'raciocínio', 'caso', 'visão', 'cenário'. A\n"
+    "  repetição da mesma palavra cansa e denuncia texto automatizado. Releia\n"
+    "  e troque qualquer palavra de conteúdo que apareça 3+ vezes no carrossel.\n\n"
 
     "════ PROIBIDO — VÍCIOS QUE DENUNCIAM TEXTO DE IA (regra crítica) ════\n"
     "PRINCÍPIO MESTRE: textos humanos AFIRMAM. Textos de IA ANUNCIAM. Corte\n"
