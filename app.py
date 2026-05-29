@@ -1734,7 +1734,10 @@ SYSTEM_ARTIGO = (
     "  narrativa: 'A indústria recuou 6%, mas no mesmo período a inflação\n"
     "  despencou de 13% para 2% ao mês, o que devolveu poder de compra ao\n"
     "  salário real.'\n"
-    "- Frases predominantemente MÉDIAS e conectadas.\n"
+    "- Frases predominantemente MÉDIAS (15 a 25 palavras) e conectadas.\n"
+    "- NÃO escreva frase gigante de 40+ palavras cheia de vírgulas (vira um\n"
+    "  bloco cansativo sem onde respirar). Se a ideia é longa, divida em 2\n"
+    "  frases com ponto, conectadas por um conector ('por isso', 'e assim').\n"
     "- PROIBIDO frase isolada de 1 a 3 palavras pra dar drama ('Recessão.',\n"
     "  'É matemática.', 'E não para por aí.'). TODA frase tem sujeito e\n"
     "  desenvolvimento, integrada ao texto. Nada de palavra solta com ponto.\n"
@@ -2159,20 +2162,34 @@ def _formatar_paragrafos_varos(text: str) -> str:
     sentences = re.split(r'(?<=[.!?])\s+', flat)
     if len(sentences) <= 1:
         return flat
-    # Agrupa frases em paragrafos com RESPIRO. ALVO ~115: frase media/longa
-    # (~120-180 chars, densa) vira 1 paragrafo proprio (respiro estilo Varos);
-    # frases curtas (~50-70) agrupam em 2 pra nao ficarem soltas/picotadas.
-    # O conteudo fluido (conectores) vem do prompt — aqui so quebramos.
+    # Quebra frase GIGANTE (>200 chars, sem ponto interno) na virgula mais
+    # proxima do meio, pra nao virar um blocao sem respiro. Mantem a virgula.
+    def _quebra_frase_longa(fr):
+        if len(fr) <= 200:
+            return [fr]
+        virgs = [m.end() for m in re.finditer(r",\s", fr)]
+        if not virgs:
+            return [fr]
+        meio = len(fr) / 2
+        corte = min(virgs, key=lambda p: abs(p - meio))
+        return [fr[:corte].strip(), fr[corte:].strip()]
+    unidades = []
+    for s in sentences:
+        unidades.extend(_quebra_frase_longa(s))
+    # Agrupa em paragrafos com RESPIRO (~115 chars). Uma unidade grande
+    # (>130) vira paragrafo proprio: fecha o atual antes de juntar com ela.
     ALVO = 115
     paragraphs, current, clen = [], [], 0
-    for s in sentences:
-        current.append(s)
-        clen += len(s) + 1
+    for u in unidades:
+        if current and (len(u) > 130 or clen >= ALVO):
+            paragraphs.append(" ".join(current))
+            current, clen = [], 0
+        current.append(u)
+        clen += len(u) + 1
         if clen >= ALVO:
             paragraphs.append(" ".join(current))
             current, clen = [], 0
     if current:
-        # sobra curta (<60 chars) funde no paragrafo anterior pra nao ficar orfa
         if paragraphs and clen < 60:
             paragraphs[-1] += " " + " ".join(current)
         else:
