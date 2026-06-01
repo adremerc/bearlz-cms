@@ -2279,13 +2279,28 @@ def _juntar_frases_curtas(text: str) -> str:
     return " ".join(out)
 
 
+def _juntar_antitese(text: str) -> str:
+    """Junta antitese de efeito 'Nao e X. E Y.' numa frase so com ', e sim '.
+    'Nao e questao politica. E geologia.' -> 'Nao e questao politica, e sim geologia.'
+    Elimina o picote dramatico que o Gabriel sinalizou como vies de IA."""
+    if not text:
+        return text
+    # 'Nao e/foi/sao X' + '. E/Sao ' -> ', e sim '
+    return re.sub(
+        r'(N[ãa]o\s+(?:é|e|foi|são|sao|era)\s+[^.!?]{2,70})\.\s+(?:[EÉ]|S[ãa]o)\s+',
+        r'\1, e sim ',
+        text,
+    )
+
+
 def _sanitizar_slide_varos(text: str) -> str:
     """Sanitizacao pro fluxo de geracao em 2 fases. Remove travessao/aspas,
-    junta frases ultra-curtas, limpa cliche, e FORMATA em paragrafos com
-    respiro (2-3 blocos fluidos por slide)."""
+    junta frases ultra-curtas e antitese, limpa cliche, e FORMATA em
+    paragrafos com respiro (2-3 blocos fluidos por slide)."""
     text = _strip_em_dash(text or "")
     text = _remover_dois_pontos_anuncio(text)
     text = _aspas_simples_pra_duplas(text)
+    text = _juntar_antitese(text)
     text = _juntar_frases_curtas(text)
     text = _limpar_cliches_abertura(text)
     text = _formatar_paragrafos_varos(text)
