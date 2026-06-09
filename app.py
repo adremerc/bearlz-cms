@@ -3126,10 +3126,11 @@ def _detect_vicios_ia(texto: str):
         (r"\bdiz(?:em)? muito sobre\b", "'Diz muito sobre' é vago, cara de IA. Diga concretamente O QUE mostra."),
         (r"\bo detalhe [eé] que\b", "'O detalhe é que' é andaime de IA. Corte e afirme direto."),
         (r"\ba leitura (?:do mercado |geral |dos analistas )?[eé] que\b", "'A leitura é que' é andaime. Use agente + verbo: 'O mercado trata X como...'."),
-        (r"(?:^|(?<=\n)|(?<=[.!?]\s))O resultado(?: disso)? (?:[eé]|foi)\b", "'O resultado é/foi' abrindo frase é andaime. Diga o resultado em ordem direta (sujeito + verbo)."),
+        (r"(?:^|(?<=\n)|(?<=[.!?]\s)|(?<=\*\*))O resultado(?: disso)? (?:[eé]|foi)\b", "'O resultado é/foi' abrindo frase é andaime. Diga o resultado em ordem direta (sujeito + verbo)."),
         # Frases clivadas ('Foi esse X que...', 'São esses X que...') — ordem direta
-        (r"(?:^|(?<=\n)|(?<=[.!?]\s))(?:Foi|[ÉE])\s+(?:ess[ea]s?|es[st]e|aquel[ea]s?)\s[^.!?]{2,45}\bque\b", "Frase clivada ('Foi esse X que fez Y'). Prefira ordem direta: 'Esse X fez Y'."),
-        (r"(?:^|(?<=\n)|(?<=[.!?]\s))S[ãa]o ess[ea]s?\s[^.!?]{2,40}\bque\b", "Frase clivada ('São esses X que...'). Ordem direta: 'Esses X fazem...'."),
+        # (?<=\*\*) cobre frase que abre com negrito: '**O resultado é...'
+        (r"(?:^|(?<=\n)|(?<=[.!?]\s)|(?<=\*\*))(?:Foi|[ÉE])\s+(?:ess[ea]s?|es[st]e|aquel[ea]s?)\s[^.!?]{2,45}\bque\b", "Frase clivada ('Foi esse X que fez Y'). Prefira ordem direta: 'Esse X fez Y'."),
+        (r"(?:^|(?<=\n)|(?<=[.!?]\s)|(?<=\*\*))S[ãa]o ess[ea]s?\s[^.!?]{2,40}\bque\b", "Frase clivada ('São esses X que...'). Ordem direta: 'Esses X fazem...'."),
     ]
     for pattern, msg in cliches:
         for m in re.finditer(pattern, texto, re.IGNORECASE):
