@@ -453,6 +453,29 @@ def api_admin_editar_textos(slug):
     return jsonify({"ok": True, "substituidos": min(contador["i"], len(textos))})
 
 
+@app.route("/api/_admin/editar-meta/<slug>", methods=["POST"])
+def api_admin_editar_meta(slug):
+    """Atualiza artigo/legenda/hashtags de um carrossel no DB. Permite manter
+    o artigo IDENTICO ao texto dos slides (fonte unica: artigo fatiado).
+    Body JSON: {artigo?: str, legenda?: str, hashtags?: str}. Requer X-Admin-Key."""
+    if not _admin_check_key():
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json() or {}
+    campos = {k: data[k] for k in ("artigo", "legenda", "hashtags")
+              if k in data and isinstance(data[k], str)}
+    if not campos:
+        return jsonify({"error": "nada pra atualizar (artigo/legenda/hashtags)"}), 400
+    sets = ", ".join(f"{k}=?" for k in campos)
+    with get_db() as conn:
+        cur = conn.execute(
+            f"UPDATE carrosseis SET {sets}, updated_at=datetime('now') WHERE slug=?",
+            (*campos.values(), slug)
+        )
+        if cur.rowcount == 0:
+            return jsonify({"error": "slug nao encontrado"}), 404
+    return jsonify({"ok": True, "campos": sorted(campos)})
+
+
 @app.route("/api/_admin/bump-asset-version", methods=["POST"])
 def api_admin_bump_assets():
     """Faz patch em todos os HTMLs em data/generated/ trocando
@@ -1927,7 +1950,10 @@ SYSTEM_FATIAR = (
     "- Corte em pontos de CLIFFHANGER NATURAL: onde uma frase termina\n"
     "  deixando curiosidade pro próximo ('Mas o produto que mudou tudo tem\n"
     "  outro nome.'). Esses cortes já existem no texto, você só os encontra.\n"
-    "- Cada slide tem UMA ideia central. Quando o assunto vira, corte.\n"
+    "- Cada slide tem UMA ideia central — UM TEMA SÓ por slide, NUNCA dois.\n"
+    "  Se o slide termina um assunto e começa outro, o corte está no lugar\n"
+    "  errado: mova o corte pra exatamente onde o assunto vira. Slide com\n"
+    "  dois temas quebra a fluidez da leitura.\n"
     "- Cada slide começa EXATAMENTE de onde o anterior parou. Sem reset,\n"
     "  sem repetir o que já foi dito, sem 'como vimos', sem 'recapitulando'.\n\n"
 
