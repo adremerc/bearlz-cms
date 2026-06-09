@@ -1801,8 +1801,8 @@ SYSTEM_ARTIGO = (
     "RITMO E FLUIDEZ (regra crítica — leia com atenção):\n"
     "- O texto tem que FLUIR como uma narrativa que se desenrola, com começo,\n"
     "  meio e fim CONECTADOS. NÃO é um amontoado de frases soltas.\n"
-    "- USE CONECTORES e relações de causa-tempo entre as ideias: 'foi aí que',\n"
-    "  'o resultado disso', 'meses depois', 'a consequência', 'por causa de',\n"
+    "- USE CONECTORES e relações de causa-tempo entre as ideias: 'a partir daí',\n"
+    "  'meses depois', 'por causa de', 'com isso', 'desde então',\n"
     "  'enquanto isso', 'o que explica', 'na sequência'. Cada frase puxa a\n"
     "  próxima — o leitor é levado por uma CRONOLOGIA, não por tópicos jogados.\n"
     "- PROIBIDO o texto picotado de frases curtas soltas que não conectam\n"
@@ -1821,7 +1821,27 @@ SYSTEM_ARTIGO = (
     "  Em vez de 'O resultado foi o esperado. Recessão.', escreva 'O resultado\n"
     "  foi a recessão que ele mesmo havia previsto.'\n\n"
 
-    "PERGUNTAS RETÓRICAS: use, curtas, com resposta IMEDIATA na frase seguinte.\n"
+    "CONSTRUÇÃO DA FRASE — ORDEM DIRETA (regra de manual de redação):\n"
+    "- Escreva na ordem direta: SUJEITO + VERBO + COMPLEMENTO. O leitor entende\n"
+    "  na primeira passada. Inversões e intercalações longas confundem.\n"
+    "- TODA frase tem um AGENTE claro fazendo algo com VERBO forte. Prefira\n"
+    "  'Os fundos sacaram R$ 36 bilhões' a 'Houve um saque de R$ 36 bilhões'.\n"
+    "  Prefira verbo a substantivo abstrato: 'investidores realizaram lucros'\n"
+    "  em vez de 'a realização de lucros aconteceu' (nominalização esconde quem faz).\n"
+    "- PROIBIDO ANDAIME (frase-suporte vazia que adia o fato): 'Foi o que\n"
+    "  aconteceu', 'O resultado é que', 'A leitura é que', 'O detalhe é que',\n"
+    "  'diz muito sobre', 'O problema é que', 'A verdade é que'. Corte o andaime\n"
+    "  e afirme o fato direto.\n"
+    "- PROIBIDO FRASE CLIVADA ('Foi esse dinheiro que levou o índice', 'São\n"
+    "  esses motivos que explicam'). Use ordem direta: 'Esse dinheiro levou o\n"
+    "  índice', 'Esses motivos explicam'.\n"
+    "- Voz ativa por padrão. Passiva só quando o agente é desconhecido ou\n"
+    "  irrelevante.\n\n"
+
+    "PERGUNTAS RETÓRICAS: no MÁXIMO UMA no texto inteiro, e ela precisa ser\n"
+    "  CONCRETA (com fato/número embutido), nunca molde genérico tipo 'O que\n"
+    "  acontece quando...', 'O que faz...', 'O que explica...'. Se usar, a\n"
+    "  resposta vem IMEDIATA na frase seguinte.\n"
     "  Ex: 'O motivo? A empresa achou que ninguém aceitaria outra injeção.'\n\n"
 
     "CONTRASTE: use 'de um lado X, do outro Y' ou 'enquanto X, Y' pra mostrar\n"
@@ -3100,6 +3120,16 @@ def _detect_vicios_ia(texto: str):
         (r"\bo (?:grande )?problema [eé] que,?", "'O problema é que' como abertura é gancho de IA. Apenas afirme."),
         (r"\bisso (?:n[ãa]o [eé] coincid[êe]ncia|n[ãa]o [eé] [aà]\s*toa)\b", "'Não é coincidência/à toa' é dramatização cara de IA."),
         (r"\b(?:e )?[eé] (?:exatamente )?(?:a[ií]|nesse momento) que\b", "'É aí que' como gancho repetido vira tique de IA."),
+        # Andaimes (frase-suporte vazia que adia o fato) — manual de redação:
+        # afirme direto, em ordem direta (sujeito + verbo + complemento).
+        (r"\bfoi o que aconteceu\b", "'Foi o que aconteceu' é andaime de IA (pergunta retórica + resposta vazia). Afirme o fato direto."),
+        (r"\bdiz(?:em)? muito sobre\b", "'Diz muito sobre' é vago, cara de IA. Diga concretamente O QUE mostra."),
+        (r"\bo detalhe [eé] que\b", "'O detalhe é que' é andaime de IA. Corte e afirme direto."),
+        (r"\ba leitura (?:do mercado |geral |dos analistas )?[eé] que\b", "'A leitura é que' é andaime. Use agente + verbo: 'O mercado trata X como...'."),
+        (r"(?:^|(?<=\n)|(?<=[.!?]\s))O resultado(?: disso)? (?:[eé]|foi)\b", "'O resultado é/foi' abrindo frase é andaime. Diga o resultado em ordem direta (sujeito + verbo)."),
+        # Frases clivadas ('Foi esse X que...', 'São esses X que...') — ordem direta
+        (r"(?:^|(?<=\n)|(?<=[.!?]\s))(?:Foi|[ÉE])\s+(?:ess[ea]s?|es[st]e|aquel[ea]s?)\s[^.!?]{2,45}\bque\b", "Frase clivada ('Foi esse X que fez Y'). Prefira ordem direta: 'Esse X fez Y'."),
+        (r"(?:^|(?<=\n)|(?<=[.!?]\s))S[ãa]o ess[ea]s?\s[^.!?]{2,40}\bque\b", "Frase clivada ('São esses X que...'). Ordem direta: 'Esses X fazem...'."),
     ]
     for pattern, msg in cliches:
         for m in re.finditer(pattern, texto, re.IGNORECASE):
