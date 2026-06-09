@@ -124,6 +124,20 @@ function saveToServer(){
   clearTimeout(_serverSaveTimer);
   _serverSaveTimer=setTimeout(async()=>{
     try{
+      // Concorrencia otimista: antes de gravar, confere se o servidor ja tem
+      // uma versao mais nova de OUTRA aba/pessoa. Se tiver, NAO sobrescreve —
+      // recarrega (ou cancela), evitando o clobber de "ultima gravacao vence".
+      try{
+        const chk=await fetch('/api/carrossel/'+window.CAROUSEL_SLUG+'/state');
+        if(chk.ok){
+          const cd=await chk.json();
+          if(cd&&cd.updated_at&&_lastServerUpdate&&cd.updated_at!==_lastServerUpdate&&cd.autor!==_myAutor){
+            _showCloud('⚠ Versão mais nova de '+(cd.autor||'outro'));
+            if(confirm((cd.autor||'Outra pessoa')+' salvou uma versão mais nova deste carrossel. Recarregar para não sobrescrever?')){location.reload();}
+            return;
+          }
+        }
+      }catch(e){}
       _showCloud('Salvando...');
       const r=await fetch('/api/carrossel/'+window.CAROUSEL_SLUG+'/save',{
         method:'POST',
