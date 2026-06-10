@@ -1134,7 +1134,7 @@ function _updateCharCount(value){
   el.style.color=color;
 }
 window._updateCharCount=_updateCharCount;
-function liveUpdate(val){slides[cur].text=val;document.getElementById('textDisplay').innerHTML=textToDisplayHTML(val);}
+function liveUpdate(val){slides[cur].text=val;document.getElementById('textDisplay').innerHTML=textToDisplayHTML(val);if(typeof _autoPtSchedule==='function')_autoPtSchedule();}
 /* Insere um topico (bullet "• ") na posicao do cursor do textarea.
    - Se o cursor esta numa linha vazia, poe "• " no inicio dela.
    - Se a linha ja tem conteudo, quebra linha e adiciona "• " (novo topico).
@@ -1398,6 +1398,60 @@ async function revisarPortugues(){
   }
 }
 window.revisarPortugues=revisarPortugues;
+
+/* ── Corretor AUTOMATICO em tempo real ──
+   Enquanto digita: debounce 2,5s -> /api/check-pt silencioso -> o botao
+   "Revisar PT" vira indicador vivo: "PT ✓" (limpo) ou "PT · N" (N erros).
+   Clicar no botao abre o modal completo de sempre. So consulta quando o
+   texto realmente mudou (nao martela o LanguageTool). */
+let _autoPtTimer=null;
+let _autoPtLastText=null;
+let _autoPtBusy=false;
+
+function _autoPtBadge(state,n){
+  const btn=document.querySelector('.btn-revisar-pt');
+  if(!btn)return;
+  const label=btn.querySelector('.label');
+  if(!label)return;
+  if(state==='checking'){label.textContent='PT …';btn.style.color='';}
+  else if(state==='ok'){label.textContent='PT ✓';btn.style.color='#1e9e58';}
+  else if(state==='issues'){label.textContent='PT · '+n;btn.style.color='#e0443a';}
+  else{label.textContent='Revisar PT';btn.style.color='';}
+}
+
+function _autoPtSchedule(){
+  clearTimeout(_autoPtTimer);
+  _autoPtTimer=setTimeout(_autoPtRun,2500);
+}
+
+async function _autoPtRun(){
+  const ta=document.getElementById('editTA');
+  if(!ta)return;
+  const text=ta.value.trim();
+  if(text.length<10){_autoPtBadge('reset');_autoPtLastText=null;return;}
+  if(text===_autoPtLastText||_autoPtBusy)return;
+  _autoPtBusy=true;
+  _autoPtBadge('checking');
+  try{
+    const r=await fetch('/api/check-pt',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({text:text})
+    });
+    const d=await r.json();
+    _autoPtLastText=text;
+    const n=(d.matches||[]).length;
+    if(d.error){_autoPtBadge('reset');}
+    else if(n===0){_autoPtBadge('ok');}
+    else{_autoPtBadge('issues',n);}
+  }catch(e){_autoPtBadge('reset');}
+  finally{_autoPtBusy=false;}
+}
+
+// Ao abrir o editor de um slide, ja agenda a primeira checagem
+document.addEventListener('focusin',function(e){
+  if(e.target&&e.target.id==='editTA')_autoPtSchedule();
+});
 
 // Listener: parent posta correcao aplicada
 window.addEventListener('message',function(e){

@@ -4,12 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Bearlz CMS{% endblock %}</title>
-  <!-- Aplica o tema antes do paint pra evitar "flash" branco em dark mode -->
+  <!-- Tema antes do paint (sem flash). Padrão: segue o sistema; escolha manual persiste. -->
   <script>
     (function(){
       try {
-        var t = localStorage.getItem('bearlz_theme');
-        if (t === 'dark') document.documentElement.classList.add('dark');
+        var t = localStorage.getItem('bearlz_theme'); // 'light' | 'dark' | null (sistema)
+        var dark = t ? (t === 'dark') : window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (dark) document.documentElement.classList.add('dark');
       } catch(e) {}
     })();
   </script>
@@ -18,184 +19,219 @@
     tailwind.config = { darkMode: 'class' };
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet">
   <style>
-    * { font-family: 'Inter', system-ui, sans-serif; }
-    .badge-gray    { @apply bg-gray-100 text-gray-600 border border-gray-200; }
-    .badge-green   { @apply bg-green-50 text-green-700 border border-green-200; }
-    .badge-blue    { @apply bg-blue-50 text-blue-700 border border-blue-200; }
-
-    /* ── Dark mode ── overrides via classe .dark no <html>.
-       Não toca nas cores dos carrosseis (que ficam dentro de iframe).
-       Cobre as classes Tailwind mais usadas nos templates. */
-    html.dark { color-scheme: dark; }
-    html.dark body { background-color: #0a0a0b; color: #e5e7eb; }
-
-    html.dark .bg-white         { background-color: #15161a !important; }
-    html.dark .bg-gray-50       { background-color: #0f1014 !important; }
-    html.dark .bg-gray-100      { background-color: #1c1d22 !important; }
-    html.dark .bg-gray-200      { background-color: #2a2b30 !important; }
-    html.dark .bg-gray-900      { background-color: #f5f5f7 !important; color: #0a0a0b !important; }
-    html.dark .bg-black\/60     { background-color: rgba(255,255,255,.18) !important; }
-
-    html.dark .border-gray-100  { border-color: #1f2026 !important; }
-    html.dark .border-gray-200  { border-color: #2a2b30 !important; }
-    html.dark .border-gray-300  { border-color: #3a3b40 !important; }
-
-    html.dark .text-gray-900    { color: #f5f5f7 !important; }
-    html.dark .text-gray-800    { color: #e5e7eb !important; }
-    html.dark .text-gray-700    { color: #d1d5db !important; }
-    html.dark .text-gray-600    { color: #c0c2c8 !important; }
-    html.dark .text-gray-500    { color: #9ca0a8 !important; }
-    html.dark .text-gray-400    { color: #6f7480 !important; }
-    html.dark .text-gray-300    { color: #4a4d54 !important; }
-
-    /* Status/priority backgrounds (ficam mais saturados no dark) */
-    html.dark .bg-blue-50       { background-color: rgba(59,130,246,.14) !important; }
-    html.dark .bg-blue-100      { background-color: rgba(59,130,246,.22) !important; }
-    html.dark .bg-green-50      { background-color: rgba(34,197,94,.14) !important; }
-    html.dark .bg-green-100     { background-color: rgba(34,197,94,.22) !important; }
-    html.dark .bg-purple-50     { background-color: rgba(168,85,247,.14) !important; }
-    html.dark .bg-purple-100    { background-color: rgba(168,85,247,.22) !important; }
-    html.dark .bg-orange-50     { background-color: rgba(249,115,22,.14) !important; }
-    html.dark .bg-orange-100    { background-color: rgba(249,115,22,.22) !important; }
-    html.dark .bg-red-50        { background-color: rgba(239,68,68,.14) !important; }
-    html.dark .bg-yellow-50     { background-color: rgba(234,179,8,.14) !important; }
-
-    html.dark .text-blue-700    { color: #93c5fd !important; }
-    html.dark .text-green-700   { color: #86efac !important; }
-    html.dark .text-purple-700  { color: #d8b4fe !important; }
-    html.dark .text-orange-700  { color: #fdba74 !important; }
-    html.dark .text-red-700     { color: #fca5a5 !important; }
-    html.dark .text-yellow-700  { color: #fcd34d !important; }
-
-    html.dark .border-blue-200    { border-color: rgba(59,130,246,.35) !important; }
-    html.dark .border-green-200   { border-color: rgba(34,197,94,.35) !important; }
-    html.dark .border-purple-200  { border-color: rgba(168,85,247,.35) !important; }
-    html.dark .border-orange-200  { border-color: rgba(249,115,22,.35) !important; }
-    html.dark .border-red-200     { border-color: rgba(239,68,68,.35) !important; }
-    html.dark .border-yellow-200  { border-color: rgba(234,179,8,.35) !important; }
-
-    /* Hover states */
-    html.dark .hover\:bg-gray-100:hover { background-color: #1c1d22 !important; }
-    html.dark .hover\:bg-gray-50:hover  { background-color: #15161a !important; }
-    html.dark .hover\:bg-blue-50:hover  { background-color: rgba(59,130,246,.14) !important; }
-    html.dark .hover\:bg-purple-50:hover{ background-color: rgba(168,85,247,.14) !important; }
-    html.dark .hover\:border-blue-300:hover { border-color: #60a5fa !important; }
-    html.dark .hover\:text-gray-900:hover   { color: #f5f5f7 !important; }
-    html.dark .hover\:text-blue-600:hover   { color: #93c5fd !important; }
-
-    /* Inputs */
-    html.dark input, html.dark textarea, html.dark select {
-      background-color: #15161a !important;
-      color: #e5e7eb !important;
-      border-color: #2a2b30 !important;
+    /* ════════════════════════════════════════════════════════════════
+       DESIGN SYSTEM — paleta papel/marfim, acento terracota, componentes
+       mínimos (borda fina, canto suave, sombra quase invisível).
+       Tokens em CSS vars; dark mode = mesmos tokens com valores quentes.
+       O CARD DO CARROSSEL (iframe /arquivo) NÃO usa nada disso.
+       ════════════════════════════════════════════════════════════════ */
+    :root {
+      --bg:            #FAF9F5;   /* papel */
+      --panel:         #FFFFFF;
+      --panel-2:       #F4F2EC;   /* painel rebaixado */
+      --text:          #1F1E1D;
+      --text-2:        #57544D;
+      --text-3:        #8E8A80;
+      --border:        #E8E5DD;
+      --border-strong: #D6D2C7;
+      --accent:        #C96442;   /* terracota */
+      --accent-hover:  #B2532F;
+      --accent-soft:   #F4E5DE;
+      --ok:            #5E7C5A;
+      --ok-soft:       #E7EDE4;
+      --info:          #5B7A99;
+      --info-soft:     #E5EBF1;
+      --warn:          #A8762F;
+      --warn-soft:     #F3EAD8;
+      --danger:        #A8453A;
+      --danger-soft:   #F3E1DE;
+      --shadow:        0 1px 2px rgba(31,30,29,.04), 0 4px 16px rgba(31,30,29,.04);
+      --radius:        10px;
     }
-    html.dark input::placeholder, html.dark textarea::placeholder { color: #6f7480 !important; }
+    html.dark {
+      color-scheme: dark;
+      --bg:            #1B1A17;
+      --panel:         #232220;
+      --panel-2:       #2B2A26;
+      --text:          #F0EEE7;
+      --text-2:        #B6B2A7;
+      --text-3:        #807C71;
+      --border:        #38362F;
+      --border-strong: #4A473E;
+      --accent:        #D98A6A;
+      --accent-hover:  #E59E80;
+      --accent-soft:   #3A2C24;
+      --ok:            #92AE8D;
+      --ok-soft:       #2A322A;
+      --info:          #8FA9C2;
+      --info-soft:     #283038;
+      --warn:          #C99B53;
+      --warn-soft:     #383022;
+      --danger:        #CC7A6E;
+      --danger-soft:   #3B2A27;
+      --shadow:        0 1px 2px rgba(0,0,0,.25), 0 4px 18px rgba(0,0,0,.22);
+    }
 
-    /* code chips */
-    html.dark code.bg-gray-100 { background-color: #1c1d22 !important; color: #e5e7eb !important; }
+    * { font-family: 'Inter', system-ui, sans-serif; }
+    .font-display { font-family: 'Source Serif 4', Georgia, serif; letter-spacing: -0.01em; }
+    body { background: var(--bg); color: var(--text); }
 
-    /* Gradientes nos thumbnails (cards) */
-    html.dark .from-gray-50    { --tw-gradient-from: #14151a !important; }
-    html.dark .to-gray-100     { --tw-gradient-to:   #1c1d22 !important; }
-    html.dark .from-blue-50    { --tw-gradient-from: rgba(59,130,246,.10) !important; }
-    html.dark .to-blue-100     { --tw-gradient-to:   rgba(59,130,246,.20) !important; }
-    html.dark .from-green-50   { --tw-gradient-from: rgba(34,197,94,.10) !important; }
-    html.dark .to-green-100    { --tw-gradient-to:   rgba(34,197,94,.20) !important; }
-    html.dark .from-purple-50  { --tw-gradient-from: rgba(168,85,247,.10) !important; }
-    html.dark .to-purple-100   { --tw-gradient-to:   rgba(168,85,247,.20) !important; }
-    html.dark .from-orange-50  { --tw-gradient-from: rgba(249,115,22,.10) !important; }
-    html.dark .to-orange-100   { --tw-gradient-to:   rgba(249,115,22,.20) !important; }
-
-    /* Botão toggle */
-    .theme-toggle {
-      width: 34px; height: 34px;
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      color: #6b7280;
-      transition: all .15s;
+    /* ── Componentes do design system ── */
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 14px; border-radius: 8px;
+      font-size: 13.5px; font-weight: 500;
+      border: 1px solid var(--border);
+      background: var(--panel); color: var(--text-2);
+      transition: border-color .15s, background .15s, color .15s;
       cursor: pointer;
     }
-    .theme-toggle:hover { background: #f3f4f6; color: #111827; }
-    html.dark .theme-toggle:hover { background: #1c1d22; color: #f5f5f7; }
+    .btn:hover { border-color: var(--border-strong); color: var(--text); }
+    .btn-primary {
+      background: var(--accent); border-color: var(--accent); color: #FFF;
+    }
+    .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: #FFF; }
+    .btn-danger { color: var(--danger); border-color: var(--border); background: transparent; }
+    .btn-danger:hover { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
+    .input {
+      width: 100%; padding: 8px 12px;
+      border: 1px solid var(--border); border-radius: 8px;
+      background: var(--panel); color: var(--text);
+      font-size: 13.5px; outline: none;
+      transition: border-color .15s;
+    }
+    .input:focus { border-color: var(--accent); }
+    .input::placeholder { color: var(--text-3); }
+    .chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11.5px; font-weight: 500;
+      padding: 2.5px 9px; border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--text-2); background: transparent;
+    }
+    .chip-ok     { color: var(--ok);     background: var(--ok-soft);     border-color: transparent; }
+    .chip-info   { color: var(--info);   background: var(--info-soft);   border-color: transparent; }
+    .chip-warn   { color: var(--warn);   background: var(--warn-soft);   border-color: transparent; }
+    .chip-danger { color: var(--danger); background: var(--danger-soft); border-color: transparent; }
+    .chip-accent { color: var(--accent); background: var(--accent-soft); border-color: transparent; }
+    .seg { display: flex; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; padding: 3px; gap: 2px; }
+    .seg a, .seg button {
+      padding: 5px 11px; border-radius: 7px; font-size: 13px; font-weight: 500;
+      color: var(--text-2); white-space: nowrap; transition: all .15s; border: none; background: transparent; cursor: pointer;
+    }
+    .seg a:hover, .seg button:hover { color: var(--text); }
+    .seg .seg-active { background: var(--panel); color: var(--text); box-shadow: 0 1px 3px rgba(31,30,29,.08); }
+    .divider { height: 1px; background: var(--border); border: none; }
+
+    .nav-link {
+      padding: 6px 12px; border-radius: 8px;
+      font-size: 13.5px; font-weight: 500; color: var(--text-2);
+      transition: color .15s, background .15s; white-space: nowrap;
+    }
+    .nav-link:hover { color: var(--text); background: var(--panel-2); }
+    .nav-link.active { color: var(--text); background: var(--panel-2); }
+
+    /* ── Camada de compatibilidade: páginas ainda não migradas (calendário,
+       gabriel, gerar) usam classes Tailwind cinzas; o dark delas vem daqui. ── */
+    html.dark .bg-white         { background-color: var(--panel) !important; }
+    html.dark .bg-gray-50       { background-color: var(--bg) !important; }
+    html.dark .bg-gray-100      { background-color: var(--panel-2) !important; }
+    html.dark .bg-gray-200      { background-color: #38362F !important; }
+    html.dark .bg-gray-900      { background-color: #F0EEE7 !important; color: #1B1A17 !important; }
+    html.dark .bg-black\/60     { background-color: rgba(255,255,255,.18) !important; }
+    html.dark .border-gray-100  { border-color: var(--border) !important; }
+    html.dark .border-gray-200  { border-color: var(--border) !important; }
+    html.dark .border-gray-300  { border-color: var(--border-strong) !important; }
+    html.dark .text-gray-900    { color: var(--text) !important; }
+    html.dark .text-gray-800    { color: var(--text) !important; }
+    html.dark .text-gray-700    { color: var(--text-2) !important; }
+    html.dark .text-gray-600    { color: var(--text-2) !important; }
+    html.dark .text-gray-500    { color: var(--text-3) !important; }
+    html.dark .text-gray-400    { color: var(--text-3) !important; }
+    html.dark .bg-blue-50       { background-color: var(--info-soft) !important; }
+    html.dark .bg-green-50      { background-color: var(--ok-soft) !important; }
+    html.dark .bg-purple-50     { background-color: rgba(168,85,247,.14) !important; }
+    html.dark .bg-orange-50     { background-color: var(--warn-soft) !important; }
+    html.dark .bg-red-50        { background-color: var(--danger-soft) !important; }
+    html.dark .bg-yellow-50     { background-color: var(--warn-soft) !important; }
+    html.dark .text-blue-700,  html.dark .text-blue-600  { color: var(--info) !important; }
+    html.dark .text-green-700  { color: var(--ok) !important; }
+    html.dark .text-purple-700, html.dark .text-purple-600 { color: #d8b4fe !important; }
+    html.dark .text-orange-700 { color: var(--warn) !important; }
+    html.dark .text-red-700,   html.dark .text-red-600   { color: var(--danger) !important; }
+    html.dark .text-yellow-700 { color: var(--warn) !important; }
+    html.dark .border-blue-200   { border-color: rgba(91,122,153,.4) !important; }
+    html.dark .border-green-200  { border-color: rgba(94,124,90,.4) !important; }
+    html.dark .border-purple-200 { border-color: rgba(168,85,247,.35) !important; }
+    html.dark .border-orange-200 { border-color: rgba(168,118,47,.4) !important; }
+    html.dark .border-red-200    { border-color: rgba(168,69,58,.4) !important; }
+    html.dark .border-yellow-200 { border-color: rgba(168,118,47,.4) !important; }
+    html.dark .hover\:bg-gray-100:hover { background-color: var(--panel-2) !important; }
+    html.dark .hover\:bg-gray-50:hover  { background-color: var(--panel-2) !important; }
+    html.dark .hover\:bg-blue-50:hover  { background-color: var(--info-soft) !important; }
+    html.dark .hover\:bg-purple-50:hover{ background-color: rgba(168,85,247,.14) !important; }
+    html.dark input, html.dark textarea, html.dark select {
+      background-color: var(--panel) !important;
+      color: var(--text) !important;
+      border-color: var(--border) !important;
+    }
+    html.dark input::placeholder, html.dark textarea::placeholder { color: var(--text-3) !important; }
+    html.dark code.bg-gray-100 { background-color: var(--panel-2) !important; color: var(--text) !important; }
+    html.dark .from-gray-50    { --tw-gradient-from: #232220 !important; }
+    html.dark .to-gray-100     { --tw-gradient-to:   #2B2A26 !important; }
+    html.dark .from-blue-50    { --tw-gradient-from: rgba(91,122,153,.12) !important; }
+    html.dark .to-blue-100     { --tw-gradient-to:   rgba(91,122,153,.22) !important; }
+    html.dark .from-green-50   { --tw-gradient-from: rgba(94,124,90,.12) !important; }
+    html.dark .to-green-100    { --tw-gradient-to:   rgba(94,124,90,.22) !important; }
+    html.dark .from-purple-50  { --tw-gradient-from: rgba(168,85,247,.10) !important; }
+    html.dark .to-purple-100   { --tw-gradient-to:   rgba(168,85,247,.20) !important; }
+    html.dark .from-orange-50  { --tw-gradient-from: rgba(168,118,47,.12) !important; }
+    html.dark .to-orange-100   { --tw-gradient-to:   rgba(168,118,47,.22) !important; }
+
+    /* Toggle de tema */
+    .theme-toggle {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-3); transition: all .15s; cursor: pointer;
+      border: none; background: transparent;
+    }
+    .theme-toggle:hover { background: var(--panel-2); color: var(--text); }
     .theme-toggle .icon-sun  { display: none; }
     .theme-toggle .icon-moon { display: block; }
     html.dark .theme-toggle .icon-sun  { display: block; }
     html.dark .theme-toggle .icon-moon { display: none; }
 
-    /* Esconde a barra de scroll horizontal do nav (mobile) sem perder funcionalidade */
     .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
-
-    /* Mobile: tap-target maior em links/botoes interativos */
     @media (max-width: 640px) {
-      input, textarea, select { font-size: 16px !important; } /* evita zoom no iOS */
+      input, textarea, select { font-size: 16px !important; }
     }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="min-h-screen">
 
   <!-- Top bar -->
-  <header class="bg-white border-b border-gray-200 sticky top-0 z-40">
+  <header class="sticky top-0 z-40" style="background:color-mix(in srgb, var(--bg) 88%, transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)">
     <div class="max-w-screen-xl mx-auto px-3 sm:px-6 h-14 flex items-center justify-between gap-2">
-      <a href="/" class="flex items-center gap-1.5 font-bold text-gray-900 text-base sm:text-lg hover:text-blue-600 transition-colors flex-shrink-0">
-        <span class="text-blue-500">●</span>
-        <span class="hidden sm:inline">Bearlz CMS</span>
-        <span class="sm:hidden">Bearlz</span>
+      <a href="/" class="flex items-center gap-2 flex-shrink-0">
+        <span style="width:9px;height:9px;border-radius:999px;background:var(--accent);display:inline-block"></span>
+        <span class="font-display" style="font-size:17px;font-weight:600;color:var(--text)">Bearlz</span>
       </a>
       <nav class="flex items-center gap-0.5 sm:gap-1 overflow-x-auto no-scrollbar">
-        <a href="/" title="Dashboard" class="px-2 sm:px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors flex items-center gap-1.5 flex-shrink-0
-          {% if request.endpoint == 'dashboard' %}bg-gray-100 text-gray-900{% endif %}">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-          </svg>
-          <span class="hidden sm:inline">Dashboard</span>
+        <a href="/" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
+        <a href="/calendario" class="nav-link {% if request.endpoint == 'calendario' %}active{% endif %}">Calendário</a>
+        <a href="/gabriel" class="nav-link {% if request.endpoint == 'gabriel_inbox' %}active{% endif %}">
+          Gabriel{% if gabriel_fila > 0 %} <span class="chip chip-accent" style="padding:1px 7px;font-size:11px">{{ gabriel_fila }}</span>{% endif %}
         </a>
-        <a href="/calendario" title="Calendário" class="px-2 sm:px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors flex items-center gap-1.5 flex-shrink-0
-          {% if request.endpoint == 'calendario' %}bg-gray-100 text-gray-900{% endif %}">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-            <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-          </svg>
-          <span class="hidden sm:inline">Calendário</span>
-        </a>
-        <a href="/gabriel" title="Gabriel" class="relative px-2 sm:px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 flex-shrink-0
-          {% if request.endpoint == 'gabriel_inbox' %}bg-purple-500 text-white{% else %}text-purple-600 hover:bg-purple-50{% endif %}">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-          </svg>
-          <span class="hidden sm:inline">Gabriel</span>
-          {% if gabriel_fila > 0 %}
-          <span class="flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-xs font-bold
-            {% if request.endpoint == 'gabriel_inbox' %}bg-white text-purple-600{% else %}bg-purple-500 text-white{% endif %}">
-            {{ gabriel_fila }}
-          </span>
-          {% endif %}
-        </a>
-        <a href="/gerar" title="Gerar carrossel" class="px-2 sm:px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 flex-shrink-0
-          {% if request.endpoint == 'pagina_gerar' %}bg-blue-500 text-white{% else %}text-blue-600 hover:bg-blue-50{% endif %}">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-          </svg>
-          <span class="hidden sm:inline">Gerar</span>
-        </a>
-        <a href="/verificar" title="Verificar dados (datas + vícios IA)" class="px-2 sm:px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 flex-shrink-0
-          {% if request.endpoint == 'pagina_verificar' %}bg-amber-500 text-white{% else %}text-amber-700 hover:bg-amber-50{% endif %}">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-          </svg>
-          <span class="hidden sm:inline">Verificar</span>
-        </a>
-        <button onclick="syncCarrosseis()" title="Sincronizar"
-          class="ml-1 sm:ml-2 px-2 sm:px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 transition-colors flex items-center gap-1.5 flex-shrink-0">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          <span class="hidden sm:inline">Sincronizar</span>
-        </button>
-
-        <!-- Toggle dark/light -->
+        <a href="/gerar" class="btn btn-primary ml-1 sm:ml-2" style="padding:6px 14px">Gerar</a>
         <button onclick="toggleTheme()" class="theme-toggle ml-1 flex-shrink-0" title="Alternar tema">
           <svg class="icon-moon w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
@@ -209,47 +245,38 @@
     </div>
   </header>
 
-  <!-- Toast notification -->
+  <!-- Toast -->
   <div id="toast" class="fixed top-16 right-4 z-50 hidden">
-    <div class="bg-gray-900 text-white text-sm px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-2">
+    <div class="panel" style="padding:10px 16px;font-size:13.5px;color:var(--text)">
       <span id="toast-msg"></span>
     </div>
   </div>
 
-  <!-- Main content -->
+  <!-- Main -->
   <main class="max-w-screen-xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
     {% block content %}{% endblock %}
   </main>
 
   <script>
+    // Tema: padrão segue o sistema; clique alterna e PERSISTE a escolha.
     function toggleTheme() {
       const isDark = document.documentElement.classList.toggle('dark');
       try { localStorage.setItem('bearlz_theme', isDark ? 'dark' : 'light'); } catch(e) {}
     }
+    // Sem escolha manual salva, acompanha mudanças do sistema ao vivo.
+    try {
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        if (!localStorage.getItem('bearlz_theme')) {
+          document.documentElement.classList.toggle('dark', e.matches);
+        }
+      });
+    } catch(e) {}
 
-    function toast(msg, color='gray') {
+    function toast(msg) {
       const el = document.getElementById('toast');
-      const msg_el = document.getElementById('toast-msg');
-      msg_el.textContent = msg;
+      document.getElementById('toast-msg').textContent = msg;
       el.classList.remove('hidden');
       setTimeout(() => el.classList.add('hidden'), 3000);
-    }
-
-    async function syncCarrosseis() {
-      const btn = event.currentTarget;
-      btn.disabled = true;
-      btn.textContent = 'Sincronizando...';
-      try {
-        const r = await fetch('/api/sync', {method: 'POST'});
-        const d = await r.json();
-        toast(`Sincronizado — ${d.total} carrosseis`);
-        setTimeout(() => location.reload(), 800);
-      } catch(e) {
-        toast('Erro ao sincronizar');
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg> Sincronizar`;
-      }
     }
   </script>
 

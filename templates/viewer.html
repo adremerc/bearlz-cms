@@ -4,403 +4,135 @@
 {% block content %}
 
 <!-- Breadcrumb -->
-<div class="flex items-center gap-2 text-sm text-gray-500 mb-4">
-  <a href="/" class="hover:text-gray-900 transition-colors">← Dashboard</a>
+<div class="flex items-center gap-2 mb-4" style="font-size:13px;color:var(--text-3)">
+  <a href="/" style="color:var(--text-3)" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text-3)'">← Dashboard</a>
   <span>/</span>
-  <span class="text-gray-900 font-medium truncate">{{ c.titulo }}</span>
+  <span class="truncate" style="color:var(--text);font-weight:500">{{ c.titulo }}</span>
 </div>
 
-<!-- Main layout: stacked no mobile, side-by-side no desktop -->
+<!-- Layout: carrossel + painel -->
 <div class="flex flex-col lg:flex-row gap-4 lg:gap-5 items-start">
 
-  <!-- ── Carousel iframe ─────────────────────────────────── -->
+  <!-- ── Carrossel (iframe — design do card INTOCADO) ── -->
   <div class="flex-1 min-w-0 w-full">
-    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-      <div class="flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 border-b border-gray-100 bg-gray-50 gap-2">
-        <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-          <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-red-400"></span>
-          <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-yellow-400"></span>
-          <span class="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-green-400"></span>
-        </div>
-        <p class="text-xs text-gray-500 font-medium truncate flex-1 text-center">{{ c.titulo }}</p>
-        <a href="/c/{{ c.slug }}/arquivo" target="_blank"
-           class="text-xs text-blue-500 hover:underline flex items-center gap-1 flex-shrink-0">
-          <span class="hidden sm:inline">Abrir aba nova</span>
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-          </svg>
-        </a>
+    <div class="panel overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-2.5" style="border-bottom:1px solid var(--border)">
+        <p class="truncate" style="font-size:12.5px;color:var(--text-3)">{{ c.titulo }}</p>
+        <a href="/c/{{ c.slug }}/arquivo" target="_blank" class="flex-shrink-0" style="font-size:12.5px;color:var(--accent)">Abrir em nova aba ↗</a>
       </div>
-      <!-- Mobile: 600px de altura, desktop: 780px. Iframe se adapta. -->
-      <div class="relative w-full bg-gray-100 h-[600px] sm:h-[700px] lg:h-[780px]">
+      <div class="relative w-full h-[600px] sm:h-[700px] lg:h-[780px]" style="background:var(--panel-2)">
         <iframe id="carrossel-frame" src="/c/{{ c.slug }}/arquivo"
           class="w-full h-full border-0" title="{{ c.titulo }}" loading="lazy"></iframe>
       </div>
     </div>
   </div>
 
-  <!-- ── Side panel: full-width no mobile, 320px no desktop ─────── -->
+  <!-- ── Painel lateral ── -->
   <div class="w-full lg:w-80 lg:flex-shrink-0 flex flex-col gap-4">
 
     <!-- Status -->
-    <div class="bg-white rounded-xl border border-gray-200 p-4">
-      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Status</p>
-      <div class="flex flex-col gap-2">
-        {% for key, label, color in [
-          ('rascunho',        'Rascunho',         'gray'),
-          ('analise_adre',    'Análise Adre',     'orange'),
-          ('analise_gabriel', 'Análise Gabriel',  'purple'),
-          ('aprovado',        'Aprovado',         'green'),
-          ('publicado',       'Publicado',        'blue'),
+    <div class="panel" style="padding:16px 18px">
+      <p class="panel-label">Status</p>
+      <div class="flex flex-col gap-1.5">
+        {% for key, label in [
+          ('rascunho',        'Rascunho'),
+          ('analise_adre',    'Análise Adre'),
+          ('analise_gabriel', 'Análise Gabriel'),
+          ('aprovado',        'Aprovado'),
+          ('publicado',       'Publicado'),
         ] %}
         <button onclick="setStatus('{{ key }}')" data-status="{{ key }}"
-          class="status-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all
-            {% if c.status == key %}
-              {% if color == 'green' %}bg-green-500 text-white border-green-500
-              {% elif color == 'blue' %}bg-blue-500 text-white border-blue-500
-              {% elif color == 'orange' %}bg-orange-500 text-white border-orange-500
-              {% elif color == 'purple' %}bg-purple-500 text-white border-purple-500
-              {% else %}bg-gray-800 text-white border-gray-800{% endif %}
-            {% else %}bg-white text-gray-600 border-gray-200 hover:bg-gray-50{% endif %}">
-          <span class="w-2 h-2 rounded-full flex-shrink-0
-            {% if c.status == key %}bg-white
-            {% elif color == 'green' %}bg-green-400
-            {% elif color == 'blue' %}bg-blue-400
-            {% elif color == 'orange' %}bg-orange-400
-            {% elif color == 'purple' %}bg-purple-400
-            {% else %}bg-gray-400{% endif %}"></span>
+          class="status-btn {% if c.status == key %}on{% endif %}">
           {{ label }}
-          {% if c.status == key %}
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 ml-auto check-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-          </svg>
-          {% endif %}
+          <span class="status-check">✓</span>
         </button>
         {% endfor %}
       </div>
     </div>
 
-    <!-- Conteudo de texto: artigo completo + legenda + hashtags -->
+    <!-- Texto do post -->
     {% if c.artigo or c.legenda %}
-    <div class="bg-white rounded-xl border border-gray-200 p-4">
-      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Texto do post</p>
-
+    <div class="panel" style="padding:16px 18px">
+      <p class="panel-label">Texto do post</p>
       {% if c.legenda %}
-      <div class="mb-3">
-        <div class="flex items-center justify-between mb-1">
-          <span class="text-[11px] font-bold text-gray-700">Legenda</span>
-          <span class="text-[10px] text-gray-400">{{ c.legenda|length }} chars</span>
-        </div>
-        <p class="text-xs text-gray-600 leading-relaxed"
-           style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">{{ c.legenda }}</p>
-      </div>
+      <p style="font-size:12.5px;color:var(--text-2);line-height:1.55;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">{{ c.legenda }}</p>
       {% endif %}
-
       {% if c.hashtags %}
-      <p class="text-[11px] text-blue-600 leading-relaxed mb-3 break-words"
-         style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ c.hashtags }}</p>
+      <p style="font-size:11.5px;color:var(--info);margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden" class="break-words">{{ c.hashtags }}</p>
       {% endif %}
-
-      <div class="grid grid-cols-2 gap-2">
+      <div class="grid grid-cols-2 gap-2 mt-3">
         {% if c.legenda %}
-        <button onclick="copiarLegenda()" class="text-xs font-semibold px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center gap-1.5">
-          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-          Copiar legenda
-        </button>
+        <button onclick="copiarLegenda()" class="btn btn-primary justify-center" style="font-size:12.5px">Copiar legenda</button>
         {% endif %}
         {% if c.artigo %}
-        <button onclick="abrirArtigo()" class="text-xs font-medium px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors">Ver artigo completo</button>
+        <button onclick="abrirArtigo()" class="btn justify-center" style="font-size:12.5px">Ver artigo</button>
         {% endif %}
       </div>
     </div>
     {% endif %}
 
     <!-- Prioridade -->
-    <div class="bg-white rounded-xl border border-gray-200 p-4">
-      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Prioridade</p>
-      <div class="flex gap-2">
-        {% for key, label, ring, bg, text in [
-          ('alta',  'Alta',  'ring-red-400',    'bg-red-50 hover:bg-red-100',    'text-red-700'),
-          ('media', 'Média', 'ring-yellow-400', 'bg-yellow-50 hover:bg-yellow-100', 'text-yellow-700'),
-          ('baixa', 'Baixa', 'ring-gray-400',   'bg-gray-50 hover:bg-gray-100',  'text-gray-600'),
-        ] %}
+    <div class="panel" style="padding:16px 18px">
+      <p class="panel-label">Prioridade</p>
+      <div class="seg w-full">
+        {% for key, label in [('alta','Alta'), ('media','Média'), ('baixa','Baixa')] %}
         <button onclick="setPrioridade('{{ key }}')" data-prio="{{ key }}"
-          class="prio-btn flex-1 py-2 rounded-lg border text-sm font-medium transition-all
-            {{ bg }} {{ text }}
-            {% if c.prioridade == key %}ring-2 {{ ring }} border-transparent font-bold{% else %}border-gray-200{% endif %}">
-          {% if key == 'alta' %}<span class="block text-center">🔴</span>{% endif %}
-          {% if key == 'media' %}<span class="block text-center">🟡</span>{% endif %}
-          {% if key == 'baixa' %}<span class="block text-center">⚪</span>{% endif %}
-          <span class="block text-center text-xs mt-0.5">{{ label }}</span>
-        </button>
+          class="prio-btn flex-1 {% if c.prioridade == key %}seg-active{% endif %}">{{ label }}</button>
         {% endfor %}
       </div>
     </div>
 
-    <!-- Cronômetro -->
-    <div class="bg-white rounded-xl border border-gray-200 p-4">
+    <!-- Notas -->
+    <div class="panel" style="padding:16px 18px">
       <div class="flex items-center justify-between mb-3">
-        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tempo de revisão</p>
-        <div class="flex items-center gap-1.5">
-          <span class="text-xs text-gray-400 flex items-center gap-1" title="Total acumulado de todas as sessões salvas">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2"/>
-            </svg>
-            Salvo: <strong id="total-display" class="text-blue-600 ml-0.5">{{ c.tempo_fmt or '0s' }}</strong>
-          </span>
-          <button onclick="zerarTotal()" title="Zerar tempo acumulado"
-            class="text-gray-300 hover:text-red-400 transition-colors text-xs px-1 rounded">✕</button>
+        <p class="panel-label" style="margin-bottom:0">Notas</p>
+        <div class="seg" style="padding:2px">
+          <button id="autor-adre" onclick="setAutor('Adre')" class="seg-active" style="padding:3px 9px;font-size:11.5px">Adre</button>
+          <button id="autor-gabriel" onclick="setAutor('Gabriel')" style="padding:3px 9px;font-size:11.5px">Gabriel</button>
         </div>
       </div>
+      <input type="hidden" id="nota-autor" value="Adre">
+      <textarea id="nota-input" rows="2" placeholder="Escrever uma nota... (Ctrl+Enter envia)" class="input" style="resize:none;margin-bottom:8px"></textarea>
+      <button onclick="addNota()" class="btn w-full justify-center" style="font-size:12.5px;margin-bottom:12px">Adicionar</button>
 
-      <!-- Timer display -->
-      <div class="bg-gray-900 rounded-xl py-5 px-4 text-center mb-3 relative">
-        <div id="timer-display" class="text-4xl font-mono font-bold text-white tracking-widest">
-          00:00:00
-        </div>
-        <div id="timer-status" class="text-xs text-gray-400 mt-1">parado</div>
-        <!-- Pulsing dot when running -->
-        <div id="running-dot" class="hidden absolute top-3 right-3 w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse"></div>
-      </div>
-
-      <!-- Timer buttons -->
-      <div class="flex gap-2">
-        <button onclick="toggleTimer()" id="timer-btn"
-          class="flex-1 py-2 rounded-lg bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-colors">
-          Iniciar
-        </button>
-        <button onclick="resetTimer()"
-          class="px-3 py-2 rounded-lg bg-gray-100 text-gray-600 text-sm font-medium hover:bg-gray-200 transition-colors">
-          Reset
-        </button>
-        <button onclick="saveTimer()" id="save-btn"
-          class="px-3 py-2 rounded-lg bg-green-500 text-white text-sm font-medium hover:bg-green-600 transition-colors flex items-center gap-1">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-          </svg>
-          Salvar
-        </button>
-      </div>
-      <p class="text-xs text-gray-400 mt-2 text-center">Ctrl+Enter na nota para enviar rápido</p>
-    </div>
-
-    <!-- Notas com abas Adre / Gabriel -->
-    <div class="bg-white rounded-xl border border-gray-200 p-4">
-      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Notas</p>
-
-      <!-- Abas -->
-      <div class="flex bg-gray-100 rounded-lg p-0.5 mb-3">
-        <button onclick="switchTab('adrenaldo')" id="tab-adrenaldo"
-          class="tab-btn flex-1 py-1.5 rounded-md text-sm font-medium transition-colors bg-white text-gray-900 shadow-sm">
-          Minhas notas
-        </button>
-        <button onclick="switchTab('gabriel')" id="tab-gabriel"
-          class="tab-btn flex-1 py-1.5 rounded-md text-sm font-medium transition-colors text-gray-500 hover:text-gray-700">
-          Gabriel
-        </button>
-      </div>
-
-      <!-- Input -->
-      <div class="flex flex-col gap-2 mb-3">
-        <input type="hidden" id="nota-autor" value="Adre">
-        <textarea id="nota-input" rows="3"
-          placeholder="Escrever uma nota..."
-          class="text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-        <button onclick="addNota()"
-          class="w-full py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors">
-          Adicionar nota
-        </button>
-      </div>
-
-      <!-- Notes list — filtrado pela aba ativa -->
-      <div id="notas-list" class="flex flex-col gap-3 max-h-80 overflow-y-auto">
-        {% set notas_adrenaldo = notas | selectattr('autor', 'equalto', 'Adre') | list %}
-        {% set notas_gabriel   = notas | selectattr('autor', 'equalto', 'Gabriel')   | list %}
-
-        <!-- Adre notes (shown by default) -->
-        <div id="notas-adrenaldo" class="flex flex-col gap-3">
-          {% if notas_adrenaldo %}
-            {% for n in notas_adrenaldo %}
-            <div class="nota-item bg-blue-50 rounded-lg p-3 relative group border border-blue-100" data-id="{{ n.id }}" data-autor="Adre">
-              <div class="flex items-center justify-between mb-1">
-                <span class="text-xs font-semibold text-blue-800">Eu</span>
-                <div class="flex items-center gap-2">
-                  <span class="text-xs text-gray-400">{{ n.created_fmt }}</span>
-                  <button onclick="deleteNota({{ n.id }}, this)"
-                    class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all p-0.5 rounded">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-              <p class="text-sm text-blue-900 leading-snug whitespace-pre-wrap">{{ n.texto }}</p>
+      <div id="notas-list" class="flex flex-col max-h-80 overflow-y-auto">
+        {% if notas %}
+          {% for n in notas %}
+          <div class="nota-item group" data-id="{{ n.id }}" data-autor="{{ n.autor }}">
+            <div class="flex items-center justify-between">
+              <span style="font-size:11.5px;font-weight:600;color:{% if n.autor == 'Adre' %}var(--accent){% else %}var(--text-2){% endif %}">{{ n.autor }}</span>
+              <span class="flex items-center gap-2">
+                <span style="font-size:11px;color:var(--text-3)">{{ n.created_fmt }}</span>
+                <button onclick="deleteNota({{ n.id }}, this)" class="nota-del opacity-0 group-hover:opacity-100">×</button>
+              </span>
             </div>
-            {% endfor %}
-          {% else %}
-            <p id="empty-adrenaldo" class="text-sm text-gray-400 text-center py-2">Nenhuma nota sua ainda.</p>
-          {% endif %}
-        </div>
-
-        <!-- Gabriel notes (hidden by default) -->
-        <div id="notas-gabriel" class="flex flex-col gap-3 hidden">
-          {% if notas_gabriel %}
-            {% for n in notas_gabriel %}
-            <div class="nota-item bg-gray-50 rounded-lg p-3 relative group border border-gray-200" data-id="{{ n.id }}" data-autor="Gabriel">
-              <div class="flex items-center justify-between mb-1">
-                <span class="text-xs font-semibold text-gray-800">Gabriel</span>
-                <div class="flex items-center gap-2">
-                  <span class="text-xs text-gray-400">{{ n.created_fmt }}</span>
-                  <button onclick="deleteNota({{ n.id }}, this)"
-                    class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all p-0.5 rounded">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-              <p class="text-sm text-gray-700 leading-snug whitespace-pre-wrap">{{ n.texto }}</p>
-            </div>
-            {% endfor %}
-          {% else %}
-            <p id="empty-gabriel" class="text-sm text-gray-400 text-center py-2">Nenhuma nota do Gabriel ainda.</p>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-
-    <!-- Revisar com Claude -->
-    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <!-- Header colapsável -->
-      <button onclick="toggleRevisar()" id="revisar-header"
-        class="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
-        <div class="flex items-center gap-2">
-          <span class="w-6 h-6 rounded-md bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-            </svg>
-          </span>
-          <span class="text-sm font-semibold text-gray-800">Revisar com Claude</span>
-        </div>
-        <svg id="revisar-chevron" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-400 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
-        </svg>
-      </button>
-
-      <!-- Conteúdo -->
-      <div id="revisar-body" class="hidden px-4 pb-4 border-t border-gray-100 pt-3">
-        <p class="text-xs text-gray-400 mb-3 leading-relaxed">
-          Descreva o que precisa mudar. O Claude lê os slides atuais e reescreve seguindo as instruções.
-        </p>
-
-        <!-- Atalhos rápidos -->
-        <div class="flex flex-wrap gap-1.5 mb-3">
-          {% for atalho in [
-            'Tirar travessões',
-            'Hook mais forte no slide 1',
-            'Texto mais curto',
-            'Tom mais provocador',
-            'Mais negritos',
-          ] %}
-          <button onclick="usarAtalho(this.textContent)"
-            class="px-2 py-1 text-xs rounded-lg bg-gray-100 text-gray-600 hover:bg-violet-100 hover:text-violet-700 transition-colors border border-gray-200 hover:border-violet-300">
-            {{ atalho }}
-          </button>
+            <p style="font-size:13px;color:var(--text);line-height:1.5;white-space:pre-wrap;margin-top:2px">{{ n.texto }}</p>
+          </div>
           {% endfor %}
-        </div>
-
-        <textarea id="revisar-input" rows="4"
-          placeholder="Ex: Slide 3 tá longo demais, divide em 2. Tira qualquer frase picotada que tiver. Deixa o hook do slide 1 mais agressivo."
-          class="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-violet-400 leading-relaxed mb-3"></textarea>
-
-        <button onclick="revisarComClaude()" id="revisar-btn"
-          class="w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white text-sm font-semibold hover:from-violet-600 hover:to-purple-700 transition-all flex items-center justify-center gap-2 shadow-sm">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-          </svg>
-          Gerar prévia
-        </button>
-        <p class="text-[10px] text-gray-400 mt-1.5 text-center">Você revisa as sugestões antes de aplicar</p>
-
-        <!-- Estado de loading -->
-        <div id="revisar-loading" class="hidden mt-3 flex flex-col items-center gap-2 py-2">
-          <div class="flex items-center gap-2 text-sm text-violet-600 font-medium">
-            <svg class="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-            </svg>
-            Claude reescrevendo...
-          </div>
-          <p class="text-xs text-gray-400">Geralmente 10–20 segundos</p>
-        </div>
-
-        <!-- Resultado -->
-        <div id="revisar-result" class="hidden mt-3 p-3 rounded-xl bg-green-50 border border-green-200">
-          <div class="flex items-center gap-2 text-sm font-semibold text-green-700 mb-1">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-            </svg>
-            Carrossel atualizado!
-          </div>
-          <p id="revisar-result-msg" class="text-xs text-green-600"></p>
-        </div>
-
-        <!-- Erro -->
-        <div id="revisar-error" class="hidden mt-3 p-3 rounded-xl bg-red-50 border border-red-200">
-          <p id="revisar-error-msg" class="text-xs text-red-600"></p>
-        </div>
+        {% else %}
+          <p id="notas-empty" style="font-size:12.5px;color:var(--text-3);text-align:center;padding:8px 0">Nenhuma nota ainda.</p>
+        {% endif %}
       </div>
     </div>
 
-    <!-- Info -->
-    <div class="bg-white rounded-xl border border-gray-200 p-4">
-      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Informações</p>
-      <div class="text-sm text-gray-700 space-y-1.5">
-        <div class="flex justify-between">
-          <span class="text-gray-500">Slides</span>
-          <span class="font-medium">{{ c.num_slides or '?' }}</span>
-        </div>
-        <div class="flex justify-between">
-          <span class="text-gray-500">Criado em</span>
-          <span class="font-medium text-xs">{{ c.created_fmt }}</span>
-        </div>
-        <div class="flex justify-between">
-          <span class="text-gray-500">Arquivo</span>
-          <span class="font-medium text-xs truncate max-w-40" title="{{ c.arquivo }}">{{ c.arquivo }}</span>
-        </div>
+    <!-- Informações -->
+    <div class="panel" style="padding:16px 18px">
+      <p class="panel-label">Informações</p>
+      <div style="font-size:13px;color:var(--text-2)" class="space-y-1.5">
+        <div class="flex justify-between"><span style="color:var(--text-3)">Slides</span><span>{{ c.num_slides or '?' }}</span></div>
+        <div class="flex justify-between"><span style="color:var(--text-3)">Criado em</span><span style="font-size:12px">{{ c.created_fmt }}</span></div>
       </div>
     </div>
 
-    <!-- Delete -->
-    <button onclick="deletarCarrossel()"
-      class="w-full py-2.5 rounded-xl border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition-colors flex items-center justify-center gap-2">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-      </svg>
-      Excluir carrossel
-    </button>
+    <!-- Excluir -->
+    <button onclick="deletarCarrossel()" class="btn btn-danger w-full justify-center">Excluir carrossel</button>
 
-  </div><!-- /panel -->
+  </div><!-- /painel -->
 </div>
 
-<!-- ── Modal de Prévia da revisão Claude ─────────── -->
-<div id="revisarPreviewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99999;padding:24px 16px;overflow-y:auto" onclick="if(event.target===this)closeRevisarPreview()">
-  <div style="background:#fff;border-radius:14px;max-width:760px;width:100%;margin:0 auto;padding:18px 22px;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.4);font-family:'Open Sans',sans-serif">
-    <div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;padding-bottom:8px;border-bottom:1px solid #f0f0f0">
-      <strong style="font-size:15px;color:#111">Prévia das alterações sugeridas</strong>
-      <button onclick="closeRevisarPreview()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#999;line-height:1;padding:0 6px">×</button>
-    </div>
-    <div id="revisarPreviewBody" style="display:flex;flex-direction:column;gap:14px"></div>
-    <div id="revisarPreviewActions" style="display:flex;justify-content:flex-end;gap:10px;padding-top:8px;border-top:1px solid #f0f0f0">
-      <button onclick="closeRevisarPreview()" style="padding:8px 16px;font-size:12px;font-weight:600;background:#f3f4f6;color:#374151;border:none;border-radius:8px;cursor:pointer">Cancelar</button>
-      <button id="revisarApplyBtn" onclick="aplicarRevisao()" style="padding:8px 18px;font-size:12px;font-weight:700;background:linear-gradient(to right,#8b5cf6,#7c3aed);color:#fff;border:none;border-radius:8px;cursor:pointer">Aplicar todas</button>
-    </div>
-  </div>
-</div>
-
-<!-- ── Modal de Hooks renderizado no parent (sai do iframe) ─────────── -->
+<!-- ── Modal de Hooks (renderizado no parent, fora do iframe) ── -->
 <div id="parentHooksModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99999;padding:24px 16px;overflow-y:auto" onclick="if(event.target===this)closeParentHooks()">
-  <div id="parentHooksInner" style="background:#fff;border-radius:14px;max-width:600px;width:100%;margin:0 auto;padding:18px 22px;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.4);font-family:'Open Sans',sans-serif">
+  <div id="parentHooksInner" style="background:#fff;border-radius:14px;max-width:600px;width:100%;margin:0 auto;padding:18px 22px;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.4);font-family:'Inter',sans-serif">
     <div style="display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;padding-bottom:8px;border-bottom:1px solid #f0f0f0">
       <strong style="font-size:15px;color:#111">3 variações do slide 1</strong>
       <button onclick="closeParentHooks()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#999;line-height:1;padding:0 6px">×</button>
@@ -413,38 +145,33 @@
 
 <!-- Modal: texto do post (legenda + hashtags + artigo completo) -->
 <div id="artigo-modal" class="hidden fixed inset-0 bg-black/70 z-50 p-6 overflow-y-auto" onclick="if(event.target===this)fecharArtigo()">
-  <div class="bg-white rounded-2xl max-w-2xl mx-auto p-6 shadow-2xl">
-    <div class="flex items-center justify-between border-b border-gray-200 pb-3 mb-4">
+  <div class="panel max-w-2xl mx-auto" style="padding:24px;background:var(--panel)">
+    <div class="flex items-center justify-between pb-3 mb-4" style="border-bottom:1px solid var(--border)">
       <div>
-        <h3 class="text-lg font-bold text-gray-900">Texto do post</h3>
-        <p class="text-xs text-gray-500 mt-0.5">Legenda + hashtags pro Instagram, e o artigo completo que originou os slides.</p>
+        <h3 class="font-display" style="font-size:18px;font-weight:600;color:var(--text)">Texto do post</h3>
+        <p style="font-size:12px;color:var(--text-3);margin-top:2px">Legenda + hashtags pro Instagram, e o artigo completo.</p>
       </div>
-      <button onclick="fecharArtigo()" class="text-2xl text-gray-400 hover:text-gray-700 leading-none">&times;</button>
+      <button onclick="fecharArtigo()" style="font-size:24px;color:var(--text-3);background:none;border:none;cursor:pointer;line-height:1">&times;</button>
     </div>
     <div class="max-h-[65vh] overflow-y-auto space-y-4">
-      <!-- Legenda + hashtags -->
       <div id="modal-legenda-block" class="hidden">
         <div class="flex items-center justify-between mb-2">
-          <h4 class="text-sm font-bold text-gray-800">Legenda (pro Instagram)</h4>
-          <button onclick="copiarLegenda()" class="text-xs font-semibold px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-            Copiar legenda + #
-          </button>
+          <h4 style="font-size:13px;font-weight:600;color:var(--text)">Legenda</h4>
+          <button onclick="copiarLegenda()" class="btn btn-primary" style="font-size:12px;padding:5px 12px">Copiar legenda + #</button>
         </div>
-        <div id="modal-legenda" class="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap bg-blue-50 border border-blue-100 rounded-lg p-3"></div>
-        <div id="modal-hashtags" class="text-xs text-blue-600 leading-relaxed mt-2 break-words"></div>
+        <div id="modal-legenda" style="font-size:13.5px;color:var(--text);line-height:1.6;white-space:pre-wrap;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:12px"></div>
+        <div id="modal-hashtags" style="font-size:12px;color:var(--info);margin-top:8px" class="break-words"></div>
       </div>
-      <!-- Artigo completo -->
       <div id="modal-artigo-block" class="hidden">
-        <div class="flex items-center justify-between mb-2 pt-2 border-t border-gray-100">
-          <h4 class="text-sm font-bold text-gray-800">Artigo completo <span class="font-normal text-gray-400 text-xs" id="modal-artigo-chars"></span></h4>
-          <button onclick="copiarArtigo()" class="text-xs font-medium px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg">Copiar artigo</button>
+        <div class="flex items-center justify-between mb-2 pt-2" style="border-top:1px solid var(--border)">
+          <h4 style="font-size:13px;font-weight:600;color:var(--text)">Artigo completo <span id="modal-artigo-chars" style="font-weight:400;color:var(--text-3);font-size:11.5px"></span></h4>
+          <button onclick="copiarArtigo()" class="btn" style="font-size:12px;padding:5px 12px">Copiar artigo</button>
         </div>
-        <div id="artigo-full" class="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap bg-gray-50 border border-gray-100 rounded-lg p-3"></div>
+        <div id="artigo-full" style="font-size:13.5px;color:var(--text);line-height:1.6;white-space:pre-wrap;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:12px"></div>
       </div>
     </div>
     <div class="flex justify-end mt-4">
-      <button onclick="fecharArtigo()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg">Fechar</button>
+      <button onclick="fecharArtigo()" class="btn">Fechar</button>
     </div>
   </div>
 </div>
@@ -452,13 +179,38 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+  .panel-label {
+    font-size: 11px; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--text-3); margin-bottom: 12px;
+  }
+  .status-btn {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; padding: 8px 12px;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: transparent; color: var(--text-2);
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    transition: all .15s; text-align: left;
+  }
+  .status-btn:hover { border-color: var(--border-strong); color: var(--text); }
+  .status-btn .status-check { opacity: 0; color: var(--accent); font-weight: 700; }
+  .status-btn.on {
+    border-color: var(--accent); background: var(--accent-soft); color: var(--text);
+  }
+  .status-btn.on .status-check { opacity: 1; }
+  .nota-item { padding: 9px 0; border-top: 1px solid var(--border); }
+  .nota-item:first-child { border-top: none; }
+  .nota-del {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-3); font-size: 15px; line-height: 1; padding: 0 2px;
+    transition: opacity .15s, color .15s;
+  }
+  .nota-del:hover { color: var(--danger); }
+</style>
 <script>
-  const SLUG        = {{ c.slug | tojson }};
-  let timerInterval = null;
-  let sessionSecs   = 0;
-  let totalSecs     = {{ c.tempo_revisao or 0 }};
+  const SLUG = {{ c.slug | tojson }};
 
-  // ── Texto do post: artigo completo + legenda + hashtags ──
+  // ── Texto do post: artigo + legenda + hashtags ──
   window.CAROUSEL_ARTIGO   = {{ c.artigo | tojson }};
   window.CAROUSEL_LEGENDA  = {{ c.legenda | tojson }};
   window.CAROUSEL_HASHTAGS = {{ c.hashtags | tojson }};
@@ -466,14 +218,12 @@
     const leg = window.CAROUSEL_LEGENDA || '';
     const tags = window.CAROUSEL_HASHTAGS || '';
     const art = window.CAROUSEL_ARTIGO || '';
-    // Legenda + hashtags
     const legBlock = document.getElementById('modal-legenda-block');
     if (leg || tags) {
       legBlock.classList.remove('hidden');
       document.getElementById('modal-legenda').textContent = leg;
       document.getElementById('modal-hashtags').textContent = tags;
     } else { legBlock.classList.add('hidden'); }
-    // Artigo completo
     const artBlock = document.getElementById('modal-artigo-block');
     if (art) {
       artBlock.classList.remove('hidden');
@@ -493,7 +243,6 @@
       () => toast('Falha ao copiar')
     );
   }
-  // Copia legenda + hashtags juntas (pronto pra colar no Instagram)
   function copiarLegenda(){
     const leg = window.CAROUSEL_LEGENDA || '';
     const tags = window.CAROUSEL_HASHTAGS || '';
@@ -508,10 +257,9 @@
     if (e.key === 'Escape') fecharArtigo();
   });
 
-  // ── Hooks modal renderizado AQUI no parent (em vez de dentro do iframe).
-  // O iframe envia postMessage 'bearlz-hooks-open' quando o usuario clica
-  // ✨ Hooks. A gente faz o fetch + render aqui (full screen viewport),
-  // depois manda 'bearlz-hooks-apply' de volta com o texto escolhido.
+  // ── Hooks: modal no parent. O iframe manda postMessage 'bearlz-hooks-open';
+  // o fetch + render acontecem aqui (viewport cheio) e devolvemos
+  // 'bearlz-hooks-apply' com a variação escolhida. ──
   let _parentHooksVariantes = null;
 
   function closeParentHooks(){
@@ -551,7 +299,7 @@
         return `<div style="padding:12px 14px;background:#fafafa;border:1px solid #eee;border-radius:10px;display:flex;flex-direction:column;gap:8px">
           <span style="align-self:flex-start;font-size:10px;font-weight:800;letter-spacing:.7px;padding:3px 8px;border-radius:4px;text-transform:uppercase;background:${cor[0]};color:${cor[1]}">${v.tipo}</span>
           <div style="font-size:13px;line-height:1.5;color:#1a1a1a">${html}</div>
-          <button data-idx="${i}" onclick="aplicarParentHook(${i})" style="align-self:flex-end;padding:7px 16px;font-size:12px;font-weight:700;background:#1d9bf0;color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:inherit">Usar este</button>
+          <button data-idx="${i}" onclick="aplicarParentHook(${i})" style="align-self:flex-end;padding:7px 16px;font-size:12px;font-weight:700;background:#C96442;color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:inherit">Usar este</button>
         </div>`;
       }).join('');
     } catch(e) {
@@ -562,7 +310,6 @@
   function aplicarParentHook(i){
     const v = (_parentHooksVariantes || [])[i];
     if (!v) return;
-    // Manda pro iframe aplicar o hook nos slides
     const iframe = document.getElementById('carrossel-frame');
     if (iframe && iframe.contentWindow) {
       iframe.contentWindow.postMessage({type: 'bearlz-hooks-apply', variante: v}, '*');
@@ -571,7 +318,7 @@
     toast(`Hook "${v.tipo}" aplicado no slide 1`);
   }
 
-  // ── Galeria: modal renderizado no parent (com busca Pexels) ──
+  // ── Galeria: modal no parent (com busca Wikimedia + Pexels) ──
   function openParentGallery(images){
     let m = document.getElementById('parentGalleryModal');
     if (!m) {
@@ -580,22 +327,21 @@
       m.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99999;padding:24px 16px;overflow-y:auto';
       m.onclick = (e) => { if (e.target === m) m.style.display = 'none'; };
       m.innerHTML = `
-        <div style="background:#fff;border-radius:14px;max-width:920px;width:100%;margin:0 auto;padding:18px 22px;display:flex;flex-direction:column;gap:14px;font-family:'Open Sans',sans-serif">
+        <div style="background:#fff;border-radius:14px;max-width:920px;width:100%;margin:0 auto;padding:18px 22px;display:flex;flex-direction:column;gap:14px;font-family:'Inter',sans-serif">
           <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f0f0f0;padding-bottom:8px">
             <div>
               <strong style="font-size:15px;color:#111">Galeria de imagens</strong>
-              <p style="font-size:11px;color:#6b7280;margin:2px 0 0">Imagens dos links + busca Pexels. Clique numa pra aplicar.</p>
+              <p style="font-size:11px;color:#6b7280;margin:2px 0 0">Imagens dos links + busca. Clique numa pra aplicar.</p>
             </div>
             <button onclick="document.getElementById('parentGalleryModal').style.display='none'" style="background:none;border:none;font-size:24px;cursor:pointer;color:#999;line-height:1;padding:0 6px">×</button>
           </div>
           <div style="display:flex;gap:8px">
-            <input id="pexelsSearchInput" type="text" placeholder="Buscar no Pexels (ex: bitcoin, brazilian flag, stock market)..." style="flex:1;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;outline:none">
-            <button id="pexelsSearchBtn" style="padding:8px 16px;background:#1d9bf0;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px">Buscar</button>
+            <input id="pexelsSearchInput" type="text" placeholder="Buscar (ex: bitcoin, B3, minimal concrete texture)..." style="flex:1;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;outline:none">
+            <button id="pexelsSearchBtn" style="padding:8px 16px;background:#C96442;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px">Buscar</button>
           </div>
           <div id="parentGalleryGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;max-height:60vh;overflow-y:auto;min-height:200px"></div>
         </div>`;
       document.body.appendChild(m);
-      // Wire up busca Pexels
       const inp = document.getElementById('pexelsSearchInput');
       const btn = document.getElementById('pexelsSearchBtn');
       const doSearch = async () => {
@@ -604,8 +350,6 @@
         const grid = document.getElementById('parentGalleryGrid');
         grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;padding:40px;color:#888;font-size:13px">Buscando em Wikimedia + Pexels...</p>';
         try {
-          // Endpoint novo /api/img/search retorna mix de Wikimedia Commons
-          // (fotos reais de pessoas/predios/marcas) + Pexels (stock visual)
           const r = await fetch('/api/img/search?q=' + encodeURIComponent(q));
           const d = await r.json();
           if (d.ok && d.fotos && d.fotos.length) {
@@ -651,7 +395,7 @@
       </div>`;
     }).join('');
     grid.querySelectorAll('[data-url]').forEach(d => {
-      d.onmouseenter = () => { d.style.borderColor = '#1d9bf0'; d.style.transform = 'scale(1.02)'; };
+      d.onmouseenter = () => { d.style.borderColor = '#C96442'; d.style.transform = 'scale(1.02)'; };
       d.onmouseleave = () => { d.style.borderColor = '#e5e7eb'; d.style.transform = ''; };
       d.onclick = () => {
         const url = d.dataset.url;
@@ -665,7 +409,7 @@
     });
   }
 
-  // ── Revisar PT: modal renderizado no parent (mais espaço) ──
+  // ── Revisão de português: modal no parent ──
   let _revisarTextOriginal = '';
   function openParentRevisarPt(data, originalText) {
     _revisarTextOriginal = originalText || '';
@@ -689,13 +433,11 @@
         <div style="margin-top:6px;color:#6b7280;font-size:12px">Texto sem erros ortográficos ou gramaticais.</div>
       </div>`;
     } else {
-      // Separa em 2 grupos: vícios de IA (laranja) vs erros gramaticais (vermelho)
       const isVicioIA = (em) => em.category === 'Vício de IA' || (em.type||'').startsWith('AI_');
       const vicios = matches.filter(isVicioIA);
       const erros = matches.filter(em => !isVicioIA(em));
 
       const renderItem = (em, i, scheme) => {
-        // scheme: 'red' (erro) ou 'orange' (vicio IA)
         const colors = scheme === 'orange'
           ? {border:'#fed7aa', bg:'#fff7ed', titleColor:'#9a3412', badgeColor:'#7c2d12', badgeBg:'#fed7aa'}
           : {border:'#fee2e2', bg:'#fef2f2', titleColor:'#991b1b', badgeColor:'#7f1d1d', badgeBg:'#fecaca'};
@@ -710,7 +452,6 @@
           ${sug ? `<div style="margin-top:6px;font-size:11px;color:#374151">Sugestões: ${sug}</div>` : ''}
         </div>`;
       };
-      // Mapeia índice global no array `matches` pra usar nas sugestões
       let html = '';
       if (vicios.length > 0) {
         html += `<div style="font-size:11px;font-weight:700;color:#9a3412;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px">⚠ Vícios de IA (${vicios.length})</div>`;
@@ -722,22 +463,19 @@
       }
       body = html;
     }
-    m.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:680px;width:100%;margin:0 auto;padding:18px 22px;font-family:'Open Sans',sans-serif">
+    m.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:680px;width:100%;margin:0 auto;padding:18px 22px;font-family:'Inter',sans-serif">
       <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f0f0f0;padding-bottom:8px;margin-bottom:12px">
         <div>
-          <strong style="font-size:15px">📝 Revisão Português</strong>
-          <span style="font-size:11px;color:#6b7280;margin-left:6px">${matches.length} ${matches.length === 1 ? 'erro encontrado' : 'erros encontrados'}</span>
+          <strong style="font-size:15px">Revisão de português</strong>
+          <span style="font-size:11px;color:#6b7280;margin-left:6px">${matches.length} ${matches.length === 1 ? 'apontamento' : 'apontamentos'}</span>
         </div>
         <button onclick="document.getElementById('parentRevisarPtModal').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#999">×</button>
       </div>
       <div style="max-height:60vh;overflow-y:auto">${body}</div>
     </div>`;
-    // Wire up sugestões clicáveis: aplica a correção no texto e re-envia pro iframe.
-    // IMPORTANTE: cada match tem {offset, length} relativos ao texto ORIGINAL.
-    // Quando aplica uma correção, o texto encolhe/expande — preciso recalcular
-    // os offsets dos matches restantes pra eles continuarem apontando pro lugar
-    // certo no texto atualizado. Sem isso, aplicar 2 correções deixa fragmentos
-    // tipo "demaisdemais" porque a segunda usa offset desatualizado.
+    // Sugestões clicáveis: aplica no texto e re-envia pro iframe.
+    // Offsets dos matches restantes são recalculados (delta) pra não
+    // corromper o texto quando 2+ correções são aplicadas em sequência.
     m.querySelectorAll('.revisar-sug-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const i = parseInt(btn.dataset.i, 10);
@@ -745,21 +483,15 @@
         const match = matches[i];
         const sugText = match.suggestions[j];
         if (!match || sugText === undefined) return;
-        if (match._applied || match._invalidated) return;  // proteção dupla-clique
-        // Aplica a sugestão substituindo no texto atualizado
+        if (match._applied || match._invalidated) return;
         const before = _revisarTextOriginal.slice(0, match.offset);
         const after = _revisarTextOriginal.slice(match.offset + match.length);
         const newText = before + sugText + after;
         _revisarTextOriginal = newText;
-        // Envia o novo texto pro iframe
         const iframe = document.getElementById('carrossel-frame');
         if (iframe && iframe.contentWindow) {
           iframe.contentWindow.postMessage({type: 'bearlz-revisar-pt-apply', text: newText}, '*');
         }
-        // Recalcula offsets dos OUTROS matches.
-        // - Se sobrepoem com o aplicado: invalida (não dá mais pra aplicar com confiança)
-        // - Se estão APÓS o aplicado: ajusta offset pelo delta (sugText - original)
-        // - Se estão ANTES do aplicado: não mexe
         const delta = sugText.length - match.length;
         const appliedStart = match.offset;
         const appliedEnd = match.offset + match.length;
@@ -767,30 +499,25 @@
           if (idx === i || other._applied || other._invalidated) return;
           const otherStart = other.offset;
           const otherEnd = other.offset + other.length;
-          // Sobreposição: [otherStart, otherEnd) ∩ [appliedStart, appliedEnd) ≠ ∅
           if (otherStart < appliedEnd && otherEnd > appliedStart) {
             other._invalidated = true;
             return;
           }
-          // Após o aplicado: shift por delta
           if (otherStart >= appliedEnd) {
             other.offset += delta;
           }
         });
         match._applied = true;
-        // UI: marca o botão clicado como aplicado
         btn.style.background = '#10b981';
         btn.style.color = '#fff';
         btn.textContent = '✓ ' + sugText;
         btn.disabled = true;
-        // UI: desabilita os outros botões do MESMO match (já consumido)
         m.querySelectorAll(`.revisar-sug-btn[data-i="${i}"]`).forEach(b => {
           if (b === btn) return;
           b.disabled = true;
           b.style.opacity = '.35';
           b.style.cursor = 'not-allowed';
         });
-        // UI: desabilita botões de matches invalidados (sobrepostos)
         m.querySelectorAll('.revisar-sug-btn').forEach(b => {
           const bi = parseInt(b.dataset.i, 10);
           if (bi === i) return;
@@ -800,7 +527,7 @@
             b.style.color = '#9ca3af';
             b.style.textDecoration = 'line-through';
             b.style.cursor = 'not-allowed';
-            b.title = 'Outra correção foi aplicada no mesmo trecho. Feche e rode Revisar PT de novo.';
+            b.title = 'Outra correção foi aplicada no mesmo trecho. Rode a revisão de novo.';
           }
         });
         toast('Correção aplicada');
@@ -809,7 +536,7 @@
     m.style.display = 'block';
   }
 
-  // ── Polir slide: modal antes/depois lado a lado ──
+  // ── Polir slide: modal antes/depois ──
   function openParentPolir(data, original) {
     let m = document.getElementById('parentPolirModal');
     if (!m) {
@@ -822,23 +549,21 @@
     const err = data && data.error;
     let body;
     if (err) {
-      // Se o backend mandou o raw output do Claude (caso 'Resposta invalida'),
-      // mostra num <details> + botao "Tentar de novo" pra reenviar o request.
       const rawBlock = data.raw
         ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-size:11px;color:#6b7280;font-weight:600">Ver resposta bruta do Claude</summary><pre style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px;font-size:11px;color:#374151;white-space:pre-wrap;max-height:200px;overflow:auto;margin-top:6px">${data.raw.replace(/</g,'&lt;')}</pre></details>`
         : '';
       const retryBtn = original
-        ? `<div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end"><button id="parentPolirRetryBtn" style="padding:8px 16px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff;border:none;border-radius:7px;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">✨ Tentar de novo</button></div>`
+        ? `<div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end"><button id="parentPolirRetryBtn" style="padding:8px 16px;background:#C96442;color:#fff;border:none;border-radius:7px;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">Tentar de novo</button></div>`
         : '';
       body = `<div style="padding:14px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;color:#991b1b;font-size:13px"><strong>${err}</strong>${rawBlock}</div>${retryBtn}`;
     } else if (!data || !data.texto_novo) {
       body = `<div style="padding:16px;color:#888">Sem mudanças sugeridas.</div>`;
     } else {
-      const mudancas = (data.mudancas || []).map(m => `<li>${m.replace(/</g,'&lt;')}</li>`).join('');
+      const mudancas = (data.mudancas || []).map(x => `<li>${x.replace(/</g,'&lt;')}</li>`).join('');
       const orig = (data.texto_original || original || '').replace(/</g,'&lt;').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
       const novo = (data.texto_novo || '').replace(/</g,'&lt;').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
       const alerta_encolheu = data.encolheu
-        ? `<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;font-size:12px;color:#92400e;margin-bottom:12px"><strong>⚠ Versão polida encolheu ${Math.round((1 - data.chars_depois/data.chars_antes) * 100)}%.</strong> Se ficou raso, cancele e tente de novo (Claude às vezes encurta demais).</div>`
+        ? `<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;font-size:12px;color:#92400e;margin-bottom:12px"><strong>⚠ Versão polida encolheu ${Math.round((1 - data.chars_depois/data.chars_antes) * 100)}%.</strong> Se ficou raso, cancele e tente de novo.</div>`
         : '';
       body = alerta_encolheu + `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
@@ -854,13 +579,13 @@
         ${mudancas ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;font-size:12px;color:#1e3a8a;margin-bottom:12px"><strong>Mudanças principais:</strong><ul style="margin:4px 0 0;padding-left:20px">${mudancas}</ul></div>` : ''}
         <div style="display:flex;gap:8px;justify-content:flex-end">
           <button onclick="document.getElementById('parentPolirModal').style.display='none'" style="padding:9px 18px;background:#f3f4f6;color:#374151;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-family:inherit">Cancelar</button>
-          <button id="parentPolirApplyBtn" style="padding:9px 22px;background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(139,92,246,.4)">✨ Aplicar versão polida</button>
+          <button id="parentPolirApplyBtn" style="padding:9px 22px;background:#C96442;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Aplicar versão polida</button>
         </div>
       `;
     }
-    m.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:880px;width:100%;margin:0 auto;padding:18px 22px;font-family:'Open Sans',sans-serif">
+    m.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:880px;width:100%;margin:0 auto;padding:18px 22px;font-family:'Inter',sans-serif">
       <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f0f0f0;padding-bottom:8px;margin-bottom:14px">
-        <strong style="font-size:15px">✨ Polir slide — Antes / Depois</strong>
+        <strong style="font-size:15px">Polir slide — antes / depois</strong>
         <button onclick="document.getElementById('parentPolirModal').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#999">×</button>
       </div>
       ${body}
@@ -873,29 +598,24 @@
           iframe.contentWindow.postMessage({type:'bearlz-polir-apply', text: data.texto_novo}, '*');
         }
         m.style.display = 'none';
-        toast('✨ Versão polida aplicada');
+        toast('Versão polida aplicada');
       };
     }
-    // Botao "Tentar de novo" no estado de erro — reenvia o request ao iframe
     const retryBtn = document.getElementById('parentPolirRetryBtn');
     if (retryBtn && original) {
       retryBtn.onclick = () => {
-        // Pede pro iframe rodar polir() de novo. O iframe ja tem o texto
-        // do slide atual no editTA — basta disparar o handler novamente.
         const iframe = document.getElementById('carrossel-frame');
         if (iframe && iframe.contentWindow) {
           iframe.contentWindow.postMessage({type: 'bearlz-polir-retry'}, '*');
         }
-        // Mostra estado de loading
-        body = m.querySelector('div[style*="border-radius:14px"] > div:last-child');
         m.querySelector('div[style*="border-radius:14px"]').lastChild.outerHTML =
-          `<div style="padding:30px;text-align:center;color:#8b5cf6"><div style="font-size:32px;margin-bottom:8px">✨</div><strong>Polindo de novo…</strong></div>`;
+          `<div style="padding:30px;text-align:center;color:#C96442"><strong>Polindo de novo…</strong></div>`;
       };
     }
     m.style.display = 'block';
   }
 
-  // Listener pras mensagens do iframe
+  // ── Mensagens vindas do iframe do carrossel ──
   window.addEventListener('message', (e) => {
     if (!e.data || typeof e.data !== 'object') return;
     if (e.data.type === 'bearlz-hooks-open') {
@@ -911,15 +631,14 @@
         m.onclick = (ev) => { if (ev.target === m) m.style.display = 'none'; };
         document.body.appendChild(m);
       }
-      m.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:520px;margin:0 auto;padding:30px;text-align:center;font-family:'Open Sans',sans-serif">
-        <div style="font-size:14px;color:#7c3aed">✨ Claude está polindo o slide...</div>
+      m.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:520px;margin:0 auto;padding:30px;text-align:center;font-family:'Inter',sans-serif">
+        <div style="font-size:14px;color:#C96442">Claude está polindo o slide...</div>
         <div style="font-size:12px;color:#6b7280;margin-top:4px">Remove vícios de IA e simplifica linguagem · 5-15s</div>
       </div>`;
       m.style.display = 'block';
     } else if (e.data.type === 'bearlz-polir-result') {
       openParentPolir(e.data.data, e.data.original);
     } else if (e.data.type === 'bearlz-revisar-pt-start') {
-      // Mostra loading enquanto o iframe consulta
       let m = document.getElementById('parentRevisarPtModal');
       if (!m) {
         m = document.createElement('div');
@@ -928,8 +647,8 @@
         m.onclick = (ev) => { if (ev.target === m) m.style.display = 'none'; };
         document.body.appendChild(m);
       }
-      m.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:520px;margin:0 auto;padding:30px;text-align:center;font-family:'Open Sans',sans-serif">
-        <div style="font-size:14px;color:#1e3a8a">📝 Verificando ortografia e gramática...</div>
+      m.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:520px;margin:0 auto;padding:30px;text-align:center;font-family:'Inter',sans-serif">
+        <div style="font-size:14px;color:#1e3a8a">Verificando ortografia e gramática...</div>
         <div style="font-size:12px;color:#6b7280;margin-top:4px">LanguageTool, 1-3 segundos</div>
       </div>`;
       m.style.display = 'block';
@@ -942,122 +661,7 @@
   window.aplicarParentHook  = aplicarParentHook;
   window.openParentGallery  = openParentGallery;
 
-  // ── Timer ─────────────────────────────────────────────────────────────────
-
-  function fmtTime(s) {
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const sec = s % 60;
-    return [h, m, sec].map(v => String(v).padStart(2, '0')).join(':');
-  }
-
-  function fmtTimeShort(s) {
-    if (!s) return '—';
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const sec = s % 60;
-    if (h) return `${h}h ${String(m).padStart(2,'0')}m`;
-    if (m) return `${m}m ${String(sec).padStart(2,'0')}s`;
-    return `${sec}s`;
-  }
-
-  function toggleTimer() {
-    if (timerInterval) {
-      // Pause
-      clearInterval(timerInterval);
-      timerInterval = null;
-      document.getElementById('timer-btn').textContent = 'Continuar';
-      document.getElementById('timer-status').textContent = 'pausado';
-      document.getElementById('running-dot').classList.add('hidden');
-    } else {
-      // Start
-      timerInterval = setInterval(() => {
-        sessionSecs++;
-        document.getElementById('timer-display').textContent = fmtTime(sessionSecs);
-      }, 1000);
-      document.getElementById('timer-btn').textContent = 'Pausar';
-      document.getElementById('timer-status').textContent = 'contando...';
-      document.getElementById('running-dot').classList.remove('hidden');
-    }
-  }
-
-  function resetTimer() {
-    clearInterval(timerInterval);
-    timerInterval = null;
-    sessionSecs = 0;
-    document.getElementById('timer-display').textContent = '00:00:00';
-    document.getElementById('timer-btn').textContent = 'Iniciar';
-    document.getElementById('timer-status').textContent = 'parado';
-    document.getElementById('running-dot').classList.add('hidden');
-  }
-
-  async function saveTimer() {
-    if (sessionSecs === 0) { toast('Nada para salvar — inicie o cronômetro primeiro'); return; }
-    const wasRunning = !!timerInterval;
-    if (wasRunning) { clearInterval(timerInterval); timerInterval = null; }
-
-    const sessaoSalva = sessionSecs;
-    try {
-      const r = await fetch('/api/tempo', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({slug: SLUG, segundos: sessaoSalva})
-      });
-      const d = await r.json();
-      totalSecs = d.total || (totalSecs + sessaoSalva);
-      document.getElementById('total-display').textContent = fmtTimeShort(totalSecs);
-      toast('Sessão: +' + fmtTimeShort(sessaoSalva) + ' · Total salvo: ' + fmtTimeShort(totalSecs));
-      sessionSecs = 0;
-      document.getElementById('timer-display').textContent = '00:00:00';
-      document.getElementById('timer-btn').textContent = 'Iniciar';
-      document.getElementById('timer-status').textContent = 'parado';
-      document.getElementById('running-dot').classList.add('hidden');
-    } catch(e) { toast('Erro ao salvar tempo'); }
-  }
-
-  async function zerarTotal() {
-    if (!confirm('Zerar todo o tempo acumulado para este carrossel?')) return;
-    try {
-      const r = await fetch('/api/tempo/zerar', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({slug: SLUG})
-      });
-      const d = await r.json();
-      if (d.ok) {
-        totalSecs = 0;
-        document.getElementById('total-display').textContent = '0s';
-        toast('Tempo zerado');
-      }
-    } catch(e) { toast('Erro ao zerar'); }
-  }
-
-  // Auto-save quando sair da página
-  window.addEventListener('beforeunload', () => {
-    if (sessionSecs > 5) {
-      navigator.sendBeacon('/api/tempo',
-        new Blob([JSON.stringify({slug: SLUG, segundos: sessionSecs})],
-                 {type: 'application/json'}));
-    }
-  });
-
-  // ── Status ────────────────────────────────────────────────────────────────
-
-  const STATUS_ACTIVE = {
-    rascunho:        'bg-gray-800 text-white border-gray-800',
-    analise_adre:    'bg-orange-500 text-white border-orange-500',
-    analise_gabriel: 'bg-purple-500 text-white border-purple-500',
-    aprovado:        'bg-green-500 text-white border-green-500',
-    publicado:       'bg-blue-500 text-white border-blue-500',
-  };
-  const STATUS_DOT_IDLE = {
-    rascunho:        'bg-gray-400',
-    analise_adre:    'bg-orange-400',
-    analise_gabriel: 'bg-purple-400',
-    aprovado:        'bg-green-400',
-    publicado:       'bg-blue-400',
-  };
-
+  // ── Status ──
   async function setStatus(s) {
     const r = await fetch('/api/status', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -1066,23 +670,12 @@
     const d = await r.json();
     if (!d.ok) return;
     document.querySelectorAll('.status-btn').forEach(btn => {
-      const k = btn.dataset.status;
-      const active = k === s;
-      btn.className = 'status-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all '
-        + (active ? STATUS_ACTIVE[k] : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50');
-      btn.querySelector('span').className = 'w-2 h-2 rounded-full flex-shrink-0 ' + (active ? 'bg-white' : STATUS_DOT_IDLE[k]);
-      const chk = btn.querySelector('.check-icon');
-      if (active && !chk) btn.insertAdjacentHTML('beforeend',
-        '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 ml-auto check-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>');
-      else if (!active && chk) chk.remove();
+      btn.classList.toggle('on', btn.dataset.status === s);
     });
     toast('Status: ' + d.label);
   }
 
-  // ── Prioridade ────────────────────────────────────────────────────────────
-
-  const PRIO_RING = {alta: 'ring-red-400', media: 'ring-yellow-400', baixa: 'ring-gray-400'};
-
+  // ── Prioridade ──
   async function setPrioridade(p) {
     const r = await fetch('/api/prioridade', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -1091,278 +684,68 @@
     const d = await r.json();
     if (!d.ok) return;
     document.querySelectorAll('.prio-btn').forEach(btn => {
-      const k = btn.dataset.prio;
-      const active = k === p;
-      // Remove ring classes
-      btn.classList.remove('ring-2','ring-red-400','ring-yellow-400','ring-gray-400','border-transparent','font-bold');
-      btn.classList.remove('border-gray-200');
-      if (active) {
-        btn.classList.add('ring-2', PRIO_RING[k], 'border-transparent', 'font-bold');
-      } else {
-        btn.classList.add('border-gray-200');
-      }
+      btn.classList.toggle('seg-active', btn.dataset.prio === p);
     });
     toast('Prioridade: ' + d.label);
   }
 
-  // ── Abas de notas ─────────────────────────────────────────────────────────
-
-  let activeTab = 'adrenaldo';
-
-  function switchTab(tab) {
-    activeTab = tab;
-    const tabs = {adrenaldo: 'notas-adrenaldo', gabriel: 'notas-gabriel'};
-    Object.entries(tabs).forEach(([key, id]) => {
-      document.getElementById(id).classList.toggle('hidden', key !== tab);
-    });
-
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      const isActive = btn.id === `tab-${tab}`;
-      btn.classList.toggle('bg-white',      isActive);
-      btn.classList.toggle('text-gray-900', isActive);
-      btn.classList.toggle('shadow-sm',     isActive);
-      btn.classList.toggle('text-gray-500', !isActive);
-    });
-
-    // Update placeholder and author
-    document.getElementById('nota-autor').value = tab === 'adrenaldo' ? 'Adre' : 'Gabriel';
-    document.getElementById('nota-input').placeholder =
-      tab === 'adrenaldo' ? 'Minha nota de produção...' : 'Nota do Gabriel...';
+  // ── Notas (fio único, autor alternável) ──
+  function setAutor(a) {
+    document.getElementById('nota-autor').value = a;
+    document.getElementById('autor-adre').classList.toggle('seg-active', a === 'Adre');
+    document.getElementById('autor-gabriel').classList.toggle('seg-active', a === 'Gabriel');
   }
-
-  // ── Notas ─────────────────────────────────────────────────────────────────
-
-  async function addNota() {
-    const texto = document.getElementById('nota-input').value.trim();
-    const autor = document.getElementById('nota-autor').value;
-    if (!texto) return;
-
-    const r = await fetch('/api/nota', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({slug: SLUG, autor, texto})
-    });
-    const d = await r.json();
-    if (!d.ok) return toast('Erro ao salvar nota');
-
-    document.getElementById('nota-input').value = '';
-
-    const isAdre = autor === 'Adre';
-    const container   = document.getElementById(isAdre ? 'notas-adrenaldo' : 'notas-gabriel');
-    const emptyId     = isAdre ? 'empty-adrenaldo' : 'empty-gabriel';
-    const emptyEl     = document.getElementById(emptyId);
-    if (emptyEl) emptyEl.remove();
-
-    const cardClass = isAdre
-      ? 'bg-blue-50 border-blue-100'
-      : 'bg-gray-50 border-gray-200';
-    const nameLabel = isAdre ? 'Eu' : 'Gabriel';
-    const textColor = isAdre ? 'text-blue-900' : 'text-gray-700';
-    const nameColor = isAdre ? 'text-blue-800' : 'text-gray-800';
-
-    const html = `
-      <div class="nota-item ${cardClass} rounded-lg p-3 relative group border" data-id="${d.id}" data-autor="${escHtml(autor)}">
-        <div class="flex items-center justify-between mb-1">
-          <span class="text-xs font-semibold ${nameColor}">${escHtml(nameLabel)}</span>
-          <div class="flex items-center gap-2">
-            <span class="text-xs text-gray-400">${escHtml(d.created_fmt)}</span>
-            <button onclick="deleteNota(${d.id}, this)"
-              class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all p-0.5 rounded">
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-        <p class="text-sm ${textColor} leading-snug whitespace-pre-wrap">${escHtml(d.texto)}</p>
-      </div>`;
-
-    container.insertAdjacentHTML('afterbegin', html);
-    toast('Nota adicionada');
-  }
-
-  async function deleteNota(id, btn) {
-    if (!confirm('Apagar esta nota?')) return;
-    await fetch(`/api/nota/${id}`, {method: 'DELETE'});
-    const item   = btn.closest('.nota-item');
-    const autor  = item.dataset.autor;
-    const contId = autor === 'Adre' ? 'notas-adrenaldo' : 'notas-gabriel';
-    const empId  = autor === 'Adre' ? 'empty-adrenaldo' : 'empty-gabriel';
-    item.remove();
-    if (!document.querySelector(`#${contId} .nota-item`)) {
-      document.getElementById(contId).innerHTML =
-        `<p id="${empId}" class="text-sm text-gray-400 text-center py-2">Nenhuma nota ainda.</p>`;
-    }
-    toast('Nota apagada');
-  }
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
 
   function escHtml(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
       .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
 
+  async function addNota() {
+    const texto = document.getElementById('nota-input').value.trim();
+    const autor = document.getElementById('nota-autor').value;
+    if (!texto) return;
+    const r = await fetch('/api/nota', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({slug: SLUG, autor, texto})
+    });
+    const d = await r.json();
+    if (!d.ok) return toast('Erro ao salvar nota');
+    document.getElementById('nota-input').value = '';
+    const empty = document.getElementById('notas-empty');
+    if (empty) empty.remove();
+    const corAutor = autor === 'Adre' ? 'var(--accent)' : 'var(--text-2)';
+    const html = `
+      <div class="nota-item group" data-id="${d.id}" data-autor="${escHtml(autor)}">
+        <div class="flex items-center justify-between">
+          <span style="font-size:11.5px;font-weight:600;color:${corAutor}">${escHtml(autor)}</span>
+          <span class="flex items-center gap-2">
+            <span style="font-size:11px;color:var(--text-3)">${escHtml(d.created_fmt)}</span>
+            <button onclick="deleteNota(${d.id}, this)" class="nota-del opacity-0 group-hover:opacity-100">×</button>
+          </span>
+        </div>
+        <p style="font-size:13px;color:var(--text);line-height:1.5;white-space:pre-wrap;margin-top:2px">${escHtml(d.texto)}</p>
+      </div>`;
+    document.getElementById('notas-list').insertAdjacentHTML('afterbegin', html);
+    toast('Nota adicionada');
+  }
+
+  async function deleteNota(id, btn) {
+    if (!confirm('Apagar esta nota?')) return;
+    await fetch(`/api/nota/${id}`, {method: 'DELETE'});
+    btn.closest('.nota-item').remove();
+    if (!document.querySelector('#notas-list .nota-item')) {
+      document.getElementById('notas-list').innerHTML =
+        '<p id="notas-empty" style="font-size:12.5px;color:var(--text-3);text-align:center;padding:8px 0">Nenhuma nota ainda.</p>';
+    }
+    toast('Nota apagada');
+  }
+
   document.getElementById('nota-input').addEventListener('keydown', e => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) addNota();
   });
 
-  // ── Revisar com Claude ───────────────────────────────────────────────────
-
-  function toggleRevisar() {
-    const body    = document.getElementById('revisar-body');
-    const chevron = document.getElementById('revisar-chevron');
-    body.classList.toggle('hidden');
-    chevron.classList.toggle('rotate-180');
-  }
-
-  function usarAtalho(texto) {
-    const input = document.getElementById('revisar-input');
-    input.value = input.value ? input.value.trimEnd() + '. ' + texto : texto;
-    input.focus();
-  }
-
-  // ── Fluxo Revisar com Claude: preview -> aprovacao -> apply ──
-  let _revisarPropostas = null;
-
-  function closeRevisarPreview(){
-    document.getElementById('revisarPreviewModal').style.display = 'none';
-  }
-
-  function escHtml(s){
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-  function renderTexto(t){
-    return escHtml(t).replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
-  }
-
-  async function revisarComClaude() {
-    const instrucoes = document.getElementById('revisar-input').value.trim();
-    if (!instrucoes) { toast('Escreva as instruções antes de revisar'); return; }
-
-    const btn     = document.getElementById('revisar-btn');
-    const loading = document.getElementById('revisar-loading');
-    const result  = document.getElementById('revisar-result');
-    const error   = document.getElementById('revisar-error');
-
-    btn.classList.add('hidden');
-    loading.classList.remove('hidden');
-    result.classList.add('hidden');
-    error.classList.add('hidden');
-
-    try {
-      const r = await fetch(`/api/revisar/${SLUG}/preview`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({instrucoes})
-      });
-      const d = await r.json();
-
-      loading.classList.add('hidden');
-      btn.classList.remove('hidden');
-
-      if (!d.ok) {
-        document.getElementById('revisar-error-msg').textContent = d.error || 'Erro desconhecido';
-        error.classList.remove('hidden');
-        return;
-      }
-
-      if (!d.propostas || d.propostas.length === 0) {
-        document.getElementById('revisar-result-msg').textContent =
-          `Claude analisou os ${d.num_slides} slides mas não propôs alterações.`;
-        result.classList.remove('hidden');
-        setTimeout(()=>result.classList.add('hidden'), 4000);
-        return;
-      }
-
-      _revisarPropostas = d.propostas;
-      mostrarPreviewRevisao(d.propostas, d.num_slides);
-
-    } catch(e) {
-      loading.classList.add('hidden');
-      btn.classList.remove('hidden');
-      document.getElementById('revisar-error-msg').textContent = 'Erro de conexão. Tente novamente.';
-      error.classList.remove('hidden');
-    }
-  }
-
-  function mostrarPreviewRevisao(propostas, numSlides){
-    const modal = document.getElementById('revisarPreviewModal');
-    const body  = document.getElementById('revisarPreviewBody');
-    body.innerHTML = `
-      <p style="font-size:12px;color:#6b7280;margin:0 0 4px">
-        ${propostas.length} de ${numSlides} slides têm sugestões. Revise e aplique se concordar.
-      </p>
-    ` + propostas.map((p, i) => `
-      <div data-prop-idx="${i}" style="border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;background:#fafafa">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-size:11px;font-weight:700;color:#7c3aed;letter-spacing:.5px">SLIDE ${p.slide}</span>
-          <label style="font-size:11px;color:#6b7280;cursor:pointer;display:flex;align-items:center;gap:4px">
-            <input type="checkbox" class="prop-check" data-idx="${i}" checked style="cursor:pointer">
-            aplicar
-          </label>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr;gap:8px">
-          <div style="background:#fff;border:1px solid #fee2e2;border-radius:6px;padding:10px 12px">
-            <div style="font-size:10px;color:#991b1b;font-weight:700;margin-bottom:4px;letter-spacing:.5px">ANTES</div>
-            <div style="font-size:13px;line-height:1.5;color:#525252">${renderTexto(p.atual)}</div>
-          </div>
-          <div style="background:#fff;border:1px solid #d1fae5;border-radius:6px;padding:10px 12px">
-            <div style="font-size:10px;color:#065f46;font-weight:700;margin-bottom:4px;letter-spacing:.5px">DEPOIS</div>
-            <div style="font-size:13px;line-height:1.5;color:#1f2937">${renderTexto(p.novo)}</div>
-          </div>
-        </div>
-      </div>
-    `).join('');
-    modal.style.display = 'block';
-  }
-
-  async function aplicarRevisao(){
-    if (!_revisarPropostas) return;
-    const btn = document.getElementById('revisarApplyBtn');
-    btn.disabled = true; btn.textContent = 'Aplicando...';
-    // Filtra so as marcadas
-    const checks = document.querySelectorAll('.prop-check');
-    const aplicar = [];
-    checks.forEach(c => {
-      if (c.checked) {
-        const idx = parseInt(c.dataset.idx, 10);
-        const p = _revisarPropostas[idx];
-        if (p) aplicar.push({slide: p.slide, novo: p.novo});
-      }
-    });
-    if (aplicar.length === 0) {
-      toast('Nenhuma alteração marcada');
-      btn.disabled = false; btn.textContent = 'Aplicar todas';
-      return;
-    }
-    try {
-      const r = await fetch(`/api/revisar/${SLUG}/apply`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({alteracoes: aplicar})
-      });
-      const d = await r.json();
-      if (!d.ok) {
-        toast('Erro: ' + (d.error || 'desconhecido'));
-        btn.disabled = false; btn.textContent = 'Aplicar todas';
-        return;
-      }
-      toast(`✓ ${d.aplicados} slide(s) atualizado(s)`);
-      closeRevisarPreview();
-      // Recarrega iframe pra mostrar novo conteudo
-      const iframe = document.getElementById('carrossel-frame');
-      const src = iframe.src.split('?')[0];
-      iframe.src = src + '?t=' + Date.now();
-      document.getElementById('revisar-input').value = '';
-      _revisarPropostas = null;
-    } catch(e) {
-      toast('Erro de conexão');
-      btn.disabled = false; btn.textContent = 'Aplicar todas';
-    }
-  }
-  window.closeRevisarPreview = closeRevisarPreview;
-  window.aplicarRevisao = aplicarRevisao;
-
+  // ── Excluir ──
   async function deletarCarrossel() {
     if (!confirm('Excluir este carrossel permanentemente? Esta ação não pode ser desfeita.')) return;
     try {
