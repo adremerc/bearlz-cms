@@ -91,6 +91,7 @@ function _buildState(){
   return{
     slides:slides.map(s=>{
       const c={...s};
+      delete c._autoFit; // efemero (decisao de render), nao persiste no estado
       if(c.image&&c.image.startsWith('data:image/svg+xml'))c.image=null;
       return c;
     }),
@@ -448,6 +449,11 @@ function render(){
 function getEffectiveFit(s){
   // SVG charts always use contain to show the full chart
   if(s.image&&s.image.startsWith('data:image/svg'))return'contain';
+  // Video (grafico animado): mostra inteiro por padrao
+  if(s.video&&!s.fit)return'contain';
+  // Auto-fit: imagem LARGA (grafico/panorama, ar>=1.7) detectada no load
+  // vira contain sozinha — acaba o "grafico cortado ate ajustar na mao".
+  if(!s.fit&&s._autoFit)return s._autoFit;
   return s.fit||'cover';
 }
 
@@ -464,10 +470,22 @@ function renderImgSection(){
     sec.innerHTML=`<div class="img-section" style="position:relative">
       <div class="img-container" id="imgContainer" style="${hStyle}">
         <video id="vidReal" class="img-real" src="${s.video}" autoplay muted loop playsinline
-          style="width:100%;height:100%;object-fit:${fit==='contain'?'contain':'cover'};display:block"></video>
+          style="width:100%;height:100%;object-fit:contain;background:#0b0e14;display:block"></video>
         <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;letter-spacing:.5px;pointer-events:none">🎬 VÍDEO</div>
       </div>
     </div>`;
+    // Centralizacao automatica: o container ganha a ALTURA da proporcao do
+    // video (nada de corte nem barras), a nao ser que o usuario tenha
+    // ajustado a altura na mao (s.imgH).
+    const vEl=document.getElementById('vidReal');
+    if(vEl&&!s.imgH){
+      vEl.addEventListener('loadedmetadata',()=>{
+        const cont=vEl.parentElement;
+        if(!cont||!vEl.videoWidth)return;
+        const h=Math.max(180,Math.min(560,Math.round(cont.clientWidth*vEl.videoHeight/vEl.videoWidth)));
+        cont.style.height=h+'px';cont.style.flex='none';
+      });
+    }
     _ensureCardDeleteBtn();
     _showCardDeleteBtn(true);
     document.getElementById('btnAjustar').style.display='none';
@@ -497,7 +515,19 @@ function renderImgSection(){
       _applyImgFraming(s); // aplica margin-top + altura customizadas
       applyBgSize(s);
       const im=document.getElementById('imgReal');
-      if(im)im.style.visibility='visible';
+      if(im){
+        im.style.visibility='visible';
+        // Auto-fit: grafico/panorama (largura >= 1.7x altura) mostra INTEIRO
+        // sem o usuario precisar clicar em 'contain'. So quando nao ha fit
+        // manual salvo; re-renderiza uma vez ao detectar.
+        const decide=()=>{
+          if(s.fit||s._autoFit)return;
+          const isChartUrl=/\/static\/charts\/|fredgraph|stooq\.com|quickchart/.test(s.image||'');
+          const wide=im.naturalWidth&&im.naturalHeight&&im.naturalWidth/im.naturalHeight>=1.9;
+          if(isChartUrl||wide){s._autoFit='contain';render();}
+        };
+        if(im.complete)decide();else im.addEventListener('load',decide,{once:true});
+      }
     });
     document.getElementById('btnAjustar').style.display='inline';
     // Drag funciona em cover E free; contain a posicao eh fixa
@@ -1654,8 +1684,13 @@ async function drawSlideToCanvas(canvas,slide){
     try{
       const img=await loadImg(slide.image);
       const sw=W-px*2,sh=imgH;
+      // Mesma regra de auto-fit do viewer: grafico (pela URL) ou imagem
+      // muito larga sem fit manual sai INTEIRA no PNG exportado tambem.
+      let fmEff=fitMode;
+      const isChartUrl=/\/static\/charts\/|fredgraph|stooq\.com|quickchart/.test(slide.image||'');
+      if(!slide.fit&&!isSVGimg&&(isChartUrl||(img.width&&img.height&&img.width/img.height>=1.9)))fmEff='contain';
       ctx.save();roundRect(ctx,px,cy,sw,sh,radius);ctx.clip();
-      if(fitMode==='contain'){
+      if(fmEff==='contain'){
         // Letterbox: show full image with light background
         ctx.fillStyle='#ffffff';ctx.fillRect(px,cy,sw,sh);
         const scale=Math.min(sw/img.width,sh/img.height);
