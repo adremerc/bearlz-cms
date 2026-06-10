@@ -550,3 +550,22 @@ body{min-height:100vh;background:#F0EEEC;font-family:'Open Sans','Helvetica Neue
 .etb-btn:hover{background:#1d9bf0;color:#fff;border-color:#1d9bf0}
 .etb-btn.active{background:#1d9bf0;color:#fff;border-color:#1d9bf0}
 .etb-hint{font-size:10px;color:#aaa;margin-left:auto}
+
+/* ── MOBILE (celular) ──────────────────────────────────────────────
+   O card mantem a geometria interna de 420px (design INTOCADO; o export
+   canvas usa W/H fixos e nao depende disso). No celular, aplicamos zoom
+   proporcional pra caber na tela, e a toolbar passa a quebrar linha. */
+@media (max-width: 479px){
+  body{ padding:12px 4px 32px; }
+  .card{ zoom:.85; }
+  .header, .nav-wrap, .help-box, .style-panel{ max-width:96vw; }
+  .footer-actions{ flex-wrap:wrap; justify-content:center; gap:8px; row-gap:6px; }
+  .footer-actions button{ font-size:11px; padding:7px 10px; }
+  .edit-toolbar{ flex-wrap:wrap; }
+}
+@media (max-width: 389px){
+  .card{ zoom:.76; }
+}
+@media (max-width: 339px){
+  .card{ zoom:.68; }
+}
