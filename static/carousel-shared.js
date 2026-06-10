@@ -178,6 +178,7 @@ async function loadFromServer(){
             oy:saved.oy!=null?saved.oy:50,
             imgH:saved.imgH??null,
             fit:saved.fit||null,
+            video:saved.video||null,
             imgNW:null,imgNH:null
           };
           slides.push(novo);
@@ -196,6 +197,7 @@ async function loadFromServer(){
         // gapTextImg: usuario ajusta gap entre texto e imagem manualmente
         if('gapTextImg' in saved)slides[i].gapTextImg=saved.gapTextImg;
         if('fit' in saved)slides[i].fit=saved.fit;
+        if('video' in saved)slides[i].video=saved.video;
         if('image' in saved){
           if(saved.image===null){
             slides[i].image=null;
@@ -290,6 +292,7 @@ function autoLoad(){
             oy:saved.oy!=null?saved.oy:50,
             imgH:saved.imgH??null,
             fit:saved.fit||null,
+            video:saved.video||null,
             imgNW:null,imgNH:null,
             freeX:saved.freeX??null,freeY:saved.freeY??null
           });
@@ -308,6 +311,7 @@ function autoLoad(){
         // gapTextImg: usuario ajusta gap entre texto e imagem manualmente
         if('gapTextImg' in saved)slides[i].gapTextImg=saved.gapTextImg;
         if('fit' in saved)slides[i].fit=saved.fit;
+        if('video' in saved)slides[i].video=saved.video;
         if('image' in saved){
           if(saved.image===null){
             slides[i].image=null;
@@ -451,7 +455,24 @@ function renderImgSection(){
   const s=slides[cur];
   const sec=document.getElementById('imgSection');
   const panel=document.getElementById('imgCtrlPanel');
-  if(s.image){
+  if(s.video){
+    // Slide com VIDEO (grafico animado): toca em loop, mudo, autoplay —
+    // como no Instagram. O campo image segue como poster pro export PNG;
+    // o MP4 entra no ZIP pelo downloadZip.
+    const fit=getEffectiveFit(s);
+    const hStyle=s.imgH?`height:${s.imgH}px;flex:none`:'';
+    sec.innerHTML=`<div class="img-section" style="position:relative">
+      <div class="img-container" id="imgContainer" style="${hStyle}">
+        <video id="vidReal" class="img-real" src="${s.video}" autoplay muted loop playsinline
+          style="width:100%;height:100%;object-fit:${fit==='contain'?'contain':'cover'};display:block"></video>
+        <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;letter-spacing:.5px;pointer-events:none">🎬 VÍDEO</div>
+      </div>
+    </div>`;
+    _ensureCardDeleteBtn();
+    _showCardDeleteBtn(true);
+    document.getElementById('btnAjustar').style.display='none';
+    panel.style.display='none';
+  }else if(s.image){
     const fit=getEffectiveFit(s);
     const hStyle=s.imgH?`height:${s.imgH}px;flex:none`:'';
     const bgColor=fit==='contain'?'#f8f8f8':'transparent';
@@ -1401,7 +1422,7 @@ function onImgFile(input){
 }
 function clearImage(){
   const s=slides[cur];
-  s.image=null;s.zoom=1;s.ox=50;s.oy=50;
+  s.image=null;s.video=null;s.zoom=1;s.ox=50;s.oy=50;
   s.imgH=null;s.fit=null;s.imgNW=null;s.imgNH=null;
   s.freeX=null;s.freeY=null;s.imgMarginTop=null;s.gapTextImg=null;
   // Reseta margin-top do .img-section + gap handle pro proximo render limpo
@@ -1936,6 +1957,16 @@ async function downloadZip(){
       zip.file(`slide_${i+1}.png`,blob);
     }catch(e){console.error('Slide',i+1,e);}
     await new Promise(r=>setTimeout(r,200));
+  }
+  // Slides com video: o canvas nao captura MP4, entao o arquivo entra
+  // direto no ZIP (slide_N_video.mp4) pro usuario subir no Instagram.
+  for(let i=0;i<slides.length;i++){
+    if(!slides[i].video)continue;
+    try{
+      setStatus(`Baixando vídeo do slide ${i+1}...`);
+      const vr=await fetch(slides[i].video);
+      zip.file(`slide_${i+1}_video.mp4`,await vr.blob());
+    }catch(e){console.error('video slide',i+1,e);}
   }
   cur=orig;render();
   setStatus('Criando ZIP...');
