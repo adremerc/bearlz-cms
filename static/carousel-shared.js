@@ -1952,7 +1952,11 @@ async function captureCard(){
   visHiddenEls.forEach(el=>{el.style.visibility='hidden';});
 
   const origStyle={};
-  ['borderRadius','boxShadow','border','width','maxWidth','height','minHeight','maxHeight','marginBottom','overflow'].forEach(k=>{origStyle[k]=card.style[k];});
+  ['borderRadius','boxShadow','border','width','maxWidth','height','minHeight','maxHeight','marginBottom','overflow','zoom'].forEach(k=>{origStyle[k]=card.style[k];});
+  // MOBILE: o CSS aplica zoom no .card pra caber na tela; o html2canvas
+  // captura COM o zoom e o export sai distorcido. Inline zoom:1 vence a
+  // media query so durante a captura (restaurado no finally).
+  card.style.zoom='1';
   card.style.borderRadius='0';card.style.boxShadow='none';card.style.border='none';
   card.style.width=CARD_W+'px';card.style.maxWidth=CARD_W+'px';
   card.style.height=CARD_H+'px';card.style.minHeight=CARD_H+'px';card.style.maxHeight=CARD_H+'px';
