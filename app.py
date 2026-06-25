@@ -1352,6 +1352,81 @@ def _parse_claude_json(texto: str):
     except Exception:
         return None
 
+
+def _extrair_campos_artigo(texto: str):
+    """Fallback robusto pro JSON da FASE 1 quando _parse_claude_json falha
+    (tipico: aspas duplas NAO escapadas no meio da prosa — slogans, falas —
+    que quebram o json.loads). Extrai titulo/artigo/legenda/hashtags por
+    DELIMITADOR de chave, tolerante a aspas internas. Os marcadores
+    ('","legenda":', '","hashtags":') praticamente nao aparecem em prosa,
+    entao o corte e confiavel. Retorna dict ou None se nem o artigo achar."""
+    if not texto:
+        return None
+
+    def _campo(chave, prox):
+        m = re.search(r'"' + chave + r'"\s*:\s*"(.*?)"\s*,\s*"' + prox + r'"',
+                      texto, re.DOTALL)
+        if not m:
+            return None
+        v = m.group(1)
+        # desescapa o que o modelo escapou; mantem aspas internas como aspas
+        return (v.replace('\\n', '\n').replace('\\t', '\t')
+                 .replace('\\"', '"').replace('\\\\', '\\')).strip()
+
+    artigo = _campo('artigo', 'legenda') or _campo('artigo', 'hashtags')
+    if not artigo or len(artigo) < 100:
+        return None
+    titulo = _campo('titulo', 'artigo') or ""
+    legenda = _campo('legenda', 'hashtags') or ""
+    mh = re.search(r'"hashtags"\s*:\s*\[(.*?)\]', texto, re.DOTALL)
+    hashtags = re.findall(r'"(#[^"]+)"', mh.group(1)) if mh else []
+    return {"titulo": titulo, "artigo": artigo,
+            "legenda": legenda, "hashtags": hashtags}
+
+
+def _consolidar_paragrafos(paras, alvo):
+    """Usado no FALLBACK de fatiar. Pega os paragrafos do artigo e os
+    consolida pra caber em 'alvo' slides (e nunca estourar 20 do Instagram):
+    1) um lead-in que termina em ':' cola no proximo (introduz a lista/frase),
+       pra nao sobrar slide orfao tipo 'O tamanho do que esta em jogo:';
+    2) enquanto houver paragrafos demais, funde o mais curto com o vizinho
+       menor (mantendo o respiro \\n\\n dentro do slide)."""
+    paras = [p.strip() for p in paras if p.strip()]
+    # 1) cola lead-in (':') curto no proximo paragrafo
+    merged, i = [], 0
+    while i < len(paras):
+        p = paras[i]
+        if (p.rstrip().endswith(":") and len(p) < 110 and i + 1 < len(paras)):
+            nxt = paras[i + 1]
+            sep = "\n" if re.match(r'^\s*[•\-\*→]', nxt) else "\n\n"
+            merged.append(p + sep + nxt)
+            i += 2
+        else:
+            merged.append(p)
+            i += 1
+    paras = merged
+    # 2) AUTO-DIMENSIONA pela densidade: em vez de fatiar fino pra bater o
+    # numero pedido, funde ate cada slide ter ~360 chars (densidade do post
+    # de referencia, CazeTV ~376). Assim a contagem flutua mas a profundidade
+    # por slide fica sempre cheia. Nunca passa do numero pedido nem de 20.
+    total = sum(len(p) for p in paras)
+    ideal = max(6, round(total / 360))   # nº de slides que da ~360 chars cada
+    teto = min(alvo if alvo else 20, 20, ideal)
+    while len(paras) > teto and len(paras) > 1:
+        idx = min(range(len(paras)), key=lambda k: len(paras[k]))
+        if idx == 0:
+            j = 1
+        elif idx == len(paras) - 1:
+            j = idx - 1
+        else:
+            j = idx - 1 if len(paras[idx - 1]) <= len(paras[idx + 1]) else idx + 1
+        a, b = sorted((idx, j))
+        sep = "\n" if paras[b].lstrip()[:1] in "•-*→" else "\n\n"
+        paras[a] = paras[a] + sep + paras[b]
+        del paras[b]
+    return paras
+
+
 def _revisar_unescape_js(t):
     return t.replace("\\n", "\n").replace("\\`", "`").replace("\\\\", "\\")
 
@@ -1725,16 +1800,22 @@ SYSTEM_ARTIGO = (
     "       fechar sua oitava semana seguida de queda.');\n"
     "   (2) POR QUE IMPORTA, em 1 frase ('Isso nunca tinha acontecido, nem em\n"
     "       2008, nem na pandemia.');\n"
-    "   (3) UM NÚMERO que impressione sozinho, sem adjetivo ('As ações subiram\n"
-    "       8 vezes em 12 meses.');\n"
-    "   (4) UM LOOP ABERTO hiperespecífico e inesperado, que SÓ será explicado\n"
-    "       mais adiante no texto ('Mas tudo começou no porão de um consultório\n"
-    "       odontológico em Idaho, com dinheiro de um fazendeiro de batatas.').\n"
-    "   O loop precisa de um DETALHE CONCRETO e quase absurdo (lugar, objeto,\n"
-    "   pessoa, comparação) — é ele que obriga a continuar lendo. PROIBIDO\n"
-    "   loop vago ('o motivo vai te surpreender', 'a resposta está adiante').\n"
-    "   O parágrafo 2 deve começar a PAGAR o loop (ou avançar a história que\n"
-    "   leva até ele), nunca mudar de assunto.\n\n"
+    "   (3) UMA ÂNCORA DE ESCALA que dá tamanho ao número. No estilo 'Para\n"
+    "       comparar, [referência conhecida] fatura/custa [número]' ('Para\n"
+    "       comparar, o Real Madrid, maior clube do mundo, fatura cerca de\n"
+    "       US$ 1 bilhão por ano.'), ou um reframe de 1 linha que reembala o\n"
+    "       dado ('A FIFA fatura 13x mais com um evento de 40 dias.');\n"
+    "   (4) UM GANCHO que abre um loop a ser pago adiante. PODE ser uma\n"
+    "       AFIRMAÇÃO com detalhe concreto e inesperado ('Mas tudo começou no\n"
+    "       porão de um consultório odontológico em Idaho.') OU uma PERGUNTA\n"
+    "       curta, concreta e em negrito, do jeito que o Varos fecha a capa\n"
+    "       ('**Mas quem fica com essa montanha de dinheiro quando a Copa\n"
+    "       acaba?**'). Escolha a que for mais forte pro tema.\n"
+    "   O gancho precisa de ALGO ESPECÍFICO (detalhe absurdo, número, ou a\n"
+    "   pergunta exata) — é ele que obriga a continuar lendo. PROIBIDO gancho\n"
+    "   vago ('o motivo vai te surpreender', 'a resposta está adiante').\n"
+    "   O parágrafo 2 começa a PAGAR o gancho (ou avança a história que leva\n"
+    "   até ele), nunca muda de assunto.\n\n"
     "   DEPOIS DO GANCHO, percorra estes blocos NA ORDEM (nem todo tema tem\n"
     "   todos, mas use os que fizerem sentido):\n"
     "   GANCHO → ORIGEM → PRODUTO/MECANISMO → ESCASSEZ/TENSÃO → NÚMEROS →\n"
@@ -1814,28 +1895,32 @@ SYSTEM_ARTIGO = (
     "  preferência apresentado na abertura e pago no meio.\n"
     "- NUNCA gaste a tensão à toa: cada loop aberto TEM que ser pago depois.\n\n"
 
-    "RITMO E FLUIDEZ (regra crítica — leia com atenção):\n"
-    "- O texto tem que FLUIR como uma narrativa que se desenrola, com começo,\n"
-    "  meio e fim CONECTADOS. NÃO é um amontoado de frases soltas.\n"
-    "- USE CONECTORES e relações de causa-tempo entre as ideias: 'a partir daí',\n"
-    "  'meses depois', 'por causa de', 'com isso', 'desde então',\n"
-    "  'enquanto isso', 'o que explica', 'na sequência'. Cada frase puxa a\n"
-    "  próxima — o leitor é levado por uma CRONOLOGIA, não por tópicos jogados.\n"
-    "- PROIBIDO o texto picotado de frases curtas soltas que não conectam\n"
-    "  ('A indústria caiu. Mas a inflação despencou. O salário subiu.'). Isso\n"
-    "  cansa, não conta história e tem cara de IA. Junte com conectores numa\n"
-    "  narrativa: 'A indústria recuou 6%, mas no mesmo período a inflação\n"
-    "  despencou de 13% para 2% ao mês, o que devolveu poder de compra ao\n"
-    "  salário real.'\n"
-    "- Frases predominantemente MÉDIAS (15 a 25 palavras) e conectadas.\n"
-    "- NÃO escreva frase gigante de 40+ palavras cheia de vírgulas (vira um\n"
-    "  bloco cansativo sem onde respirar). Se a ideia é longa, divida em 2\n"
-    "  frases com ponto, conectadas por um conector ('por isso', 'e assim').\n"
-    "- PROIBIDO frase isolada de 1 a 3 palavras pra dar drama ('Recessão.',\n"
-    "  'É matemática.', 'E não para por aí.'). TODA frase tem sujeito e\n"
-    "  desenvolvimento, integrada ao texto. Nada de palavra solta com ponto.\n"
-    "  Em vez de 'O resultado foi o esperado. Recessão.', escreva 'O resultado\n"
-    "  foi a recessão que ele mesmo havia previsto.'\n\n"
+    "RITMO E FLUIDEZ — O JEITO VAROS (regra crítica, leia com atenção):\n"
+    "- FRASES CURTAS. Uma ideia por frase, 8 a 16 palavras. É o ritmo do Varos:\n"
+    "  o texto anda rápido, cada frase entrega uma coisa e passa a bola.\n"
+    "- PARÁGRAFO DE NO MÁXIMO 3 LINHAS (1 a 2 frases curtas). MUITO respiro,\n"
+    "  linha em branco entre os parágrafos. Slide arejado é mais Varos que denso.\n"
+    "- A FLUIDEZ vem do SENTIDO, não de empilhar vírgula. Cada frase puxa a\n"
+    "  próxima pelo conteúdo, às vezes com um conector leve ('mas', 'só que',\n"
+    "  'por isso', 'e aí', 'então'). É história andando, não tópico jogado.\n"
+    "- PROIBIDO frase arrastada (mais de ~18 palavras, cheia de vírgulas, que\n"
+    "  vira bloco de 4 linhas). Se a ideia é longa, QUEBRE em 2 ou 3 frases.\n"
+    "  RUIM (uma frase só, arrastada): 'A indústria recuou 6%, mas no mesmo\n"
+    "  período a inflação despencou de 13% para 2% ao mês, o que devolveu poder\n"
+    "  de compra ao salário real.'\n"
+    "  BOM (curto e fluido, Varos): 'A indústria recuou 6%. Mas a inflação\n"
+    "  despencou, de 13% para 2% ao mês. E o salário real voltou a comprar mais.'\n"
+    "- O proibido MESMO é o picote DESCONEXO, frases que não se ligam ('Queda.\n"
+    "  Alta. Recuperação.'). O alvo é curto E conectado pelo sentido.\n"
+    "- FRASE CURTA DE IMPACTO — permitida com PARCIMÔNIA (macete do Varos):\n"
+    "  uma frase curtíssima SOZINHA, pra cravar uma conclusão do argumento,\n"
+    "  pode e fica ótima: 'Monopólio.', 'Não é coincidência.', 'É a estrutura.'\n"
+    "  Use no MÁXIMO 3 no carrossel todo, e SÓ depois de ter construído o ponto\n"
+    "  (ela crava, não substitui o raciocínio).\n"
+    "- PROIBIDO é o PICOTAMENTO: VÁRIAS curtas seguidas sem conexão ('Queda.\n"
+    "  Alta. Recuperação.') ou drama vazio que não conclui nada ('E não para\n"
+    "  por aí.'). Curtas em sequência cansam e têm cara de IA. A de impacto é\n"
+    "  uma só, isolada entre frases normais.\n\n"
 
     "CONSTRUÇÃO DA FRASE — ORDEM DIRETA (regra de manual de redação):\n"
     "- Escreva na ordem direta: SUJEITO + VERBO + COMPLEMENTO. O leitor entende\n"
@@ -1854,13 +1939,47 @@ SYSTEM_ARTIGO = (
     "- Voz ativa por padrão. Passiva só quando o agente é desconhecido ou\n"
     "  irrelevante.\n\n"
 
-    "PERGUNTAS RETÓRICAS: NÃO use. O benchmark (Varos) escreve posts inteiros\n"
-    "  sem UMA pergunta sequer: é afirmação atrás de afirmação, e a curiosidade\n"
-    "  vem dos loops abertos, não de pergunta. Se for absolutamente inevitável,\n"
-    "  no máximo uma no texto, concreta, com resposta imediata na frase seguinte.\n\n"
+    "PERGUNTAS — USE COM PROPÓSITO (o benchmark Varos usa, e funcionam):\n"
+    "  O Varos abre o loop da CAPA e faz transições COM perguntas curtas e\n"
+    "  concretas: 'Mas quem fica com essa montanha de dinheiro depois que a\n"
+    "  Copa acaba?', 'Então pra onde vai o dinheiro?'. PODE e DEVE usar assim:\n"
+    "  (a) a ÚLTIMA linha da capa pode ser uma pergunta-gancho em negrito;\n"
+    "  (b) 1 ou 2 transições entre blocos podem ser uma pergunta curta cuja\n"
+    "  resposta vem nos parágrafos seguintes. Limite: ~3 no carrossel inteiro.\n"
+    "  A pergunta é sempre CONCRETA e sobre o tema. PROIBIDA a pergunta retórica\n"
+    "  VAZIA/filosófica ('será que vale a pena?', 'o que isso nos ensina?',\n"
+    "  'até quando?'). Fora os ganchos, é afirmação atrás de afirmação.\n\n"
 
     "CONTRASTE: use 'de um lado X, do outro Y' ou 'enquanto X, Y' pra mostrar\n"
     "  que você entende os dois lados (dá credibilidade analítica).\n\n"
+
+    "════ MACETES DO BENCHMARK (Varos) — é o que deixa denso e gostoso de ler ════\n"
+    "Use estes recursos (não todos no mesmo slide; alterne com prosa normal):\n"
+    "1) SETAS (→) PARA CADEIA CAUSAL: quando uma coisa puxa a outra, mostre a\n"
+    "   escada com setas, UMA POR LINHA (quebra simples \\n entre elas):\n"
+    "      → Mais seleções significa mais jogos\n"
+    "      → Mais jogos significa mais transmissões, patrocínios e ingressos\n"
+    "      → Mais receita entrando pra FIFA\n"
+    "   Use quando há encadeamento lógico (causa puxando consequência).\n"
+    "2) BULLETS (•) — CADA UM CARREGA UMA INFORMAÇÃO, nunca um rótulo solto.\n"
+    "   Comece o bullet em negrito e complete com o porquê/o dado. UM POR LINHA:\n"
+    "      • **Ela não paga salário de jogador.** Isso é dos clubes.\n"
+    "      • **Ela não constrói estádios.** Isso é dos governos.\n"
+    "   Série de dados também vira bullet ('• A Copa de 2014 gerou US$ 4,8 bi.').\n"
+    "   PROIBIDO bullet genérico de rótulo (só um nome solto). RUIM: '• Haiti\\n"
+    "   • Irã\\n• Senegal'. Isso é uma etiqueta, não diz nada. Ou cada item ganha\n"
+    "   contexto ('• Irã, que cai no grupo do Brasil') ou então NÃO use bullet,\n"
+    "   escreve em prosa fluida ('O veto atinge torcedores de Haiti, Irã,\n"
+    "   Costa do Marfim e Senegal, quatro seleções que vão jogar a Copa').\n"
+    "3) ÂNCORA DE ESCALA / ANALOGIA VÍVIDA: pra dar tamanho a um número, compare\n"
+    "   com algo conhecido ('Para comparar, ...') ou crie imagem memorável\n"
+    "   ('A FIFA tem menos rotatividade no cargo que o Papa no Vaticano.').\n"
+    "4) FRASE-CHAVE EM NEGRITO FECHANDO O BLOCO: termine vários slides com a\n"
+    "   conclusão do raciocínio em negrito ('**O modelo financeiro sustenta o\n"
+    "   modelo político.**', '**É um negócio construído pra nunca perder.**').\n"
+    "FORMATAÇÃO DESTES BLOCOS: bullets e setas usam quebra SIMPLES (\\n) entre\n"
+    "  as linhas da lista, e o slide inteiro continua separado do próximo por\n"
+    "  linha em branco (\\n\\n). NUNCA misture a lista com \\n\\n no meio.\n\n"
 
     "DADOS — SEMPRE específicos, nunca vagos:\n"
     "- BOM: 'subiu mais de 8x em 12 meses', 'R$ 3,8 bilhões', 'alta de 21%'\n"
@@ -1938,10 +2057,15 @@ SYSTEM_ARTIGO = (
     "- Cada parágrafo é AUTO-CONTIDO (uma ideia central) mas CONECTADO ao\n"
     "  anterior: começa de onde o outro parou, sem repetir, sem 'como vimos'.\n"
     "- O último parágrafo de vários blocos pode terminar numa frase que puxa\n"
-    "  o próximo (cliffhanger natural), porque o corte será exatamente ali.\n\n"
+    "  o próximo (cliffhanger natural), porque o corte será exatamente ali.\n"
+    "- Um parágrafo PODE conter uma lista (bullets • ou setas →) com quebras\n"
+    "  SIMPLES (\\n) entre os itens — isso continua sendo UM parágrafo, logo UM\n"
+    "  slide. A linha em branco (\\n\\n) só separa um slide do outro.\n\n"
 
     "TAMANHO (CRÍTICO — não entregue artigo curto, é o erro mais comum):\n"
-    "- Cada parágrafo/slide tem ~300-330 caracteres, TODOS de tamanho parecido.\n"
+    "- Cada parágrafo/slide tem ~350-420 caracteres: DENSO de conteúdo, mas\n"
+    "  em frases curtas (a densidade vem da substância, não de frase longa).\n"
+    "  NÃO entregue slide raso ou curto demais. Igual aos melhores posts.\n"
     "- O artigo inteiro PRECISA ter entre {min_chars} e {max_chars} caracteres.\n"
     "- Artigo curto = slides rasos e ruins. Você precisa de material pra\n"
     "  {num_slides} blocos densos. NÃO resuma os pontos — DESENVOLVA cada um\n"
@@ -2005,29 +2129,30 @@ SYSTEM_FATIAR = (
     "- Se o slide 1 estiver morno, REORDENE: pegue a frase mais surpreendente\n"
     "  do artigo e use ela como abertura.\n\n"
 
-    "TAMANHO — SLIDES DENSOS (não rasos):\n"
-    "- Cada slide tem entre 280 e 400 caracteres. Slide com pouco texto fica\n"
-    "  raso e sem conteúdo — evite. Aproveite o espaço pra desenvolver a ideia.\n"
-    "- Tamanho razoavelmente CONSISTENTE entre os slides (não um com 150 e\n"
-    "  outro com 400).\n"
-    "- Exceção: o slide 1 (hook/pergunta) pode ser um pouco mais curto.\n"
-    "- NUNCA acima de 420.\n\n"
+    "TAMANHO — SLIDES DENSOS E FLUIDOS AO MESMO TEMPO (o equilíbrio do Varos):\n"
+    "- Cada slide tem entre 330 e 440 caracteres. CHEIO de conteúdo, MAS em\n"
+    "  frases curtas e parágrafos curtos. A densidade vem da SUBSTÂNCIA (dado,\n"
+    "  causa, consequência), não de frase longa. Slide raso/curto demais é ERRO.\n"
+    "- O slide 1 (hook) pode ser um pouco mais curto. NUNCA acima de 470.\n\n"
 
-    "FORMATO VISUAL — RESPIRO + FLUIDEZ (o equilíbrio certo):\n"
-    "- Cada slide tem 2 ou 3 PARÁGRAFOS separados por linha em branco (\\n\\n).\n"
-    "  Esse espaço entre parágrafos é essencial pra respirar e não cansar.\n"
-    "- MAS cada parágrafo tem 1-2 frases CONECTADAS (com conectores), não uma\n"
-    "  frase curta solta. A diferença é tudo:\n"
-    "  RUIM (picotado, frase solta por parágrafo):\n"
-    "    A indústria caiu 6%.\n\n    Mas a inflação despencou.\n\n    O salário subiu.\n"
-    "  RUIM (tudo junto, sem respiro): um bloco único de 350 caracteres.\n"
-    "  BOM (respiro + fluidez):\n"
-    "    Quando Milei assumiu em dezembro de 2023, a Argentina acumulava 211%\n"
-    "    de inflação e metade da população perto da pobreza, resultado de\n"
-    "    décadas gastando acima do que arrecadava.\n\n"
-    "    Foi nesse cenário de quase colapso que ele aplicou o choque, começando\n"
-    "    pela desvalorização de 54% do peso na primeira semana.\n"
-    "- Então: VÁRIOS parágrafos (respiro), cada um fluido e conectado.\n\n"
+    "FORMATO VISUAL — O JEITO VAROS (frase curta + MUITO respiro):\n"
+    "- FRASES CURTAS: uma ideia por frase, 8 a 16 palavras. Sem empilhar\n"
+    "  vírgula. Se a frase passou de ~16 palavras, quebre em duas frases.\n"
+    "- PARÁGRAFO DE NO MÁXIMO 3 LINHAS (1 a 2 frases curtas). Cada parágrafo\n"
+    "  separado por linha em branco (\\n\\n). O respiro é o que faz fluir.\n"
+    "- Um slide tem 3 ou 4 parágrafos CURTOS, nunca 2 blocões.\n"
+    "  RUIM (bloco denso, uma frase arrastada de 4 linhas):\n"
+    "    O ICE, a agência de imigração e alfândega dos EUA, estará presente nos\n"
+    "    estádios durante todo o torneio, oficialmente no papel de segurança.\n"
+    "  BOM (Varos, curto e fluido, respirando):\n"
+    "    O ICE vai estar nos estádios o torneio inteiro.\n\n"
+    "    Oficialmente, só como segurança.\n\n"
+    "    Mas a agência não descartou fazer prisões ali dentro.\n"
+    "- Cada parágrafo puxa o próximo. Fluido, jamais picotado e desconexo.\n"
+    "- LISTA DO ARTIGO (bullets • ou setas →): se o artigo trouxe uma lista,\n"
+    "  PRESERVE-A idêntica, com quebra SIMPLES (\\n) entre os itens, toda no\n"
+    "  MESMO slide. NÃO vire a lista em prosa, NÃO separe os itens em slides\n"
+    "  diferentes, NÃO troque \\n por \\n\\n entre os itens.\n\n"
 
     "NÚMERO DE SLIDES: corte em EXATAMENTE {num_slides} slides.\n"
     "  Distribua o artigo de forma equilibrada entre eles.\n\n"
@@ -2269,46 +2394,52 @@ def _formatar_paragrafos_varos(text: str) -> str:
     MAS cada paragrafo tem 1-2 frases CONECTADAS (~150 chars), nao uma frase
     curta solta picotada. O conteudo fluido vem do prompt; aqui so agrupamos
     em paragrafos de tamanho confortavel.
-    Preserva listas de bullet (linhas com •/-/* ) intactas."""
+    Preserva listas de bullet (•/-/*) e cadeias de seta (→) intactas — sao
+    macetes do Varos e a estrutura de linhas e proposital."""
     if not text:
         return text
-    # Bullets: estrutura de linhas eh intencional, nao mexe
-    if re.search(r'(?m)^\s*[•\-\*]\s+', text):
+    # Bullets E setas: estrutura de linhas eh intencional, nao mexe
+    if re.search(r'(?m)^\s*(?:[•\-\*→›▸◦]|->)\s+', text):
         return text
     # Junta tudo num texto plano (remove quebras que o Claude tenha posto)
     flat = re.sub(r'\s*\n+\s*', ' ', text).strip()
     sentences = re.split(r'(?<=[.!?])\s+', flat)
     if len(sentences) <= 1:
         return flat
-    # Quebra frase GIGANTE (>200 chars, sem ponto interno) na virgula mais
-    # proxima do meio, pra nao virar um blocao sem respiro. Mantem a virgula.
+    # Quebra frase LONGA (>120 chars) na virgula mais proxima do meio, pra
+    # nenhum paragrafo virar um blocao de 4+ linhas. Estilo Varos: respiro.
     def _quebra_frase_longa(fr):
-        if len(fr) <= 200:
+        if len(fr) <= 130:
             return [fr]
         virgs = [m.end() for m in re.finditer(r",\s", fr)]
-        if not virgs:
+        # so corta numa virgula que deixe AMBOS os lados com >=45 chars, pra
+        # nao criar fragmento solto tipo 'Desde 2 de abril de 2026,'.
+        bons = [v for v in virgs if v >= 45 and (len(fr) - v) >= 45]
+        if not bons:
             return [fr]
         meio = len(fr) / 2
-        corte = min(virgs, key=lambda p: abs(p - meio))
+        corte = min(bons, key=lambda p: abs(p - meio))
         return [fr[:corte].strip(), fr[corte:].strip()]
-    unidades = []
-    for s in sentences:
-        unidades.extend(_quebra_frase_longa(s))
-    # Agrupa em paragrafos com RESPIRO (~115 chars). Uma unidade grande
-    # (>130) vira paragrafo proprio: fecha o atual antes de juntar com ela.
-    ALVO = 115
+    # Agrupa em paragrafos CURTOS (~90 chars = ate ~3 linhas), muito respiro,
+    # estilo Varos. Frase longa quebrada: cada pedaco vira paragrafo proprio.
+    # Frases curtas se juntam ATE ~90 chars; nunca passam disso (sem re-merge).
+    ALVO = 90
     paragraphs, current, clen = [], [], 0
-    for u in unidades:
-        if current and (len(u) > 130 or clen >= ALVO):
-            paragraphs.append(" ".join(current))
-            current, clen = [], 0
+    for s in sentences:
+        pieces = _quebra_frase_longa(s)
+        if len(pieces) > 1:
+            if current:
+                paragraphs.append(" ".join(current)); current, clen = [], 0
+            paragraphs.extend(pieces)
+            continue
+        u = pieces[0]
+        # fecha o paragrafo antes de estourar o ALVO (nao soma alem do alvo)
+        if current and clen + len(u) > ALVO:
+            paragraphs.append(" ".join(current)); current, clen = [], 0
         current.append(u)
         clen += len(u) + 1
-        if clen >= ALVO:
-            paragraphs.append(" ".join(current))
-            current, clen = [], 0
     if current:
-        if paragraphs and clen < 60:
+        if paragraphs and clen < 35:
             paragraphs[-1] += " " + " ".join(current)
         else:
             paragraphs.append(" ".join(current))
@@ -2316,21 +2447,30 @@ def _formatar_paragrafos_varos(text: str) -> str:
 
 
 def _juntar_frases_curtas(text: str) -> str:
-    """Junta frase ULTRA-CURTA de efeito (1-3 palavras, sem numero) com a
-    frase ANTERIOR via virgula, eliminando o picote dramatico.
-    'O plano era claro. Deficit zero.' -> 'O plano era claro, deficit zero.'
-    'Isso e real. E matematica.' -> 'Isso e real, e matematica.'"""
+    """Junta frases ULTRA-CURTAS de efeito SO quando vem em SEQUENCIA (2+
+    seguidas) — esse e o picotamento que cansa e tem cara de IA:
+    'Queda. Alta. Recuperacao.' -> 'Queda, alta, recuperacao.'
+    Uma frase curta SOZINHA, cercada de frases normais, e macete legitimo do
+    benchmark (Varos): 'Monopolio.', 'Nao e coincidencia.', 'E a estrutura.'
+    Essa e PRESERVADA — ela crava um ponto do argumento, nao picota."""
     if not text:
         return text
     partes = re.split(r'(?<=[.!?])\s+', text.strip())
-    out = []
-    for p in partes:
+
+    def _is_curta(p):
         nuc = p.strip().rstrip(".!?").strip().strip("*").strip()
-        palavras = nuc.split()
-        curta = (1 <= len(palavras) <= 3 and len(nuc) <= 24
-                 and not any(c.isdigit() for c in nuc) and nuc[:1].isupper())
-        if curta and out:
-            # junta com a anterior: tira o ponto final dela, vira virgula
+        pal = nuc.split()
+        return (1 <= len(pal) <= 3 and len(nuc) <= 24
+                and not any(c.isdigit() for c in nuc) and nuc[:1].isupper())
+
+    flags = [_is_curta(p) for p in partes]
+    out = []
+    for i, p in enumerate(partes):
+        # so junta se esta curta E faz parte de um RUN (vizinha tambem curta)
+        em_run = flags[i] and ((i > 0 and flags[i - 1]) or
+                               (i + 1 < len(flags) and flags[i + 1]))
+        if em_run and out:
+            nuc = p.strip().rstrip(".!?").strip().strip("*").strip()
             ant = out[-1].rstrip()
             if ant and ant[-1] in ".!?":
                 ant = ant[:-1]
@@ -3306,25 +3446,34 @@ def _detect_vicios_ia(texto: str):
                 "context": texto[max(0,m.start()-15):min(len(texto), m.end()+25)],
             })
 
-    # 9. Sentenca ULTRA-CURTA isolada (1-3 palavras) usada pra dar drama:
-    # 'Recessao.', 'E matematica.', 'Mudou tudo.'. Pega sentencas entre
-    # delimitadores. So flagra se <=3 palavras, <=24 chars e sem digito.
-    for sm in re.finditer(r"(?:^|(?<=[.!?]\s))([^.!?\n]{2,40}?)([.!?])(?=\s|$)", texto):
-        frase = sm.group(1).strip().strip("*").strip()
-        if not frase or any(c.isdigit() for c in frase):
+    # 9. PICOTAMENTO: sentencas ULTRA-CURTAS (1-3 palavras) em SEQUENCIA.
+    # 'Queda. Alta. Recuperacao.' cansa e tem cara de IA. MAS uma curta SOZINHA
+    # ('Monopolio.', 'Nao e coincidencia.') e macete legitimo do Varos — NAO
+    # flagra. So vira vicio quando vem 2+ seguidas (a vizinha tambem e curta).
+    _sent = list(re.finditer(r"(?:^|(?<=[.!?]\s))([^.!?\n]{2,40}?)([.!?])(?=\s|$)", texto))
+    def _curta(sm):
+        fr = sm.group(1).strip().strip("*").strip()
+        if not fr or any(c.isdigit() for c in fr):
+            return False
+        return len(fr.split()) <= 3 and len(fr) <= 24 and fr[0:1].isupper()
+    _flags = [_curta(sm) for sm in _sent]
+    for i, sm in enumerate(_sent):
+        if not _flags[i]:
             continue
-        palavras = frase.split()
-        if len(palavras) <= 3 and len(frase) <= 24 and frase[0:1].isupper():
-            matches.append({
-                "offset": sm.start(1),
-                "length": len(sm.group(1)),
-                "message": f"'{frase}.' é frase ultra-curta de efeito (cara de IA, picota a leitura). Integre numa frase com sujeito e desenvolvimento.",
-                "short": "Frase curta de efeito",
-                "suggestions": [],
-                "category": "Vício de IA",
-                "type": "AI_FRASE_CURTA",
-                "context": texto[max(0,sm.start()-20):min(len(texto), sm.end()+15)],
-            })
+        vizinha_curta = (i > 0 and _flags[i-1]) or (i+1 < len(_flags) and _flags[i+1])
+        if not vizinha_curta:
+            continue  # curta isolada = punch line do Varos, permitida
+        frase = sm.group(1).strip().strip("*").strip()
+        matches.append({
+            "offset": sm.start(1),
+            "length": len(sm.group(1)),
+            "message": f"'{frase}.' faz parte de uma sequência de frases ultra-curtas (picotamento, cara de IA). Junte numa frase com desenvolvimento. (Uma curta sozinha de impacto é ok.)",
+            "short": "Picotamento",
+            "suggestions": [],
+            "category": "Vício de IA",
+            "type": "AI_FRASE_CURTA",
+            "context": texto[max(0,sm.start()-20):min(len(texto), sm.end()+15)],
+        })
 
     return matches
 
@@ -3778,10 +3927,11 @@ def _gerar_conteudo_2fases(client, topico, brief_enriched, imagens_block,
 
     Retorna (titulo, slides_raw, artigo, legenda, hashtags, fase_debug).
     Levanta ValueError se alguma fase falhar de forma irrecuperavel."""
-    # Tamanho-alvo do artigo: ~290-360 chars por slide (estilo Varos, denso).
-    # Piso de seguranca pra nao gerar raso mesmo com poucos slides.
-    min_chars = max(num_slides * 320, 1100)
-    max_chars = num_slides * 400
+    # Tamanho-alvo do artigo: ~350-420 chars por slide. Densidade igual ao
+    # post de referencia (CazeTV ~376 chars/slide). Denso de conteudo MAS
+    # fluido (frase curta). Piso alto pra nao gerar slide raso.
+    min_chars = max(num_slides * 340, 1200)
+    max_chars = num_slides * 430
     sys_artigo = (system_artigo
                   .replace("{min_chars}", str(min_chars))
                   .replace("{max_chars}", str(max_chars))
@@ -3792,15 +3942,19 @@ def _gerar_conteudo_2fases(client, topico, brief_enriched, imagens_block,
         f"TÓPICO: {topico}\n\n"
         f"BRIEF/CONTEÚDO:\n{brief_enriched or topico}\n\n"
         f"Escreva o artigo completo ({min_chars}-{max_chars} caracteres) "
-        "seguindo a arquitetura narrativa: abertura com PERGUNTA provocativa, "
-        "desenvolvimento que reconstrói o raciocínio com dados, fechamento com "
-        "conclusão DIRETA e concreta (SEM frase de efeito poética, aforismo ou "
-        "rima). Texto corrido, fluido, SEM CTA. Inclua legenda e hashtags. "
-        "Retorne SOMENTE JSON."
+        "seguindo a arquitetura narrativa do system: capa que abre com FATO + "
+        "NÚMERO e fecha num gancho (afirmação concreta OU pergunta curta), "
+        "desenvolvimento que reconstrói o raciocínio com dados e usa os macetes "
+        "(setas →, bullets •, âncora de escala, frase-chave em negrito), "
+        "fechamento com conclusão DIRETA e concreta (SEM frase de efeito "
+        "poética, aforismo ou rima). O FECHAMENTO são 1-2 frases curtas, "
+        "conclusivas e COMPLETAS; NUNCA termine o artigo com uma citação longa "
+        "nem pare no meio de uma frase ou ideia. Texto fluido, SEM CTA. Inclua legenda e "
+        "hashtags. Retorne SOMENTE JSON."
     )
     # max_tokens generoso: artigo grande + legenda + hashtags
     resp1 = claude_call_with_retry(client,
-        model="claude-sonnet-4-5", max_tokens=6000,
+        model="claude-sonnet-4-5", max_tokens=7000,
         system=sys_artigo,
         messages=[{"role": "user", "content": prompt_artigo}]
     )
@@ -3809,6 +3963,13 @@ def _gerar_conteudo_2fases(client, topico, brief_enriched, imagens_block,
         out1 = re.sub(r"^```[a-z]*\n?", "", out1)
         out1 = re.sub(r"\n?```$", "", out1).strip()
     dados1 = _parse_claude_json(out1)
+    if not (dados1 and isinstance(dados1, dict) and dados1.get("artigo")):
+        # JSON quebrou (tipico: aspas internas nao escapadas). Extrai o artigo
+        # por delimitador de chave, tolerante a aspas — evita salvar o JSON cru
+        # como se fosse o artigo (bug que embutia '{"titulo":...' no slide 1).
+        recuperado = _extrair_campos_artigo(out1)
+        if recuperado:
+            dados1 = recuperado
     legenda = ""
     hashtags = []
     if dados1 and isinstance(dados1, dict) and dados1.get("artigo"):
@@ -3857,12 +4018,27 @@ def _gerar_conteudo_2fases(client, topico, brief_enriched, imagens_block,
         out2 = re.sub(r"^```[a-z]*\n?", "", out2)
         out2 = re.sub(r"\n?```$", "", out2).strip()
     dados2 = _parse_claude_json(out2)
-    if not dados2 or not isinstance(dados2, dict) or not dados2.get("slides"):
+    if dados2 and isinstance(dados2, dict) and dados2.get("slides"):
+        slides_raw = dados2.get("slides", [])
+    else:
+        # FALLBACK: o fatiador (LLM) as vezes devolve JSON impossivel de
+        # parsear (tipico: aspas duplas nao escapadas dentro do texto, que
+        # este conteudo tem de monte por causa de slogans citados). Em vez
+        # de falhar a geracao inteira, fatiamos o ARTIGO por paragrafos —
+        # que e exatamente a filosofia do projeto: 1 paragrafo = 1 slide,
+        # carrossel = artigo verbatim. Sem imagem (adicionada na revisao).
         import sys as _sys
-        print(f"[FATIAR-FAIL] num_slides={num_slides} max_tok={max_tok_fatiar} "
+        print(f"[FATIAR-FALLBACK] num_slides={num_slides} max_tok={max_tok_fatiar} "
               f"out_len={len(out2)} tail={out2[-200:]!r}", file=_sys.stderr, flush=True)
-        raise ValueError("Fase 2 (fatiar) não gerou slides válidos")
-    slides_raw = dados2.get("slides", [])
+        paras = [p.strip() for p in re.split(r"\n\s*\n", artigo) if p.strip()]
+        if not paras:
+            raise ValueError("Fase 2 (fatiar) falhou e o artigo não tem parágrafos")
+        paras = _consolidar_paragrafos(paras, num_slides)
+        slides_raw = [
+            {"texto": p, "image_type": "photo", "photo_topic": "",
+             "photo_source": "stock", "image_from_link": None}
+            for p in paras
+        ]
 
     fase_debug = {
         "artigo": artigo,
