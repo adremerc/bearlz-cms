@@ -533,16 +533,17 @@ def api_admin_editar_textos(slug):
 
 @app.route("/api/_admin/editar-meta/<slug>", methods=["POST"])
 def api_admin_editar_meta(slug):
-    """Atualiza artigo/legenda/hashtags de um carrossel no DB. Permite manter
-    o artigo IDENTICO ao texto dos slides (fonte unica: artigo fatiado).
-    Body JSON: {artigo?: str, legenda?: str, hashtags?: str}. Requer X-Admin-Key."""
+    """Atualiza titulo/artigo/legenda/hashtags de um carrossel no DB. Permite
+    manter o artigo IDENTICO ao texto dos slides (fonte unica: artigo fatiado)
+    e renomear o post (titulo aparece no card do dashboard).
+    Body JSON: {titulo?, artigo?, legenda?, hashtags?} (str). Requer X-Admin-Key."""
     if not _admin_check_key():
         return jsonify({"error": "unauthorized"}), 401
     data = request.get_json() or {}
-    campos = {k: data[k] for k in ("artigo", "legenda", "hashtags")
+    campos = {k: data[k] for k in ("titulo", "artigo", "legenda", "hashtags")
               if k in data and isinstance(data[k], str)}
     if not campos:
-        return jsonify({"error": "nada pra atualizar (artigo/legenda/hashtags)"}), 400
+        return jsonify({"error": "nada pra atualizar (titulo/artigo/legenda/hashtags)"}), 400
     sets = ", ".join(f"{k}=?" for k in campos)
     with get_db() as conn:
         cur = conn.execute(
