@@ -265,6 +265,7 @@ def init_db():
             ("artigo",          "TEXT"),  # texto corrido completo (fase 1)
             ("legenda",         "TEXT"),  # resumo executivo pro Instagram
             ("hashtags",        "TEXT"),  # "#a #b #c" pro Instagram
+            ("api_usage",       "TEXT"),  # JSON: tokens/buscas/custo da geracao
         ]:
             try:
                 conn.execute(f"ALTER TABLE carrosseis ADD COLUMN {col} {definition}")
@@ -356,6 +357,82 @@ def claude_call_with_retry(client, max_retries=4, **params):
             # Backoff exponencial: 1s, 2s, 4s, 8s
             _time.sleep(2 ** attempt)
     raise last_err
+
+
+# ── Modelo do gerador + custo por post ───────────────────────────────────────
+# O gerador usa Opus 4.8 (mesmo modelo do Claude Code) com WEB SEARCH server-
+# side: o modelo pesquisa e VERIFICA os dados antes de escrever o artigo, em
+# vez de escrever de memoria (que inventava/desatualizava numeros). Override
+# via env GERAR_MODEL se quiser baratear (ex: claude-sonnet-4-6).
+GERAR_MODEL = os.environ.get("GERAR_MODEL", "claude-opus-4-8")
+
+# USD por 1M tokens (input, output). Cache: read = 0.1x input, write = 1.25x.
+# Web search: US$ 10 por 1.000 buscas.
+MODEL_PRICES = {
+    "claude-opus-4-8":   (5.00, 25.00),
+    "claude-opus-4-7":   (5.00, 25.00),
+    "claude-sonnet-4-6": (3.00, 15.00),
+    "claude-sonnet-4-5": (3.00, 15.00),
+    "claude-haiku-4-5":  (1.00, 5.00),
+}
+
+def _novo_usage():
+    return {"input_tokens": 0, "output_tokens": 0, "cache_read": 0,
+            "cache_write": 0, "web_searches": 0, "calls": 0}
+
+def _acumular_usage(acc, resp):
+    """Soma o usage de uma resposta da API no acumulador (custo por post)."""
+    if acc is None or resp is None:
+        return
+    try:
+        u = resp.usage
+        acc["input_tokens"]  += getattr(u, "input_tokens", 0) or 0
+        acc["output_tokens"] += getattr(u, "output_tokens", 0) or 0
+        acc["cache_read"]    += getattr(u, "cache_read_input_tokens", 0) or 0
+        acc["cache_write"]   += getattr(u, "cache_creation_input_tokens", 0) or 0
+        stu = getattr(u, "server_tool_use", None)
+        if stu is not None:
+            acc["web_searches"] += getattr(stu, "web_search_requests", 0) or 0
+        acc["calls"] += 1
+    except Exception:
+        pass
+
+def _custo_usd(acc, model=None):
+    """Custo estimado (USD) do acumulador de usage."""
+    pin, pout = MODEL_PRICES.get(model or GERAR_MODEL, (5.00, 25.00))
+    custo = (acc["input_tokens"] * pin + acc["output_tokens"] * pout
+             + acc["cache_read"] * pin * 0.1 + acc["cache_write"] * pin * 1.25) / 1e6
+    custo += acc["web_searches"] * 0.01
+    return round(custo, 4)
+
+def _extrair_texto_resp(resp):
+    """Concatena so os blocos de texto (ignora thinking/tool_use/resultados)."""
+    return "".join(
+        b.text for b in resp.content if getattr(b, "type", "") == "text"
+    ).strip()
+
+def _claude_fase1_com_busca(client, usage_acc, **params):
+    """FASE 1 com web search server-side: o modelo pesquisa e confirma os
+    dados ANTES de escrever. Trata stop_reason=pause_turn (o loop de busca do
+    servidor pausa a cada ~10 iteracoes) re-enviando a conversa. Retorna o
+    texto final da resposta."""
+    model = params.get("model", GERAR_MODEL)
+    # Modelos 4.6+ tem a variante nova (filtro dinamico); 4.5 so a basica.
+    tool_type = "web_search_20250305" if "4-5" in model else "web_search_20260209"
+    params["tools"] = [{"type": tool_type, "name": "web_search", "max_uses": 6}]
+    if "4-5" not in model:
+        # Adaptive thinking melhora planejamento/escrita (nao suportado no 4.5)
+        params.setdefault("thinking", {"type": "adaptive"})
+    msgs = list(params.pop("messages"))
+    resp = None
+    for _ in range(8):
+        resp = claude_call_with_retry(client, messages=msgs, **params)
+        _acumular_usage(usage_acc, resp)
+        if getattr(resp, "stop_reason", "") != "pause_turn":
+            break
+        # Servidor pausou no meio das buscas: re-envia com o parcial e continua
+        msgs = msgs + [{"role": "assistant", "content": resp.content}]
+    return _extrair_texto_resp(resp)
 
 
 # Inicializa DB e escaneia pasta na startup
@@ -666,6 +743,22 @@ def dashboard():
         c["prio_label"],   c["prio_color"]   = PRIO_LABELS.get(c.get("prioridade","media"), ("Média","yellow"))
         c["created_fmt"]  = fmt_data(c["created_at"])
         c["tempo_fmt"]    = fmt_tempo(c.get("tempo_revisao") or 0)
+        # Custo da geracao via API (JSON gravado pelo /api/gerar)
+        c["custo_fmt"], c["custo_title"] = "", ""
+        try:
+            au = json.loads(c.get("api_usage") or "null") or {}
+            cu = au.get("custo_usd")
+            if cu:
+                c["custo_fmt"] = "US$ %.2f" % cu
+                c["custo_title"] = (
+                    "%s tokens in / %s out · %s buscas web · %s" % (
+                        f"{au.get('input_tokens', 0):,}".replace(",", "."),
+                        f"{au.get('output_tokens', 0):,}".replace(",", "."),
+                        au.get("web_searches", 0),
+                        au.get("model", ""),
+                    ))
+        except Exception:
+            pass
 
     return render_template("index.html",
                            carrosseis=carrosseis,
@@ -3932,7 +4025,7 @@ def api_pexels_search():
 
 
 def _gerar_conteudo_2fases(client, topico, brief_enriched, imagens_block,
-                            num_slides, system_artigo):
+                            num_slides, system_artigo, usage_acc=None):
     """Geracao em 2 fases (estilo Varos):
       FASE 1: escreve o ARTIGO corrido fluido (system_artigo / SYSTEM_ARTIGO)
       FASE 2: fatia o artigo em num_slides slides + escolhe imagens (SYSTEM_FATIAR)
@@ -3963,14 +4056,27 @@ def _gerar_conteudo_2fases(client, topico, brief_enriched, imagens_block,
         "conclusivas e COMPLETAS; NUNCA termine o artigo com uma citação longa "
         "nem pare no meio de uma frase ou ideia. Texto fluido, SEM CTA. Inclua legenda e "
         "hashtags. Retorne SOMENTE JSON."
+        "\n\nVERIFICAÇÃO OBRIGATÓRIA (antes de escrever): use a ferramenta "
+        "web_search para CONFIRMAR cada número e fato que pretende usar "
+        "(faça 4-6 buscas objetivas). Regras: "
+        "1) NUNCA escreva um dado que você não confirmou numa fonte; "
+        "2) RECÊNCIA: o dado CENTRAL do post deve ser confirmado em DUAS "
+        "fontes, sempre preferindo a mais recente — cheque a DATA da fonte "
+        "(um valor de 2024 pode estar muito defasado hoje; busque 'X 2026' "
+        "ou 'X hoje' antes de cravar); "
+        "3) se as fontes divergirem, use a mais recente e diga o período; "
+        "4) atribua previsões e opiniões a quem as fez; "
+        "5) se um dado do brief estiver errado ou desatualizado, corrija no "
+        "artigo (não copie o erro). Depois de verificar, escreva o artigo "
+        "completo e retorne SOMENTE o JSON final."
     )
-    # max_tokens generoso: artigo grande + legenda + hashtags
-    resp1 = claude_call_with_retry(client,
-        model="claude-sonnet-4-5", max_tokens=7000,
+    # max_tokens generoso: thinking + artigo grande + legenda + hashtags.
+    # A fase 1 agora PESQUISA (web search server-side) antes de escrever.
+    out1 = _claude_fase1_com_busca(client, usage_acc,
+        model=GERAR_MODEL, max_tokens=16000,
         system=sys_artigo,
         messages=[{"role": "user", "content": prompt_artigo}]
     )
-    out1 = resp1.content[0].text.strip()
     if out1.startswith("```"):
         out1 = re.sub(r"^```[a-z]*\n?", "", out1)
         out1 = re.sub(r"\n?```$", "", out1).strip()
@@ -4021,11 +4127,12 @@ def _gerar_conteudo_2fases(client, topico, brief_enriched, imagens_block,
     # 6000 estourava e truncava o JSON -> parse falhava. Damos folga.
     max_tok_fatiar = min(16000, 2500 + num_slides * 650)
     resp2 = claude_call_with_retry(client,
-        model="claude-sonnet-4-5", max_tokens=max_tok_fatiar,
+        model=GERAR_MODEL, max_tokens=max_tok_fatiar,
         system=sys_fatiar,
         messages=[{"role": "user", "content": prompt_fatiar}]
     )
-    out2 = resp2.content[0].text.strip()
+    _acumular_usage(usage_acc, resp2)
+    out2 = _extrair_texto_resp(resp2)
     if out2.startswith("```"):
         out2 = re.sub(r"^```[a-z]*\n?", "", out2)
         out2 = re.sub(r"\n?```$", "", out2).strip()
@@ -4079,6 +4186,101 @@ def api_gerar_system_prompt():
     return jsonify({"system": preview})
 
 
+def _problemas_slide(texto, idx):
+    """Valida um slide com as regras da casa (mesmo criterio do corretor da
+    UI + limites de tamanho). Retorna lista de problemas legiveis."""
+    probs = []
+    for m in _detect_vicios_ia(texto):
+        if m.get("short") == "Negrito mal usado":
+            continue
+        trecho = texto[m["offset"]:m["offset"] + m["length"]][:40]
+        probs.append(f"vício de IA ({m.get('short')}): {trecho!r}")
+    if "—" in texto or "–" in texto:
+        probs.append("travessão (proibido; use vírgula/ponto/parênteses)")
+    if texto.count("**") % 2:
+        probs.append("negrito desbalanceado (** aberto sem fechar)")
+    for block in texto.split("\n\n"):
+        lines = block.split("\n")
+        islist = any(re.match(r"^\s*[•→]", ln) for ln in lines)
+        if islist:
+            for ln in lines:
+                if re.match(r"^\s*[•→]", ln) and len(ln) > 66:
+                    probs.append(f"bullet/seta com {len(ln)} chars (máx 64)")
+        elif len(block) > 112:
+            probs.append(f"parágrafo de prosa com {len(block)} chars (máx ~108, 3 linhas)")
+    # Slide raso: a reclamação nº 1. Capa pode ser mais enxuta.
+    minimo = 220 if idx == 0 else 265
+    if len(texto) < minimo:
+        probs.append(f"slide raso ({len(texto)} chars; alvo 300-400) — aprofunde "
+                     "com dado/mecanismo DO ARTIGO, sem encher linguiça")
+    return probs
+
+
+def _corrigir_slides_vicios(client, slides_out, artigo, usage_acc, max_rodadas=2):
+    """FASE 2.5: valida cada slide e manda o modelo REESCREVER só os que têm
+    problema (vício de IA, parágrafo longo, slide raso, travessão...). Fecha
+    o loop que faltava no gerador: antes publicava com defeito e ninguém
+    corrigia — a correção manual era o motivo do conteúdo sair 'inútil'."""
+    relatorio = {"rodadas": 0, "corrigidos": [], "restantes": {}}
+    for rodada in range(max_rodadas):
+        pendentes = {i: _problemas_slide(s["texto"], i)
+                     for i, s in enumerate(slides_out)
+                     if _problemas_slide(s["texto"], i)}
+        if not pendentes:
+            break
+        relatorio["rodadas"] = rodada + 1
+        lista = []
+        for i, probs in sorted(pendentes.items()):
+            lista.append(f"SLIDE {i+1}:\n{slides_out[i]['texto']}\n"
+                         "PROBLEMAS:\n- " + "\n- ".join(probs))
+        prompt = (
+            "Você revisa slides de um carrossel de análise econômica (estilo "
+            "Varos: denso, direto, sem cara de IA). Reescreva APENAS os slides "
+            "abaixo, corrigindo os problemas apontados em cada um.\n\n"
+            "REGRAS DURAS: parágrafo de prosa com no máx ~105 caracteres "
+            "(3 linhas); bullet (•) e seta (→) com no máx 62; 1 parágrafo "
+            "INTEIRO em negrito (**assim**) por slide; slide entre 300 e 400 "
+            "caracteres; sem travessão (— –); aspas duplas; sem frase de "
+            "efeito/aforismo/antítese; sem dois-pontos de anúncio no meio de "
+            "frase (dois-pontos SÓ antes de lista de bullets); zero clichê "
+            "de IA. Para aprofundar slide raso, use SOMENTE fatos do "
+            "ARTIGO-FONTE abaixo — NUNCA invente dado novo.\n\n"
+            f"ARTIGO-FONTE (única fonte de fatos permitida):\n{artigo}\n\n"
+            'Retorne SOMENTE JSON: {"slides":[{"i":N,"texto":"..."}]} '
+            "com i = número do slide (1-based) que você corrigiu.\n\n"
+            + "\n\n".join(lista)
+        )
+        try:
+            resp = claude_call_with_retry(client, model=GERAR_MODEL,
+                max_tokens=8000,
+                messages=[{"role": "user", "content": prompt}])
+            _acumular_usage(usage_acc, resp)
+            out = _extrair_texto_resp(resp)
+            if out.startswith("```"):
+                out = re.sub(r"^```[a-z]*\n?", "", out)
+                out = re.sub(r"\n?```$", "", out).strip()
+            dados = _parse_claude_json(out)
+            for item in (dados or {}).get("slides", []):
+                try:
+                    i = int(item.get("i", 0)) - 1
+                except (ValueError, TypeError):
+                    continue
+                novo = str(item.get("texto") or "").strip()
+                if 0 <= i < len(slides_out) and novo:
+                    slides_out[i]["texto"] = _sanitizar_slide_varos(
+                        _remover_dois_pontos_anuncio(_strip_em_dash(novo)))
+                    if (i + 1) not in relatorio["corrigidos"]:
+                        relatorio["corrigidos"].append(i + 1)
+        except Exception as e:
+            relatorio["erro"] = str(e)
+            break
+    relatorio["restantes"] = {
+        i + 1: _problemas_slide(s["texto"], i)
+        for i, s in enumerate(slides_out) if _problemas_slide(s["texto"], i)
+    }
+    return slides_out, relatorio
+
+
 @app.route("/api/gerar", methods=["POST"])
 def api_gerar():
     if not ANTHROPIC_AVAILABLE:
@@ -4117,11 +4319,14 @@ def api_gerar():
     # prompt_para_debug eh preenchido dentro do try (vem de fase_debug)
     prompt_para_debug = ""
     try:
-        client = _anthropic_lib.Anthropic(api_key=ANTHROPIC_API_KEY)
+        # timeout alto: fase 1 pesquisa na web antes de escrever (2-4 min)
+        client = _anthropic_lib.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=480.0)
+        usage_acc = _novo_usage()
         # ══ GERACAO EM 2 FASES (estilo Varos): artigo corrido -> fatiar ══
         (titulo_gerado, slides_raw, artigo_gerado, legenda_gerada,
          hashtags_geradas, fase_debug) = _gerar_conteudo_2fases(
-            client, topico, brief_enriched, imagens_block, num_slides, system_artigo
+            client, topico, brief_enriched, imagens_block, num_slides,
+            system_artigo, usage_acc=usage_acc
         )
         prompt_para_debug = fase_debug.get("prompt_artigo", "")
         if not slides_raw:
@@ -4228,6 +4433,11 @@ def api_gerar():
             texto_sanit = _sanitizar_slide_varos(s.get("texto", ""))
             slides_out.append({"texto": texto_sanit, "image_url": img})
 
+        # ══ FASE 2.5: VALIDAR + CORRIGIR ══ Roda o corretor da casa em cada
+        # slide e manda o modelo reescrever os que tem vicio/raso/estouro.
+        slides_out, correcao_rel = _corrigir_slides_vicios(
+            client, slides_out, artigo_gerado, usage_acc)
+
         # Build slug
         slug_base = re.sub(r"[^a-z0-9]+" , "-", titulo_gerado.lower())[:40].strip("-")
         from datetime import date as _date2
@@ -4307,18 +4517,24 @@ def api_gerar():
         # Sanitiza a legenda (tira travessao, aspas simples, cliche de abertura).
         legenda_gerada = _sanitizar_legenda(legenda_gerada)
         hashtags_str = " ".join(hashtags_geradas) if hashtags_geradas else ""
+        # Custo da geracao (tokens + buscas), mostrado no dashboard
+        api_usage = dict(usage_acc)
+        api_usage["custo_usd"] = _custo_usd(usage_acc)
+        api_usage["model"] = GERAR_MODEL
         with get_db() as conn:
             conn.execute("""
                 INSERT INTO carrosseis (slug, titulo, arquivo, num_slides, status,
-                                        artigo, legenda, hashtags)
-                VALUES (?, ?, ?, ?, 'rascunho', ?, ?, ?)
+                                        artigo, legenda, hashtags, api_usage)
+                VALUES (?, ?, ?, ?, 'rascunho', ?, ?, ?, ?)
                 ON CONFLICT(slug) DO UPDATE SET
                     titulo=excluded.titulo, arquivo=excluded.arquivo,
                     num_slides=excluded.num_slides, artigo=excluded.artigo,
                     legenda=excluded.legenda, hashtags=excluded.hashtags,
+                    api_usage=excluded.api_usage,
                     updated_at=datetime('now')
             """, (slug, titulo_gerado, nome, len(slides_out),
-                  artigo_gerado, legenda_gerada, hashtags_str))
+                  artigo_gerado, legenda_gerada, hashtags_str,
+                  json.dumps(api_usage, ensure_ascii=False)))
 
         return jsonify({
             "ok": True, "slug": slug, "titulo": titulo_gerado, "url": f"/c/{slug}",
@@ -4332,6 +4548,9 @@ def api_gerar():
             # - urls_fetched: cada URL tem is_instagram + is_stale + published_date
             "avisos_data": avisos_data,
             "avisos_dados": avisos_dados,
+            # Custo/uso da API desta geracao + o que a fase 2.5 corrigiu
+            "usage": api_usage,
+            "correcao": correcao_rel,
             "debug": {
                 "system_used":      system_artigo,
                 "user_prompt":      prompt_para_debug,
@@ -4341,7 +4560,7 @@ def api_gerar():
                 "prompt_fatiar":    fase_debug.get("prompt_fatiar", ""),
                 "urls_fetched":     urls_info,
                 "system_is_custom": bool(system_override),
-                "model":            "claude-sonnet-4-5",
+                "model":            GERAR_MODEL,
                 "images_from_links": all_images,           # candidatas extraidas
                 "images_used_from_links": sorted(used_link_indices),  # indices que viraram slide
                 "pexels_api_active": bool(PEXELS_API_KEY),

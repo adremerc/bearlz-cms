@@ -21,4 +21,4 @@ RUN mkdir -p /app/data
 EXPOSE 8080
 
 # gunicorn.conf.py do repo eh auto-carregado pelo gunicorn (timeout=180 etc).
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8080", "--workers", "2"]
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8080", "--workers", "2", "--timeout", "600", "--graceful-timeout", "90"]

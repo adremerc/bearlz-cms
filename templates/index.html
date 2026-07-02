@@ -76,7 +76,7 @@
     <p class="font-display flex-1" style="font-size:16.5px;font-weight:600;line-height:1.35;color:var(--text);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">{{ c.titulo }}</p>
 
     <div class="flex items-center justify-between mt-4 pt-3" style="border-top:1px solid var(--border)">
-      <span style="font-size:12px;color:var(--text-3)">{% if c.num_slides %}{{ c.num_slides }} slide{% if c.num_slides != 1 %}s{% endif %}{% endif %}</span>
+      <span style="font-size:12px;color:var(--text-3)">{% if c.num_slides %}{{ c.num_slides }} slide{% if c.num_slides != 1 %}s{% endif %}{% endif %}{% if c.custo_fmt %} <span title="{{ c.custo_title }}" style="color:var(--text-3);opacity:.85">· {{ c.custo_fmt }}</span>{% endif %}</span>
       <span style="font-size:12px;color:var(--text-3)">{{ c.created_fmt.split(' ')[0] if c.created_fmt else '' }}</span>
     </div>
   </a>
