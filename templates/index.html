@@ -24,7 +24,7 @@
       ('aprovado',        'Aprovado', counts.aprovado),
       ('publicado',       'Publicado',counts.publicado),
     ] %}
-    <a href="?status={{ key }}&prio={{ prio_filter }}{% if busca %}&q={{ busca }}{% endif %}"
+    <a href="?status={{ key }}&prio={{ prio_filter }}{% if busca %}&q={{ busca|urlencode }}{% endif %}"
        class="{% if status_filter == key %}seg-active{% endif %}">
       {{ label }} <span style="font-size:11px;color:var(--text-3);font-weight:600">{{ count }}</span>
     </a>
@@ -34,7 +34,7 @@
   <!-- Prioridade -->
   <div class="seg flex-shrink-0">
     {% for key, label in [('todos','Prioridade'), ('alta','Alta'), ('media','Média'), ('baixa','Baixa')] %}
-    <a href="?status={{ status_filter }}&prio={{ key }}{% if busca %}&q={{ busca }}{% endif %}"
+    <a href="?status={{ status_filter }}&prio={{ key }}{% if busca %}&q={{ busca|urlencode }}{% endif %}"
        class="{% if prio_filter == key %}seg-active{% endif %}">{{ label }}</a>
     {% endfor %}
   </div>
@@ -76,7 +76,7 @@
     <p class="font-display flex-1" style="font-size:16.5px;font-weight:600;line-height:1.35;color:var(--text);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">{{ c.titulo }}</p>
 
     <div class="flex items-center justify-between mt-4 pt-3" style="border-top:1px solid var(--border)">
-      <span style="font-size:12px;color:var(--text-3)">{% if c.num_slides %}{{ c.num_slides }} slides{% endif %}</span>
+      <span style="font-size:12px;color:var(--text-3)">{% if c.num_slides %}{{ c.num_slides }} slide{% if c.num_slides != 1 %}s{% endif %}{% endif %}</span>
       <span style="font-size:12px;color:var(--text-3)">{{ c.created_fmt.split(' ')[0] if c.created_fmt else '' }}</span>
     </div>
   </a>

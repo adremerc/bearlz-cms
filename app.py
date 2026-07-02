@@ -631,7 +631,7 @@ def fmt_data(iso: str) -> str:
 def dashboard():
     status_filter = request.args.get("status", "todos")
     prio_filter   = request.args.get("prio",   "todos")
-    busca         = request.args.get("q", "").strip().lower()
+    busca         = request.args.get("q", "").strip()
 
     with get_db() as conn:
         # Build query with optional filters
@@ -657,7 +657,9 @@ def dashboard():
 
     carrosseis = [dict(r) for r in rows]
     if busca:
-        carrosseis = [c for c in carrosseis if busca in c["titulo"].lower()]
+        b = busca.lower()
+        # (titulo or "") evita 500 se alguma linha tiver titulo NULL
+        carrosseis = [c for c in carrosseis if b in (c["titulo"] or "").lower()]
 
     for c in carrosseis:
         c["status_label"], c["status_color"] = STATUS_LABELS.get(c["status"], ("?", "gray"))
@@ -768,10 +770,20 @@ def api_carrossel_save(slug):
     try:
         body = json.dumps(payload, ensure_ascii=False)
         p.write_text(body, encoding="utf-8")
+        # Mantem num_slides em sincronia com o editor: sem isso o card do
+        # dashboard mostra a contagem da geracao original pra sempre (ex.:
+        # "13 slides" num post que foi editado pra 15).
+        slides_novos = state.get("slides")
         with get_db() as conn:
-            conn.execute(
-                "UPDATE carrosseis SET updated_at=datetime('now') WHERE slug=?", (slug,)
-            )
+            if isinstance(slides_novos, list) and slides_novos:
+                conn.execute(
+                    "UPDATE carrosseis SET updated_at=datetime('now'), num_slides=? WHERE slug=?",
+                    (len(slides_novos), slug)
+                )
+            else:
+                conn.execute(
+                    "UPDATE carrosseis SET updated_at=datetime('now') WHERE slug=?", (slug,)
+                )
         # Commita os edits no branch data-generated (sobrevive deploys).
         _gh_save_async(
             f"data/edits/{p.name}",
