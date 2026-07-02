@@ -555,6 +555,45 @@ def api_admin_editar_meta(slug):
     return jsonify({"ok": True, "campos": sorted(campos)})
 
 
+@app.route("/api/_admin/criar-shell", methods=["POST"])
+def api_admin_criar_shell():
+    """Cria um carrossel VAZIO (shell) a partir do template, SEM chamar LLM.
+    Pra posts escritos a mao aqui: cria o shell, depois manda os slides via
+    /save e o texto via /editar-meta. Nao gasta API. Body: {titulo, num_slides?}.
+    Requer X-Admin-Key."""
+    if not _admin_check_key():
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json() or {}
+    titulo = (data.get("titulo") or "").strip()
+    if not titulo:
+        return jsonify({"error": "titulo obrigatorio"}), 400
+    n = min(max(int(data.get("num_slides", 15)), 1), 20)
+    # slug igual ao do gerador (acentos viram '-'), com data de hoje
+    slug_base = re.sub(r"[^a-z0-9]+", "-", titulo.lower())[:40].strip("-") or "post"
+    from datetime import date as _d
+    slug = f"{slug_base}-{_d.today().strftime('%Y%m%d')}"
+    nome = f"carrossel-{slug}.html"
+    template_path = CARROSSEIS_DIR / "carrossel-carga-tributaria.html"
+    if not template_path.exists():
+        return jsonify({"error": "template ausente"}), 500
+    html = template_path.read_text(encoding="utf-8")
+    html = re.sub(r"<title>.*?</title>",
+                  f"<title>Carrossel — {titulo} | Bearlz</title>", html, flags=re.DOTALL)
+    GENERATED_DIR.mkdir(exist_ok=True)
+    (GENERATED_DIR / nome).write_text(html, encoding="utf-8")
+    # Persiste no branch data-generated pra sobreviver a deploys
+    _gh_save_async(f"data/generated/{nome}", html.encode("utf-8"), f"Shell manual: {titulo}")
+    with get_db() as conn:
+        conn.execute("""
+            INSERT INTO carrosseis (slug, titulo, arquivo, num_slides, status)
+            VALUES (?, ?, ?, ?, 'rascunho')
+            ON CONFLICT(slug) DO UPDATE SET
+                titulo=excluded.titulo, arquivo=excluded.arquivo,
+                num_slides=excluded.num_slides, updated_at=datetime('now')
+        """, (slug, titulo, nome, n))
+    return jsonify({"ok": True, "slug": slug, "url": f"/c/{slug}"})
+
+
 @app.route("/api/_admin/bump-asset-version", methods=["POST"])
 def api_admin_bump_assets():
     """Faz patch em todos os HTMLs em data/generated/ trocando
