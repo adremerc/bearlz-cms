@@ -418,11 +418,14 @@ function render(){
     // Roda DEPOIS do display:block pra garantir que o .edit-actions
     // esteja visivel quando a injecao acontece.
     setTimeout(_ensureEditButtons, 20);
-    // Auto-scroll pro textarea ficar visivel no iframe
+    // Auto-scroll pro textarea ficar visivel no iframe.
+    // block:'nearest' (e nao 'center'): se o textarea JA esta visivel nao
+    // move NADA (nem a pagina-mae); se nao esta, rola o minimo necessario.
+    // Com 'center' a tela recentralizava sempre = tremida ao entrar no edit.
     setTimeout(()=>{
       const ta=document.getElementById('editTA');
       if(ta){
-        ta.scrollIntoView({behavior:'smooth',block:'center'});
+        ta.scrollIntoView({behavior:'smooth',block:'nearest'});
       }
     },80);
   }else{
@@ -1114,7 +1117,11 @@ function onAvatarFile(input){
 }
 
 /* ── Text editing ── */
-function startEdit(){editingText=true;render();setTimeout(()=>{const ta=document.getElementById('editTA');if(ta){ta.focus();_updateCharCount(ta.value);}},10);}
+/* preventScroll: sem ele o focus() faz o navegador dar um scroll-jump pra
+   revelar o textarea (e dentro de iframe rola a pagina-mae junto) — a tela
+   "pulava e voltava" ao entrar no modo edicao. O scroll fica por conta do
+   scrollIntoView do render(), que so age se precisar. */
+function startEdit(){editingText=true;render();setTimeout(()=>{const ta=document.getElementById('editTA');if(ta){try{ta.focus({preventScroll:true});}catch(e){ta.focus();}_updateCharCount(ta.value);}},10);}
 
 /* Contador de caracteres ao vivo com cores semaforicas:
    - verde:  < 280 (ideal)
@@ -1157,7 +1164,7 @@ function inserirBullet(){
     newPos=start+3;
   }
   ta.value=novoVal;
-  ta.focus();
+  try{ta.focus({preventScroll:true});}catch(e){ta.focus();}
   ta.setSelectionRange(newPos,newPos);
   if(typeof _updateCharCount==='function')_updateCharCount(ta.value);
   if(typeof liveUpdate==='function')liveUpdate(ta.value);
