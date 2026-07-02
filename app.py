@@ -360,11 +360,12 @@ def claude_call_with_retry(client, max_retries=4, **params):
 
 
 # ── Modelo do gerador + custo por post ───────────────────────────────────────
-# O gerador usa Opus 4.8 (mesmo modelo do Claude Code) com WEB SEARCH server-
-# side: o modelo pesquisa e VERIFICA os dados antes de escrever o artigo, em
-# vez de escrever de memoria (que inventava/desatualizava numeros). Override
-# via env GERAR_MODEL se quiser baratear (ex: claude-sonnet-4-6).
-GERAR_MODEL = os.environ.get("GERAR_MODEL", "claude-opus-4-8")
+# O gerador roda no Sonnet 4.5 (decisao do Adre, 02/07/2026: o resultado do
+# Opus 4.8 a US$ 1,49/post nao compensou — os posts pra valer sao feitos a mao
+# na sessao do Claude Code; o gerador e so rascunho barato). Ele mantem o web
+# search server-side (verifica dados antes de escrever) e a fase 2.5 de
+# correcao. Override via env GERAR_MODEL se quiser trocar.
+GERAR_MODEL = os.environ.get("GERAR_MODEL", "claude-sonnet-4-5")
 
 # USD por 1M tokens (input, output). Cache: read = 0.1x input, write = 1.25x.
 # Web search: US$ 10 por 1.000 buscas.
