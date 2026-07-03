@@ -557,17 +557,19 @@ def api_admin_editar_meta(slug):
 
 @app.route("/api/_admin/criar-shell", methods=["POST"])
 def api_admin_criar_shell():
-    """Cria um carrossel VAZIO (shell) a partir do template, SEM chamar LLM.
-    Pra posts escritos a mao aqui: cria o shell, depois manda os slides via
-    /save e o texto via /editar-meta. Nao gasta API. Body: {titulo, num_slides?}.
-    Requer X-Admin-Key."""
+    """Cria um carrossel COMPLETO a mao, SEM chamar LLM. Injeta titulo, slug,
+    subtitulo e os SLIDES direto no HTML do template (mesmas substituicoes que
+    o /api/gerar faz), pra o post renderizar certo no viewer publico. Body:
+    {titulo, slides:[{text, image?}], num_slides?}. Se 'slides' vier, vira o
+    conteudo do post; senao cria shell vazio. Requer X-Admin-Key."""
     if not _admin_check_key():
         return jsonify({"error": "unauthorized"}), 401
     data = request.get_json() or {}
     titulo = (data.get("titulo") or "").strip()
     if not titulo:
         return jsonify({"error": "titulo obrigatorio"}), 400
-    n = min(max(int(data.get("num_slides", 15)), 1), 20)
+    slides_in = data.get("slides") if isinstance(data.get("slides"), list) else []
+    n = len(slides_in) if slides_in else min(max(int(data.get("num_slides", 15)), 1), 20)
     # slug igual ao do gerador (acentos viram '-'), com data de hoje
     slug_base = re.sub(r"[^a-z0-9]+", "-", titulo.lower())[:40].strip("-") or "post"
     from datetime import date as _d
@@ -577,12 +579,38 @@ def api_admin_criar_shell():
     if not template_path.exists():
         return jsonify({"error": "template ausente"}), 500
     html = template_path.read_text(encoding="utf-8")
+    # Mesmas substituicoes do /api/gerar (titulo, h1, subtitulo, slug JS, LS key)
     html = re.sub(r"<title>.*?</title>",
-                  f"<title>Carrossel — {titulo} | Bearlz</title>", html, flags=re.DOTALL)
+                  f"<title>Carrossel — {titulo} | Gabriel Bearlz</title>", html, flags=re.DOTALL)
+    html = re.sub(r"(<h1>).*?(</h1>)", rf"\g<1>{titulo}\g<2>", html, flags=re.DOTALL)
+    html = re.sub(r'(<p id="subtitle">).*?(</p>)',
+                  rf"\g<1>{n} slides · Gabriel Bearlz\g<2>", html, flags=re.DOTALL)
+    html = re.sub(r"window\.CAROUSEL_SLUG='[^']*'",
+                  f"window.CAROUSEL_SLUG='{slug}'", html)
+    ls_key_slug = slug.replace("-", "_")
+    html = re.sub(r"window\.CAROUSEL_LS_KEY='[^']*'",
+                  f"window.CAROUSEL_LS_KEY='bearlz_{ls_key_slug}_v1'", html)
+    html = re.sub(r"(?<!window\.CAROUSEL_)LS_KEY='[^']*'",
+                  f"LS_KEY='bearlz_{ls_key_slug}_v1'", html)
+    # Injeta o array de slides no HTML (assim o viewer publico ja mostra o
+    # conteudo certo, sem depender so do editor-state).
+    if slides_in:
+        def _esc(t):
+            return (str(t).replace("\\", "\\\\").replace("`", "\\`")
+                    .replace("${", "\\${").replace("\n", "\\n"))
+        linhas = ["  {id:%d,text:`%s`,image:'%s',zoom:1,ox:50,oy:50}" % (
+            i + 1, _esc(s.get("text", "")), (s.get("image") or "")) for i, s in enumerate(slides_in)]
+        novo_array = "const slides=[\n" + ",\n".join(linhas) + "\n];"
+        html = re.sub(r"const slides=\[.*?\];", lambda _: novo_array, html, flags=re.DOTALL)
     GENERATED_DIR.mkdir(exist_ok=True)
     (GENERATED_DIR / nome).write_text(html, encoding="utf-8")
-    # Persiste no branch data-generated pra sobreviver a deploys
-    _gh_save_async(f"data/generated/{nome}", html.encode("utf-8"), f"Shell manual: {titulo}")
+    # Se ja existia um edit salvo desse slug (post antigo), apaga pra nao
+    # sobrescrever o HTML novo com estado velho.
+    ep = _edits_path(slug)
+    if ep.exists() and not slides_in:
+        try: ep.unlink()
+        except Exception: pass
+    _gh_save_async(f"data/generated/{nome}", html.encode("utf-8"), f"Post manual: {titulo}")
     with get_db() as conn:
         conn.execute("""
             INSERT INTO carrosseis (slug, titulo, arquivo, num_slides, status)
@@ -591,7 +619,7 @@ def api_admin_criar_shell():
                 titulo=excluded.titulo, arquivo=excluded.arquivo,
                 num_slides=excluded.num_slides, updated_at=datetime('now')
         """, (slug, titulo, nome, n))
-    return jsonify({"ok": True, "slug": slug, "url": f"/c/{slug}"})
+    return jsonify({"ok": True, "slug": slug, "url": f"/c/{slug}", "num_slides": n})
 
 
 @app.route("/api/_admin/bump-asset-version", methods=["POST"])
