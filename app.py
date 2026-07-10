@@ -957,6 +957,158 @@ def api_carrossel_save(slug):
         return jsonify({"error": str(e)}), 500
 
 
+# ── Blog (teste Mercurius): renderiza o post como análise textual ─────────────
+
+_MESES_PT = ["janeiro", "fevereiro", "março", "abril", "maio", "junho",
+             "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"]
+
+
+def _blog_data_fmt(iso):
+    """'2026-07-09 13:17:48' -> '9 de julho de 2026'."""
+    try:
+        d = datetime.fromisoformat(str(iso)[:19])
+        return f"{d.day} de {_MESES_PT[d.month - 1]} de {d.year}"
+    except Exception:
+        return str(iso or "")[:10]
+
+
+def _blog_slide_html(texto):
+    """Converte o texto de um slide (com **negrito**, • e →) em HTML de blog."""
+    import html as _htmlmod
+
+    def _fmt(s):
+        s = _htmlmod.escape(s, quote=False)
+        return re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", s)
+
+    out = []
+    for block in texto.split("\n\n"):
+        lines = [ln for ln in block.split("\n") if ln.strip()]
+        if not lines:
+            continue
+        if any(re.match(r"^\s*[•→]", ln) for ln in lines):
+            prosa, itens = [], []
+            for ln in lines:
+                if re.match(r"^\s*[•→]", ln):
+                    itens.append(re.sub(r"^\s*[•→]\s*", "", ln).strip())
+                else:
+                    prosa.append(ln.strip())
+            if prosa:
+                out.append("<p>%s</p>" % _fmt(" ".join(prosa)))
+            out.append("<ul>%s</ul>" % "".join("<li>%s</li>" % _fmt(i) for i in itens))
+        else:
+            txt = " ".join(ln.strip() for ln in lines)
+            m = re.fullmatch(r"\*\*(.+)\*\*", txt)
+            if m and "**" not in m.group(1):
+                # Parágrafo inteiro em negrito vira bloco de destaque (estilo Nord)
+                out.append('<p class="destaque">%s</p>'
+                           % _htmlmod.escape(m.group(1), quote=False))
+            else:
+                out.append("<p>%s</p>" % _fmt(txt))
+    return "\n".join(out)
+
+
+def _blog_carregar(slug):
+    """Retorna (row, slides) — slides do editor (ricos) ou None."""
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM carrosseis WHERE slug = ?", (slug,)).fetchone()
+    if not row:
+        return None, None
+    slides = None
+    p = _edits_path(slug)
+    if p.exists():
+        try:
+            st = json.loads(p.read_text(encoding="utf-8")).get("state") or {}
+            if isinstance(st.get("slides"), list) and st["slides"]:
+                slides = st["slides"]
+        except Exception:
+            pass
+    return dict(row), slides
+
+
+def _blog_capa(arquivo, slides, permitir_data=False):
+    """Capa do post: imagem http do slide 1; se o editor salvou base64,
+    cai pra primeira imagem http do arquivo HTML (base64 de 50-100 KB por
+    card deixaria o /blog com dezenas de MB)."""
+    img = (slides[0].get("image") or "") if slides else ""
+    if img.startswith("http"):
+        return img
+    if permitir_data and img.startswith("data:"):
+        return img
+    if arquivo:
+        path = _find_carrossel_file(arquivo)
+        if path:
+            try:
+                m = re.search(r"image:\s*'(https?://[^']+)'",
+                              path.read_text(encoding="utf-8", errors="replace"))
+                if m:
+                    return m.group(1)
+            except Exception:
+                pass
+    return ""
+
+
+@app.route("/blog")
+def blog_index():
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT slug, titulo, legenda, artigo, arquivo, created_at FROM carrosseis "
+            "ORDER BY created_at DESC"
+        ).fetchall()
+    posts = []
+    for r in rows:
+        r = dict(r)
+        if not (r.get("artigo") or "").strip():
+            continue  # so entra no blog quem tem analise completa
+        slides = None
+        p = _edits_path(r["slug"])
+        if p.exists():
+            try:
+                st = json.loads(p.read_text(encoding="utf-8")).get("state") or {}
+                if isinstance(st.get("slides"), list) and st["slides"]:
+                    slides = st["slides"]
+            except Exception:
+                pass
+        posts.append({
+            "slug": r["slug"], "titulo": r["titulo"],
+            "capa": _blog_capa(r.get("arquivo"), slides),
+            "resumo": (r.get("legenda") or "")[:220],
+            "data_fmt": _blog_data_fmt(r["created_at"]),
+        })
+    return render_template("blog_index.html", posts=posts)
+
+
+@app.route("/blog/<slug>")
+def blog_post(slug):
+    row, slides = _blog_carregar(slug)
+    if not row:
+        abort(404)
+    if slides:
+        corpo = "\n".join(_blog_slide_html(s.get("text") or "") for s in slides)
+        capa = _blog_capa(row.get("arquivo"), slides, permitir_data=True)
+    elif (row.get("artigo") or "").strip():
+        corpo = "\n".join("<p>%s</p>" % par.strip()
+                          for par in row["artigo"].split("\n\n") if par.strip())
+        capa = ""
+    else:
+        abort(404)
+    tags = [t for t in (row.get("hashtags") or "").split() if t.startswith("#")]
+    categoria = tags[0].lstrip("#") if tags else ""
+    palavras = len(re.sub(r"<[^>]+>", " ", corpo).split())
+    leitura = max(3, round(palavras / 180))
+    return render_template(
+        "blog.html",
+        titulo=row["titulo"],
+        legenda=row.get("legenda") or "",
+        corpo_html=corpo,
+        capa=capa,
+        tags=tags,
+        categoria=categoria,
+        data_fmt=_blog_data_fmt(row["created_at"]),
+        leitura=leitura,
+        foto_autor="",  # trocar pela foto real do Gabriel quando tivermos a URL
+    )
+
+
 # ── API JSON ──────────────────────────────────────────────────────────────────
 
 @app.route("/api/status", methods=["POST"])

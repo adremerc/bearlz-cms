@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Análises | Mercurius</title>
+<meta name="description" content="Análises completas de mercado, economia e investimentos por Gabriel Bearlz — Mercurius Consultoria de Investimentos.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0f1419; --card:#1a2332; --ink:#f4f8fb; --muted:#9db0c3; --dim:#7f91a4;
+    --accent:#02fef3; --sans:'Inter',system-ui,sans-serif; --display:'Outfit',var(--sans);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .topo{border-bottom:1px solid rgba(157,176,195,.12)}
+  .topo-in{max-width:1060px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+  .logo{font-family:var(--display);font-weight:700;font-size:19px;letter-spacing:.06em}
+  .logo b{color:var(--accent)}
+  .topo-nav{font-size:13.5px;color:var(--muted)}
+  .topo-nav a:hover{color:var(--accent)}
+  .wrap{max-width:1060px;margin:0 auto;padding:48px 24px 80px}
+  h1{font-family:var(--display);font-size:clamp(26px,4vw,36px);font-weight:700;margin-bottom:8px}
+  .sub{color:var(--muted);font-size:15.5px;margin-bottom:40px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:22px}
+  .card{background:var(--card);border:1px solid rgba(157,176,195,.12);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:transform .15s,border-color .15s}
+  .card:hover{transform:translateY(-3px);border-color:rgba(2,254,243,.45)}
+  .card img{width:100%;aspect-ratio:16/9;object-fit:cover;background:#141b22}
+  .card-body{padding:18px 20px 20px;display:flex;flex-direction:column;gap:9px;flex:1}
+  .card h2{font-family:var(--display);font-size:18px;font-weight:600;line-height:1.3}
+  .card p{font-size:13.5px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .card-meta{margin-top:auto;padding-top:10px;font-size:12.5px;color:var(--dim);display:flex;justify-content:space-between}
+  .card-meta b{color:var(--accent);font-weight:600}
+</style>
+</head>
+<body>
+<header class="topo">
+  <div class="topo-in">
+    <a class="logo" href="/blog">MERCURIUS<b>.</b></a>
+    <nav class="topo-nav"><a href="https://mercuriuscapital.com.br/" target="_blank" rel="noopener">mercuriuscapital.com.br</a></nav>
+  </div>
+</header>
+<main class="wrap">
+  <h1>Análises</h1>
+  <p class="sub">Mercado, economia e investimentos &mdash; por Gabriel Bearlz, Mercurius Consultoria de Investimentos.</p>
+  <div class="grid">
+    {% for p in posts %}
+    <a class="card" href="/blog/{{ p.slug }}">
+      {% if p.capa %}<img src="{{ p.capa }}" alt="" loading="lazy">{% endif %}
+      <div class="card-body">
+        <h2>{{ p.titulo }}</h2>
+        <p>{{ p.resumo }}</p>
+        <div class="card-meta"><span>{{ p.data_fmt }}</span><b>Ler análise &rarr;</b></div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</main>
+</body>
+</html>
