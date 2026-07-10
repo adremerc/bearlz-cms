@@ -1007,8 +1007,43 @@ def _blog_slide_html(texto):
     return "\n".join(out)
 
 
+def _slides_do_arquivo(arquivo):
+    """Extrai os slides (texto rico + imagem) do `const slides=[...]` do HTML
+    do carrossel. Fallback pra post que nunca foi salvo no editor: assim o
+    blog sai rico (negrito/bullets/capa) direto da geracao automatica."""
+    if not arquivo:
+        return None
+    path = _find_carrossel_file(arquivo)
+    if not path:
+        return None
+    try:
+        html = path.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return None
+    m = re.search(r"const slides=\[(.*?)\];", html, re.DOTALL)
+    if not m:
+        return None
+    slides = []
+    # image vem como 'url' (gerados/criar-shell), PX+'id/foto.jpeg'+Q
+    # (template antigo) ou uma variavel JS tipo chartJuros (grafico embutido
+    # do template — vira imagem vazia, o corpo do blog so usa a capa).
+    for tm in re.finditer(
+            r"\{id:\d+\s*,\s*text:`((?:\\.|[^`\\])*)`\s*,\s*"
+            r"image:\s*(?:(PX\+)?'([^']*)'|[A-Za-z_$][\w$]*)",
+            m.group(1), re.DOTALL):
+        # Desfaz o escape do gerador: \\ -> \, \` -> `, \$ -> $, \n -> quebra
+        txt = re.sub(r"\\(.)", lambda e: "\n" if e.group(1) == "n" else e.group(1),
+                     tm.group(1))
+        img = tm.group(3) or ""
+        if tm.group(2):
+            img = ("https://images.pexels.com/photos/" + img
+                   + "?auto=compress&cs=tinysrgb&w=1080")
+        slides.append({"text": txt, "image": img})
+    return slides or None
+
+
 def _blog_carregar(slug):
-    """Retorna (row, slides) — slides do editor (ricos) ou None."""
+    """Retorna (row, slides): slides do editor se houver, senao do HTML."""
     with get_db() as conn:
         row = conn.execute("SELECT * FROM carrosseis WHERE slug = ?", (slug,)).fetchone()
     if not row:
@@ -1022,6 +1057,8 @@ def _blog_carregar(slug):
                 slides = st["slides"]
         except Exception:
             pass
+    if not slides:
+        slides = _slides_do_arquivo(dict(row).get("arquivo"))
     return dict(row), slides
 
 
@@ -1049,16 +1086,21 @@ def _blog_capa(arquivo, slides, permitir_data=False):
 
 @app.route("/blog")
 def blog_index():
+    # Porteiro: so entra no blog o que o Gabriel ja aprovou (ou publicou).
+    # /blog?todos=1 mostra tudo (preview interno antes da aprovacao).
+    mostrar_todos = request.args.get("todos") == "1"
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT slug, titulo, legenda, artigo, arquivo, created_at FROM carrosseis "
-            "ORDER BY created_at DESC"
+            "SELECT slug, titulo, legenda, artigo, arquivo, status, created_at "
+            "FROM carrosseis ORDER BY created_at DESC"
         ).fetchall()
     posts = []
     for r in rows:
         r = dict(r)
         if not (r.get("artigo") or "").strip():
             continue  # so entra no blog quem tem analise completa
+        if not mostrar_todos and r.get("status") not in ("aprovado", "publicado"):
+            continue
         slides = None
         p = _edits_path(r["slug"])
         if p.exists():
