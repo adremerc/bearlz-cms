@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Radar de temas — Bearlz CMS{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+
+  <div class="flex items-start justify-between gap-4 mb-6">
+    <div>
+      <h1 class="font-display text-2xl" style="font-weight:600;color:var(--text)">Radar de temas</h1>
+      <p class="text-sm mt-1" style="color:var(--text-3)">
+        Varredura de notícias agora, pontuada pelos padrões que já engajaram no perfil:
+        polarização política e urgência de preço em cripto/mercado.
+      </p>
+    </div>
+    <button id="btn-atualizar" onclick="atualizarRadar()" class="btn btn-primary flex-shrink-0">
+      <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+      </svg>
+      <span id="btn-atualizar-label">{% if topicos %}Atualizar{% else %}Rodar varredura{% endif %}</span>
+    </button>
+  </div>
+
+  {% if gerado_em %}
+  <p class="text-xs mb-4" style="color:var(--text-3)">
+    Última varredura: <span id="gerado-em-fmt">{{ gerado_em }}</span>
+    {% if usage and usage.custo_usd %} · custo ~US$ {{ '%.3f'|format(usage.custo_usd) }}{% endif %}
+  </p>
+  {% endif %}
+
+  <div id="lista-topicos" class="space-y-3">
+    {% for t in topicos %}
+    <div class="panel p-4">
+      <div class="flex items-start justify-between gap-3 mb-2">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="chip {% if t.potencial == 'alto' %}chip-danger{% else %}chip-warn{% endif %}">
+            potencial {{ t.potencial or 'médio' }}
+          </span>
+          <span class="chip chip-info">{{ t.categoria or '—' }}</span>
+        </div>
+      </div>
+      <h2 class="font-display text-base mb-1.5" style="font-weight:600;color:var(--text)">{{ t.titulo }}</h2>
+      <p class="text-sm mb-1.5" style="color:var(--text-2)"><b style="color:var(--text)">Gancho:</b> {{ t.gancho }}</p>
+      <p class="text-sm mb-3" style="color:var(--text-3)">{{ t.motivo }}</p>
+      {% if t.fontes %}
+      <div class="flex flex-wrap gap-2 mb-3">
+        {% for f in t.fontes %}
+        <a href="{{ f }}" target="_blank" rel="noopener" class="chip" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ f }}</a>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <a class="btn btn-primary"
+         href="/gerar?topico={{ t.titulo|urlencode }}&brief={{ (t.gancho ~ ' ' ~ t.motivo)|urlencode }}">
+        Criar carrossel a partir disso →
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if not topicos %}
+  <div class="panel p-8 text-center">
+    <p class="text-sm mb-4" style="color:var(--text-3)">
+      Nenhuma varredura ainda. Clique em "Rodar varredura" — o Claude pesquisa na web
+      (política, economia, cripto, IA) e sugere temas com maior chance de engajar.
+    </p>
+  </div>
+  {% endif %}
+
+  <div id="radar-erro" class="hidden mt-4 panel p-4" style="border-color:var(--danger)">
+    <p class="text-sm" style="color:var(--danger)" id="radar-erro-msg"></p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Formata a data ISO salva no cache pro padrao pt-BR local do navegador.
+  (function fmtData() {
+    const el = document.getElementById('gerado-em-fmt');
+    if (!el) return;
+    const d = new Date(el.textContent);
+    if (!isNaN(d)) el.textContent = d.toLocaleString('pt-BR');
+  })();
+
+  async function atualizarRadar() {
+    const btn = document.getElementById('btn-atualizar');
+    const label = document.getElementById('btn-atualizar-label');
+    const erroBox = document.getElementById('radar-erro');
+    const erroMsg = document.getElementById('radar-erro-msg');
+    erroBox.classList.add('hidden');
+    btn.disabled = true;
+    const labelAntigo = label.textContent;
+    label.textContent = 'Pesquisando... (1-2 min)';
+    try {
+      const r = await fetch('/api/radar/atualizar', { method: 'POST' });
+      const d = await r.json();
+      if (!r.ok || d.error) throw new Error(d.error || 'Falha na varredura.');
+      location.reload();
+    } catch (e) {
+      erroMsg.textContent = e.message || String(e);
+      erroBox.classList.remove('hidden');
+      btn.disabled = false;
+      label.textContent = labelAntigo;
+    }
+  }
+</script>
+{% endblock %}

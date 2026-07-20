@@ -3469,6 +3469,104 @@ def _montar_chart_url(ctype: str, ctitle: str, cdata: list) -> str:
             + "&width=1080&height=760&backgroundColor=white&version=2&devicePixelRatio=2")
 
 
+# ── Radar de temas virais ──────────────────────────────────────────────────
+# Varre noticias/mercado agora e sugere temas de carrossel, pontuados pelos
+# 2 padroes que os proprios dados de engajamento do perfil confirmaram:
+# polarizacao politica (controversia/fala de politico virando manchete) e
+# urgencia de preco/binario em cripto e mercado. Cache em disco: cada rodada
+# gasta busca web real, entao NAO recalcula a cada carregamento de pagina.
+
+RADAR_PATH = DATA_DIR / "radar.json"
+
+SYSTEM_RADAR = """Você é um analista de conteúdo viral para um perfil de \
+Instagram brasileiro de economia/mercado/geopolítica (formato carrossel, \
+15 slides, estilo Varos: denso, direto, sem CTA).
+
+Dados reais de engajamento do próprio perfil (curtidas+comentários dos \
+últimos ~2 meses) mostram 2 padrões que disparam MUITO acima da média:
+
+1. POLARIZAÇÃO POLÍTICA: quando a fala/ação de um político vira controvérsia \
+   e estampa manchete na grande mídia (ex.: um post sobre isso teve 577 de \
+   engajamento, mais que o dobro do 2º colocado — puxado por comentários, \
+   não só curtidas).
+2. URGÊNCIA/ALERTA DE PREÇO em cripto ou mercado, com tom de "vai cair/subir \
+   muito?" (ex.: "Bitcoin vai cair até 40k?", "Solana morreu?") — puxam MUITA \
+   curtida mesmo com poucos comentários.
+Título em formato de PERGUNTA BINÁRIA ("X ou Y?", "Isso é Z?") supera título \
+apenas explicativo em ambos os padrões.
+Conteúdo puramente explicativo/factual sem provocação (ex.: "por que as \
+empresas fogem do Brasil") performou mal (3-6 curtidas).
+
+TAREFA: use a ferramenta web_search (6-10 buscas) para achar o que está \
+acontecendo AGORA (últimos 3-7 dias) no Brasil e no mundo em: política \
+eleitoral brasileira, economia/mercado brasileiro, criptomoedas, e IA/Nasdaq \
+— e proponha de 6 a 10 temas de carrossel, PRIORIZANDO o que casa com os 2 \
+padrões acima. Cada tema deve ser algo REAL que está acontecendo, não \
+especulação sua.
+
+Retorne SOMENTE JSON, neste formato exato:
+{"topicos": [
+  {"titulo": "título curto, formato pergunta binária quando fizer sentido",
+   "categoria": "política" | "cripto" | "mercado" | "economia" | "ia",
+   "gancho": "1 frase: o fato/manchete concreto que motiva o post agora",
+   "motivo": "1-2 frases: por que isso deve engajar, citando o padrão (1 ou 2) que se aplica",
+   "potencial": "alto" | "medio",
+   "fontes": ["url1", "url2"]}
+]}"""
+
+
+def _radar_ler():
+    if not RADAR_PATH.exists():
+        return None
+    try:
+        return json.loads(RADAR_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+@app.route("/radar")
+def radar_index():
+    dados = _radar_ler()
+    return render_template("radar.html",
+                           topicos=(dados or {}).get("topicos") or [],
+                           gerado_em=(dados or {}).get("gerado_em"),
+                           usage=(dados or {}).get("usage"))
+
+
+@app.route("/api/radar/atualizar", methods=["POST"])
+def api_radar_atualizar():
+    """Roda a varredura (web search + Claude) e regrava o cache. Sem chave
+    admin: uso interno via UI, igual /api/gerar."""
+    if not ANTHROPIC_API_KEY:
+        return jsonify({"error": "Chave da API Claude não configurada."}), 500
+    try:
+        client = _anthropic_lib.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=180.0)
+        usage_acc = _novo_usage()
+        out = _claude_fase1_com_busca(client, usage_acc,
+            model=GERAR_MODEL, max_tokens=4000,
+            system=SYSTEM_RADAR,
+            messages=[{"role": "user", "content":
+                       "Rode a varredura e devolva o JSON dos temas de agora."}]
+        )
+        if out.startswith("```"):
+            out = re.sub(r"^```[a-z]*\n?", "", out)
+            out = re.sub(r"\n?```$", "", out).strip()
+        dados = _parse_claude_json(out)
+        if not dados or not isinstance(dados.get("topicos"), list):
+            return jsonify({"error": "Claude não retornou temas válidos. Tente de novo."}), 500
+        usage = dict(usage_acc)
+        usage["custo_usd"] = _custo_usd(usage_acc)
+        payload = {
+            "gerado_em": datetime.utcnow().isoformat() + "Z",
+            "topicos": dados["topicos"],
+            "usage": usage,
+        }
+        RADAR_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        return jsonify({"ok": True, **payload})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/gerar")
 def pagina_gerar():
     has_key = bool(ANTHROPIC_API_KEY and ANTHROPIC_API_KEY.startswith("sk-ant-api"))

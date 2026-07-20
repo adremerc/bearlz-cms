@@ -283,6 +283,13 @@
 
 {% block scripts %}
 <script>
+  // ── Pre-preenche topico/brief se vier do Radar (/gerar?topico=...&brief=...) ──
+  (function preencherDaQueryString() {
+    const q = new URLSearchParams(location.search);
+    if (q.get('topico')) document.getElementById('topico').value = q.get('topico');
+    if (q.get('brief'))  document.getElementById('brief').value  = q.get('brief');
+  })();
+
   // ── Estado global do inspector (debug do ultimo /api/gerar) ──
   let _ultimoDebug = null;
   let _systemPadrao = "";

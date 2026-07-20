@@ -237,6 +237,7 @@
       <nav class="flex items-center gap-0.5 sm:gap-1 overflow-x-auto no-scrollbar">
         <a href="/" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
         <a href="/calendario" class="nav-link {% if request.endpoint == 'calendario' %}active{% endif %}">Calendário</a>
+        <a href="/radar" class="nav-link {% if request.endpoint == 'radar_index' %}active{% endif %}">Radar</a>
         <a href="/gabriel" class="nav-link {% if request.endpoint == 'gabriel_inbox' %}active{% endif %}">
           Gabriel{% if gabriel_fila > 0 %} <span class="chip chip-accent" style="padding:1px 7px;font-size:11px">{{ gabriel_fila }}</span>{% endif %}
         </a>
