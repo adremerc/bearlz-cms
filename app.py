@@ -418,9 +418,10 @@ def _claude_fase1_com_busca(client, usage_acc, **params):
     servidor pausa a cada ~10 iteracoes) re-enviando a conversa. Retorna o
     texto final da resposta."""
     model = params.get("model", GERAR_MODEL)
+    max_searches = params.pop("max_searches", 6)
     # Modelos 4.6+ tem a variante nova (filtro dinamico); 4.5 so a basica.
     tool_type = "web_search_20250305" if "4-5" in model else "web_search_20260209"
-    params["tools"] = [{"type": tool_type, "name": "web_search", "max_uses": 6}]
+    params["tools"] = [{"type": tool_type, "name": "web_search", "max_uses": max_searches}]
     if "4-5" not in model:
         # Adaptive thinking melhora planejamento/escrita (nao suportado no 4.5)
         params.setdefault("thinking", {"type": "adaptive"})
@@ -3497,21 +3498,41 @@ apenas explicativo em ambos os padrões.
 Conteúdo puramente explicativo/factual sem provocação (ex.: "por que as \
 empresas fogem do Brasil") performou mal (3-6 curtidas).
 
-TAREFA: use a ferramenta web_search (6-10 buscas) para achar o que está \
-acontecendo AGORA (últimos 3-7 dias) no Brasil e no mundo em: política \
-eleitoral brasileira, economia/mercado brasileiro, criptomoedas, e IA/Nasdaq \
-— e proponha de 6 a 10 temas de carrossel, PRIORIZANDO o que casa com os 2 \
-padrões acima. Cada tema deve ser algo REAL que está acontecendo, não \
-especulação sua.
+TAREFA: use a ferramenta web_search (USE O MÁXIMO DE BUSCAS DISPONÍVEL, \
+15-20 buscas variadas — não pare cedo) pra achar o que está acontecendo \
+ESTA SEMANA (privilegie as últimas 24-72h; se só achar algo de 4-7 dias, \
+diga a data no gancho) espalhando as buscas por MUITAS frentes diferentes: \
+política eleitoral BR, economia/mercado BR, criptomoedas, IA/Nasdaq, \
+geopolítica internacional, tecnologia, ciência, cultura/entretenimento, \
+notícias regionais/estaduais do Brasil, dados oficiais recém-divulgados \
+(IBGE, Banco Central, Fed) e qualquer nicho fora do óbvio. Quanto mais \
+variado o leque de buscas, melhor.
+
+Devolva de 10 a 16 temas, divididos em 2 grupos:
+
+- "comprovado" (a maioria, ~2/3): casa diretamente com o padrão 1 ou 2 acima.
+- "aposta" (o resto, ~1/3): tema de NICHO que AINDA NÃO estourou — pouca \
+  gente comentando, fora do padrão comprovado e fora das 4 categorias óbvias \
+  (política/cripto/mercado/IA), mas com um ângulo forte ou dado \
+  surpreendente que pode viralizar justamente por ser inédito no feed do \
+  público. Marque por que é uma aposta (o que falta pra virar mainstream, \
+  e por que vale o risco).
+
+REGRA DURA DE FONTE: cada URL em "fontes" tem que ser o link DIRETO da \
+matéria específica (com slug/caminho longo, ex: \
+"https://site.com/2026/07/manchete-especifica"), NUNCA a home do site \
+(proibido "https://site.com/" ou "https://site.com/categoria/"). Se não \
+achar o link direto da matéria, NÃO inclua a fonte.
 
 Retorne SOMENTE JSON, neste formato exato:
 {"topicos": [
   {"titulo": "título curto, formato pergunta binária quando fizer sentido",
-   "categoria": "política" | "cripto" | "mercado" | "economia" | "ia",
-   "gancho": "1 frase: o fato/manchete concreto que motiva o post agora",
-   "motivo": "1-2 frases: por que isso deve engajar, citando o padrão (1 ou 2) que se aplica",
+   "categoria": "política" | "cripto" | "mercado" | "economia" | "ia" | "geopolítica" | "tecnologia" | "ciência" | "cultura",
+   "tipo": "comprovado" | "aposta",
+   "gancho": "1 frase: o fato/manchete concreto que motiva o post agora, com a data se não for de hoje",
+   "motivo": "1-2 frases: por que isso deve engajar — para 'comprovado', cite o padrão (1 ou 2); para 'aposta', diga por que é nicho e por que pode surpreender",
    "potencial": "alto" | "medio",
-   "fontes": ["url1", "url2"]}
+   "fontes": ["url_direto_da_materia1", "url_direto_da_materia2"]}
 ]}"""
 
 
@@ -3522,6 +3543,34 @@ def _radar_ler():
         return json.loads(RADAR_PATH.read_text(encoding="utf-8"))
     except Exception:
         return None
+
+
+def _url_viva(url, timeout=6):
+    """Confere (HEAD, fallback GET) se a URL da fonte realmente abre. Evita
+    que link morto/generico do Claude fique clicavel no radar."""
+    try:
+        import requests as _req
+        headers = {"User-Agent": "Mozilla/5.0 (compatible; BearlzRadar/1.0)"}
+        r = _req.head(url, timeout=timeout, allow_redirects=True, headers=headers)
+        if r.status_code >= 400 or r.status_code == 405:
+            r = _req.get(url, timeout=timeout, allow_redirects=True, headers=headers, stream=True)
+        return r.status_code < 400
+    except Exception:
+        return False
+
+
+def _validar_fontes(topicos):
+    """Testa cada URL de fonte em paralelo e marca as mortas como
+    fonte_valida=False (o template avisa em vez de linkar quebrado)."""
+    from concurrent.futures import ThreadPoolExecutor
+    todas = [f for t in topicos for f in (t.get("fontes") or [])]
+    if not todas:
+        return topicos
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        status = dict(zip(todas, ex.map(_url_viva, todas)))
+    for t in topicos:
+        t["fontes"] = [{"url": f, "ok": status.get(f, False)} for f in (t.get("fontes") or [])]
+    return topicos
 
 
 @app.route("/radar")
@@ -3540,13 +3589,15 @@ def api_radar_atualizar():
     if not ANTHROPIC_API_KEY:
         return jsonify({"error": "Chave da API Claude não configurada."}), 500
     try:
-        client = _anthropic_lib.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=180.0)
+        client = _anthropic_lib.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=240.0)
         usage_acc = _novo_usage()
         out = _claude_fase1_com_busca(client, usage_acc,
-            model=GERAR_MODEL, max_tokens=4000,
+            model=GERAR_MODEL, max_tokens=6000, max_searches=18,
             system=SYSTEM_RADAR,
             messages=[{"role": "user", "content":
-                       "Rode a varredura e devolva o JSON dos temas de agora."}]
+                       "Rode a varredura (use bastante busca, cubra um leque "
+                       "amplo de frentes) e devolva o JSON dos temas de agora, "
+                       "incluindo as apostas de nicho."}]
         )
         if out.startswith("```"):
             out = re.sub(r"^```[a-z]*\n?", "", out)
@@ -3554,11 +3605,12 @@ def api_radar_atualizar():
         dados = _parse_claude_json(out)
         if not dados or not isinstance(dados.get("topicos"), list):
             return jsonify({"error": "Claude não retornou temas válidos. Tente de novo."}), 500
+        topicos = _validar_fontes(dados["topicos"])
         usage = dict(usage_acc)
         usage["custo_usd"] = _custo_usd(usage_acc)
         payload = {
             "gerado_em": datetime.utcnow().isoformat() + "Z",
-            "topicos": dados["topicos"],
+            "topicos": topicos,
             "usage": usage,
         }
         RADAR_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")

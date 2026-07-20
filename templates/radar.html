@@ -8,8 +8,11 @@
     <div>
       <h1 class="font-display text-2xl" style="font-weight:600;color:var(--text)">Radar de temas</h1>
       <p class="text-sm mt-1" style="color:var(--text-3)">
-        Varredura de notícias agora, pontuada pelos padrões que já engajaram no perfil:
-        polarização política e urgência de preço em cripto/mercado.
+        Cada clique em "Atualizar" pesquisa na web AO VIVO (últimas 24-72h, leque amplo de
+        frentes) — nada fica em cache de um dia pro outro. Mistura temas <b style="color:var(--text-2)">comprovados</b>
+        (casam com os padrões que já engajaram no perfil) com <b style="color:var(--text-2)">apostas de nicho</b>
+        (pouca gente comentando, fora do óbvio, mas com potencial de surpreender). Toda fonte é
+        testada antes de aparecer — link riscado = não abriu.
       </p>
     </div>
     <button id="btn-atualizar" onclick="atualizarRadar()" class="btn btn-primary flex-shrink-0">
@@ -29,9 +32,14 @@
 
   <div id="lista-topicos" class="space-y-3">
     {% for t in topicos %}
-    <div class="panel p-4">
+    <div class="panel p-4" {% if t.tipo == 'aposta' %}style="border-style:dashed;border-color:var(--accent)"{% endif %}>
       <div class="flex items-start justify-between gap-3 mb-2">
         <div class="flex items-center gap-2 flex-wrap">
+          {% if t.tipo == 'aposta' %}
+          <span class="chip chip-accent">🎲 aposta de nicho</span>
+          {% else %}
+          <span class="chip">✓ comprovado</span>
+          {% endif %}
           <span class="chip {% if t.potencial == 'alto' %}chip-danger{% else %}chip-warn{% endif %}">
             potencial {{ t.potencial or 'médio' }}
           </span>
@@ -44,7 +52,13 @@
       {% if t.fontes %}
       <div class="flex flex-wrap gap-2 mb-3">
         {% for f in t.fontes %}
-        <a href="{{ f }}" target="_blank" rel="noopener" class="chip" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ f }}</a>
+          {% set url = f.url if f is mapping else f %}
+          {% set ok = f.ok if f is mapping else true %}
+          {% if ok %}
+          <a href="{{ url }}" target="_blank" rel="noopener" class="chip" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ url }}</a>
+          {% else %}
+          <span class="chip chip-danger" title="Este link não abriu na verificação — confira antes de citar" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:line-through">⚠ {{ url }}</span>
+          {% endif %}
         {% endfor %}
       </div>
       {% endif %}
