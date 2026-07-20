@@ -8,11 +8,11 @@
     <div>
       <h1 class="font-display text-2xl" style="font-weight:600;color:var(--text)">Radar de temas</h1>
       <p class="text-sm mt-1" style="color:var(--text-3)">
-        Cada clique em "Atualizar" pesquisa na web AO VIVO (últimas 24-72h, leque amplo de
-        frentes) — nada fica em cache de um dia pro outro. Mistura temas <b style="color:var(--text-2)">comprovados</b>
-        (casam com os padrões que já engajaram no perfil) com <b style="color:var(--text-2)">apostas de nicho</b>
-        (pouca gente comentando, fora do óbvio, mas com potencial de surpreender). Toda fonte é
-        testada antes de aparecer — link riscado = não abriu.
+        Varredura 100% via RSS de fontes reais + preço de cripto ao vivo (CoinGecko) — sem IA,
+        sem custo. Mistura temas <b style="color:var(--text-2)">comprovados</b> (casam com os
+        padrões que já engajaram no perfil) com <b style="color:var(--text-2)">apostas de nicho</b>
+        (pouca gente comentando ainda, fora do óbvio). Cada fonte é testada antes de entrar na
+        lista — se o link não abre, o tema nem aparece.
       </p>
     </div>
     <button id="btn-atualizar" onclick="atualizarRadar()" class="btn btn-primary flex-shrink-0">
@@ -26,7 +26,6 @@
   {% if gerado_em %}
   <p class="text-xs mb-4" style="color:var(--text-3)">
     Última varredura: <span id="gerado-em-fmt">{{ gerado_em }}</span>
-    {% if usage and usage.custo_usd %} · custo ~US$ {{ '%.3f'|format(usage.custo_usd) }}{% endif %}
   </p>
   {% endif %}
 
@@ -53,12 +52,7 @@
       <div class="flex flex-wrap gap-2 mb-3">
         {% for f in t.fontes %}
           {% set url = f.url if f is mapping else f %}
-          {% set ok = f.ok if f is mapping else true %}
-          {% if ok %}
-          <a href="{{ url }}" target="_blank" rel="noopener" class="chip" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ url }}</a>
-          {% else %}
-          <span class="chip chip-danger" title="Este link não abriu na verificação — confira antes de citar" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:line-through">⚠ {{ url }}</span>
-          {% endif %}
+          <a href="{{ url }}" target="_blank" rel="noopener" class="chip" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ url }}</a>
         {% endfor %}
       </div>
       {% endif %}
@@ -73,8 +67,8 @@
   {% if not topicos %}
   <div class="panel p-8 text-center">
     <p class="text-sm mb-4" style="color:var(--text-3)">
-      Nenhuma varredura ainda. Clique em "Rodar varredura" — o Claude pesquisa na web
-      (política, economia, cripto, IA) e sugere temas com maior chance de engajar.
+      Nenhuma varredura ainda. Clique em "Rodar varredura" — lê RSS de fontes reais
+      (política, economia, cripto) + preço ao vivo de cripto, e classifica por regra.
     </p>
   </div>
   {% endif %}
@@ -103,7 +97,7 @@
     erroBox.classList.add('hidden');
     btn.disabled = true;
     const labelAntigo = label.textContent;
-    label.textContent = 'Pesquisando... (1-2 min)';
+    label.textContent = 'Buscando...';
     try {
       const r = await fetch('/api/radar/atualizar', { method: 'POST' });
       const d = await r.json();

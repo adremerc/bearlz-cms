@@ -3479,61 +3479,42 @@ def _montar_chart_url(ctype: str, ctitle: str, cdata: list) -> str:
 
 RADAR_PATH = DATA_DIR / "radar.json"
 
-SYSTEM_RADAR = """Você é um analista de conteúdo viral para um perfil de \
-Instagram brasileiro de economia/mercado/geopolítica (formato carrossel, \
-15 slides, estilo Varos: denso, direto, sem CTA).
+# ── Radar 100% Python: RSS de fontes reais + CoinGecko, ZERO chamada de API
+# de LLM (zero custo). Classificacao por regra, nao por modelo:
+#  - "comprovado" = casa com um dos 2 padroes que o engajamento do perfil
+#    confirmou (politico quente + verbo de conflito // alerta de preco cripto).
+#  - "aposta" = achado de nicho (fora dessas 2 regras) com palavra de
+#    novidade/ineditismo — pouca gente comentando ainda.
+# Toda fonte tem que responder 200 ANTES de entrar na lista (senao descarta
+# o tema inteiro — nada de link riscado/morto na tela).
 
-Dados reais de engajamento do próprio perfil (curtidas+comentários dos \
-últimos ~2 meses) mostram 2 padrões que disparam MUITO acima da média:
+RADAR_FEEDS = {
+    "política":  ["https://g1.globo.com/rss/g1/politica/",
+                  "https://www.poder360.com.br/feed/"],
+    "economia":  ["https://www.infomoney.com.br/feed/",
+                  "https://g1.globo.com/rss/g1/economia/",
+                  "https://exame.com/feed/"],
+    "cripto":    ["https://cointelegraph.com.br/rss",
+                  "https://livecoins.com.br/feed/"],
+    "nicho":     ["https://agenciabrasil.ebc.com.br/rss/ultimasnoticias/feed.xml"],
+}
 
-1. POLARIZAÇÃO POLÍTICA: quando a fala/ação de um político vira controvérsia \
-   e estampa manchete na grande mídia (ex.: um post sobre isso teve 577 de \
-   engajamento, mais que o dobro do 2º colocado — puxado por comentários, \
-   não só curtidas).
-2. URGÊNCIA/ALERTA DE PREÇO em cripto ou mercado, com tom de "vai cair/subir \
-   muito?" (ex.: "Bitcoin vai cair até 40k?", "Solana morreu?") — puxam MUITA \
-   curtida mesmo com poucos comentários.
-Título em formato de PERGUNTA BINÁRIA ("X ou Y?", "Isso é Z?") supera título \
-apenas explicativo em ambos os padrões.
-Conteúdo puramente explicativo/factual sem provocação (ex.: "por que as \
-empresas fogem do Brasil") performou mal (3-6 curtidas).
+RADAR_POLITICOS = ["lula", "bolsonaro", "flávio", "flavio", "michelle", "moraes",
+                   "renan santos", "tarcísio", "tarcisio", "ciro gomes", "marina silva",
+                   "alckmin", "eduardo bolsonaro", "gleisi", "boulos", "milei", "trump"]
+RADAR_CONFLITO = ["racha", "ataca", "ataque", "amea", "acusa", "detona", "ironiza",
+                   "humilha", "processa", "provoca", "rompe", "critica", "chama de",
+                   "rebate", "dispara contra", "cobra", "exonera", "demite", "polêmica",
+                   "polemica", "expõe", "expoe"]
+RADAR_ALERTA_PRECO = ["dispara", "despenca", "colapso", "colapsa", "crash", "recorde",
+                       "máxima histórica", "maxima historica", "mínima", "minima",
+                       "tomba", "derrete", "queda livre"]
+RADAR_NOVIDADE = ["pela primeira vez", "inédito", "inedito", "revela", "descoberta",
+                   "aprova lei", "proíbe", "proibe", "estudo mostra", "novo recorde",
+                   "avanço", "avanco", "surpreende"]
 
-TAREFA: use a ferramenta web_search (USE O MÁXIMO DE BUSCAS DISPONÍVEL, \
-15-20 buscas variadas — não pare cedo) pra achar o que está acontecendo \
-ESTA SEMANA (privilegie as últimas 24-72h; se só achar algo de 4-7 dias, \
-diga a data no gancho) espalhando as buscas por MUITAS frentes diferentes: \
-política eleitoral BR, economia/mercado BR, criptomoedas, IA/Nasdaq, \
-geopolítica internacional, tecnologia, ciência, cultura/entretenimento, \
-notícias regionais/estaduais do Brasil, dados oficiais recém-divulgados \
-(IBGE, Banco Central, Fed) e qualquer nicho fora do óbvio. Quanto mais \
-variado o leque de buscas, melhor.
-
-Devolva de 10 a 16 temas, divididos em 2 grupos:
-
-- "comprovado" (a maioria, ~2/3): casa diretamente com o padrão 1 ou 2 acima.
-- "aposta" (o resto, ~1/3): tema de NICHO que AINDA NÃO estourou — pouca \
-  gente comentando, fora do padrão comprovado e fora das 4 categorias óbvias \
-  (política/cripto/mercado/IA), mas com um ângulo forte ou dado \
-  surpreendente que pode viralizar justamente por ser inédito no feed do \
-  público. Marque por que é uma aposta (o que falta pra virar mainstream, \
-  e por que vale o risco).
-
-REGRA DURA DE FONTE: cada URL em "fontes" tem que ser o link DIRETO da \
-matéria específica (com slug/caminho longo, ex: \
-"https://site.com/2026/07/manchete-especifica"), NUNCA a home do site \
-(proibido "https://site.com/" ou "https://site.com/categoria/"). Se não \
-achar o link direto da matéria, NÃO inclua a fonte.
-
-Retorne SOMENTE JSON, neste formato exato:
-{"topicos": [
-  {"titulo": "título curto, formato pergunta binária quando fizer sentido",
-   "categoria": "política" | "cripto" | "mercado" | "economia" | "ia" | "geopolítica" | "tecnologia" | "ciência" | "cultura",
-   "tipo": "comprovado" | "aposta",
-   "gancho": "1 frase: o fato/manchete concreto que motiva o post agora, com a data se não for de hoje",
-   "motivo": "1-2 frases: por que isso deve engajar — para 'comprovado', cite o padrão (1 ou 2); para 'aposta', diga por que é nicho e por que pode surpreender",
-   "potencial": "alto" | "medio",
-   "fontes": ["url_direto_da_materia1", "url_direto_da_materia2"]}
-]}"""
+RADAR_COINS = [("bitcoin", "Bitcoin"), ("ethereum", "Ethereum"), ("solana", "Solana"),
+               ("ripple", "XRP"), ("dogecoin", "Dogecoin"), ("cardano", "Cardano")]
 
 
 def _radar_ler():
@@ -3546,8 +3527,8 @@ def _radar_ler():
 
 
 def _url_viva(url, timeout=6):
-    """Confere (HEAD, fallback GET) se a URL da fonte realmente abre. Evita
-    que link morto/generico do Claude fique clicavel no radar."""
+    """Confere (HEAD, fallback GET) se a URL realmente abre. Tema cuja fonte
+    nao responde 200 e descartado inteiro (nao mostramos link morto)."""
     try:
         import requests as _req
         headers = {"User-Agent": "Mozilla/5.0 (compatible; BearlzRadar/1.0)"}
@@ -3559,18 +3540,146 @@ def _url_viva(url, timeout=6):
         return False
 
 
-def _validar_fontes(topicos):
-    """Testa cada URL de fonte em paralelo e marca as mortas como
-    fonte_valida=False (o template avisa em vez de linkar quebrado)."""
-    from concurrent.futures import ThreadPoolExecutor
-    todas = [f for t in topicos for f in (t.get("fontes") or [])]
-    if not todas:
-        return topicos
-    with ThreadPoolExecutor(max_workers=8) as ex:
-        status = dict(zip(todas, ex.map(_url_viva, todas)))
+def _radar_parse_rss(url, limite=20):
+    """Baixa e parseia um feed RSS 2.0 padrao (item/title/link/description).
+    Sem dependencia nova: xml.etree (stdlib) + requests (ja no projeto)."""
+    import requests as _req
+    import xml.etree.ElementTree as ET
+    import html as _htmlmod
+    itens = []
+    try:
+        r = _req.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0 (compatible; BearlzRadar/1.0)"})
+        r.raise_for_status()
+        root = ET.fromstring(r.content)
+        for item in root.iter("item"):
+            titulo = (item.findtext("title") or "").strip()
+            link = (item.findtext("link") or "").strip()
+            resumo = (item.findtext("description") or "").strip()
+            resumo = re.sub(r"<[^>]+>", " ", resumo)              # tira tags/CDATA-HTML
+            resumo = _htmlmod.unescape(re.sub(r"\s+", " ", resumo)).strip()
+            if titulo and link:
+                itens.append({"titulo": _htmlmod.unescape(titulo), "link": link, "resumo": resumo[:240]})
+            if len(itens) >= limite:
+                break
+    except Exception:
+        pass
+    return itens
+
+
+def _radar_classificar(item, categoria_feed):
+    """Aplica as regras (nao IA) e devolve o dict de classificacao, ou None
+    se o item nao for forte o suficiente pra entrar no radar."""
+    texto = (item["titulo"] + " " + item["resumo"]).lower()
+
+    tem_politico = any(p in texto for p in RADAR_POLITICOS)
+    tem_conflito = any(v in texto for v in RADAR_CONFLITO)
+    if tem_politico and tem_conflito:
+        return {"categoria": "política", "tipo": "comprovado", "potencial": "alto",
+                "motivo": "Cita uma figura política de alta repercussão junto com tom de "
+                          "conflito/controvérsia — o padrão que já rendeu o maior "
+                          "engajamento do perfil (polarização política)."}
+
+    if categoria_feed == "cripto" and any(k in texto for k in RADAR_ALERTA_PRECO):
+        return {"categoria": "cripto", "tipo": "comprovado", "potencial": "alto",
+                "motivo": "Manchete de cripto com linguagem de urgência (alta/queda "
+                          "forte) — puxa curtidas mesmo com poucos comentários."}
+
+    if categoria_feed == "economia" and any(
+            k in texto for k in RADAR_ALERTA_PRECO + ["selic", "juros", "dólar", "dolar", "inflação", "inflacao"]):
+        return {"categoria": "economia", "tipo": "comprovado", "potencial": "medio",
+                "motivo": "Tema de mercado/economia com sinal de urgência (juro, câmbio "
+                          "ou inflação em movimento forte)."}
+
+    if any(k in texto for k in RADAR_NOVIDADE):
+        cat = "nicho" if categoria_feed == "nicho" else categoria_feed
+        return {"categoria": cat, "tipo": "aposta", "potencial": "medio",
+                "motivo": "Fato inédito ou pouco comentado ainda — fora dos padrões "
+                          "comprovados, mas com ângulo de novidade que pode surpreender."}
+
+    return None
+
+
+def _radar_topicos_cripto_preco():
+    """CoinGecko (API pública, sem chave) — detecta variacao forte de preco em
+    24h e gera um topico determinístico (nao depende de RSS ter noticiado)."""
+    import requests as _req
+    ids = ",".join(c[0] for c in RADAR_COINS)
+    try:
+        r = _req.get("https://api.coingecko.com/api/v3/coins/markets",
+                      params={"vs_currency": "usd", "ids": ids, "price_change_percentage": "24h"},
+                      timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+        r.raise_for_status()
+        dados = r.json()
+    except Exception:
+        return []
+    nomes = dict(RADAR_COINS)
+    out = []
+    for d in dados:
+        pct = d.get("price_change_percentage_24h_in_currency")
+        if pct is None or abs(pct) < 5:
+            continue
+        nome = nomes.get(d["id"], d["id"].title())
+        preco = d.get("current_price")
+        subindo = pct > 0
+        verbo = "disparou" if subindo else "despencou"
+        pergunta = "ainda vai subir mais?" if subindo else "é hora de comprar ou vai cair mais?"
+        out.append({
+            "titulo": f"{nome} {verbo} {abs(pct):.1f}% em 24h: {pergunta}",
+            "categoria": "cripto", "tipo": "comprovado",
+            "potencial": "alto" if abs(pct) >= 8 else "medio",
+            "gancho": f"Preço atual: US$ {preco:,.0f}, variação de {pct:+.1f}% nas últimas 24h (CoinGecko).",
+            "motivo": "Movimento de preço forte e mensurável agora — padrão de urgência/alerta "
+                      "de preço que já puxou muita curtida no perfil.",
+            "fontes": [f"https://www.coingecko.com/en/coins/{d['id']}"],
+        })
+    return out
+
+
+def _radar_normalizar_titulo(t):
+    return re.sub(r"[^a-z0-9 ]", "", t.lower())[:60]
+
+
+def _radar_scan():
+    """Varredura completa: RSS + CoinGecko + classificacao por regra +
+    verificacao real de link. ZERO chamada de API de LLM, ZERO custo."""
+    topicos = []
+    for categoria, urls in RADAR_FEEDS.items():
+        for url in urls:
+            for item in _radar_parse_rss(url):
+                cls = _radar_classificar(item, categoria)
+                if not cls:
+                    continue
+                topicos.append({
+                    "titulo": item["titulo"],
+                    "gancho": item["resumo"] or item["titulo"],
+                    "fontes": [item["link"]],
+                    **cls,
+                })
+    topicos += _radar_topicos_cripto_preco()
+
+    # Dedup por titulo normalizado (a mesma noticia sai em varios feeds)
+    vistos, dedup = set(), []
     for t in topicos:
-        t["fontes"] = [{"url": f, "ok": status.get(f, False)} for f in (t.get("fontes") or [])]
-    return topicos
+        chave = _radar_normalizar_titulo(t["titulo"])
+        if chave in vistos:
+            continue
+        vistos.add(chave)
+        dedup.append(t)
+
+    # So entra tema cuja fonte principal realmente abre (nada de link morto)
+    from concurrent.futures import ThreadPoolExecutor
+    urls_checar = [t["fontes"][0] for t in dedup if t.get("fontes")]
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        status = dict(zip(urls_checar, ex.map(_url_viva, urls_checar)))
+    vivos = [t for t in dedup if status.get((t.get("fontes") or [""])[0])]
+
+    # Ordena: potencial alto primeiro, comprovado antes de aposta; limita o total
+    ordem_potencial = {"alto": 0, "medio": 1}
+    ordem_tipo = {"comprovado": 0, "aposta": 1}
+    vivos.sort(key=lambda t: (ordem_tipo.get(t["tipo"], 1), ordem_potencial.get(t["potencial"], 1)))
+    comprovados = [t for t in vivos if t["tipo"] == "comprovado"][:12]
+    apostas = [t for t in vivos if t["tipo"] == "aposta"][:5]
+    return comprovados + apostas
 
 
 @app.route("/radar")
@@ -3578,40 +3687,17 @@ def radar_index():
     dados = _radar_ler()
     return render_template("radar.html",
                            topicos=(dados or {}).get("topicos") or [],
-                           gerado_em=(dados or {}).get("gerado_em"),
-                           usage=(dados or {}).get("usage"))
+                           gerado_em=(dados or {}).get("gerado_em"))
 
 
 @app.route("/api/radar/atualizar", methods=["POST"])
 def api_radar_atualizar():
-    """Roda a varredura (web search + Claude) e regrava o cache. Sem chave
-    admin: uso interno via UI, igual /api/gerar."""
-    if not ANTHROPIC_API_KEY:
-        return jsonify({"error": "Chave da API Claude não configurada."}), 500
+    """Roda a varredura (RSS + CoinGecko, sem LLM) e regrava o cache."""
     try:
-        client = _anthropic_lib.Anthropic(api_key=ANTHROPIC_API_KEY, timeout=240.0)
-        usage_acc = _novo_usage()
-        out = _claude_fase1_com_busca(client, usage_acc,
-            model=GERAR_MODEL, max_tokens=6000, max_searches=18,
-            system=SYSTEM_RADAR,
-            messages=[{"role": "user", "content":
-                       "Rode a varredura (use bastante busca, cubra um leque "
-                       "amplo de frentes) e devolva o JSON dos temas de agora, "
-                       "incluindo as apostas de nicho."}]
-        )
-        if out.startswith("```"):
-            out = re.sub(r"^```[a-z]*\n?", "", out)
-            out = re.sub(r"\n?```$", "", out).strip()
-        dados = _parse_claude_json(out)
-        if not dados or not isinstance(dados.get("topicos"), list):
-            return jsonify({"error": "Claude não retornou temas válidos. Tente de novo."}), 500
-        topicos = _validar_fontes(dados["topicos"])
-        usage = dict(usage_acc)
-        usage["custo_usd"] = _custo_usd(usage_acc)
+        topicos = _radar_scan()
         payload = {
             "gerado_em": datetime.utcnow().isoformat() + "Z",
             "topicos": topicos,
-            "usage": usage,
         }
         RADAR_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         return jsonify({"ok": True, **payload})
