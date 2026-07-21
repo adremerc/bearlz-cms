@@ -23,6 +23,7 @@
       ('analise_gabriel', 'Gabriel',  counts.analise_gabriel),
       ('aprovado',        'Aprovado', counts.aprovado),
       ('publicado',       'Publicado',counts.publicado),
+      ('nao_publicado',   'Não Publicado', counts.nao_publicado),
     ] %}
     <a href="?status={{ key }}&prio={{ prio_filter }}{% if busca %}&q={{ busca|urlencode }}{% endif %}"
        class="{% if status_filter == key %}seg-active{% endif %}">
@@ -63,6 +64,7 @@
 
     <div class="flex items-center gap-2 mb-3">
       {% if c.status == 'publicado' %}<span class="chip chip-info">Publicado</span>
+      {% elif c.status == 'nao_publicado' %}<span class="chip chip-danger">Não Publicado</span>
       {% elif c.status == 'aprovado' %}<span class="chip chip-ok">Aprovado</span>
       {% elif c.status == 'analise_gabriel' %}<span class="chip chip-accent">Análise Gabriel</span>
       {% elif c.status == 'analise_adre' %}<span class="chip chip-warn">Análise Adre</span>

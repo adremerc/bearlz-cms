@@ -470,6 +470,7 @@ STATUS_LABELS = {
     "analise_gabriel": ("Análise Gabriel", "purple"),
     "aprovado":      ("Aprovado",        "green"),
     "publicado":     ("Publicado",       "blue"),
+    "nao_publicado": ("Não Publicado",   "red"),
 }
 
 
@@ -800,6 +801,7 @@ def dashboard():
             "analise_gabriel": conn.execute("SELECT COUNT(*) FROM carrosseis WHERE status='analise_gabriel'").fetchone()[0],
             "aprovado":        conn.execute("SELECT COUNT(*) FROM carrosseis WHERE status='aprovado'").fetchone()[0],
             "publicado":       conn.execute("SELECT COUNT(*) FROM carrosseis WHERE status='publicado'").fetchone()[0],
+            "nao_publicado":   conn.execute("SELECT COUNT(*) FROM carrosseis WHERE status='nao_publicado'").fetchone()[0],
         }
 
     carrosseis = [dict(r) for r in rows]

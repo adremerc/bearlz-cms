@@ -40,6 +40,7 @@
           ('analise_gabriel', 'Análise Gabriel'),
           ('aprovado',        'Aprovado'),
           ('publicado',       'Publicado'),
+          ('nao_publicado',   'Não Publicado'),
         ] %}
         <button onclick="setStatus('{{ key }}')" data-status="{{ key }}"
           class="status-btn {% if c.status == key %}on{% endif %}">
