@@ -562,8 +562,11 @@ def api_admin_criar_shell():
     """Cria um carrossel COMPLETO a mao, SEM chamar LLM. Injeta titulo, slug,
     subtitulo e os SLIDES direto no HTML do template (mesmas substituicoes que
     o /api/gerar faz), pra o post renderizar certo no viewer publico. Body:
-    {titulo, slides:[{text, image?}], num_slides?}. Se 'slides' vier, vira o
-    conteudo do post; senao cria shell vazio. Requer X-Admin-Key."""
+    {titulo, slides:[{text, image?}], num_slides?, slug?}. Se 'slides' vier,
+    vira o conteudo do post; senao cria shell vazio. Se 'slug' vier (de um
+    post ja existente), sobrescreve o HTML desse slug no lugar, sem passar
+    pelo sanitizador do editar-textos (preserva negrito/paragrafos exatos).
+    Requer X-Admin-Key."""
     if not _admin_check_key():
         return jsonify({"error": "unauthorized"}), 401
     data = request.get_json() or {}
@@ -572,10 +575,14 @@ def api_admin_criar_shell():
         return jsonify({"error": "titulo obrigatorio"}), 400
     slides_in = data.get("slides") if isinstance(data.get("slides"), list) else []
     n = len(slides_in) if slides_in else min(max(int(data.get("num_slides", 15)), 1), 20)
-    # slug igual ao do gerador (acentos viram '-'), com data de hoje
-    slug_base = re.sub(r"[^a-z0-9]+", "-", titulo.lower())[:40].strip("-") or "post"
-    from datetime import date as _d
-    slug = f"{slug_base}-{_d.today().strftime('%Y%m%d')}"
+    slug_override = re.sub(r"[^a-zA-Z0-9_\-]", "", (data.get("slug") or "").strip())
+    if slug_override:
+        slug = slug_override
+    else:
+        # slug igual ao do gerador (acentos viram '-'), com data de hoje
+        slug_base = re.sub(r"[^a-z0-9]+", "-", titulo.lower())[:40].strip("-") or "post"
+        from datetime import date as _d
+        slug = f"{slug_base}-{_d.today().strftime('%Y%m%d')}"
     nome = f"carrossel-{slug}.html"
     template_path = CARROSSEIS_DIR / "carrossel-carga-tributaria.html"
     if not template_path.exists():
